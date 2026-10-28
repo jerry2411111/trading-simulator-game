@@ -8,33 +8,46 @@ const INK = '#1a1020';
 const WHITE = '#ffffff';
 const BLUSH = 'rgba(255,120,160,0.7)';
 const TEAR = '#7fd4ff';
+const shade = (hex, f) => {  // a lighter (f > 1) or darker (f < 1) version of #rrggbb
+  const n = parseInt(hex.slice(1), 16);
+  const c = (v) => Math.max(0, Math.min(255, Math.round(v * f))).toString(16).padStart(2, '0');
+  return `#${c(n >> 16)}${c((n >> 8) & 255)}${c(n & 255)}`;
+};
 
 // Head templates per group, colored and shaped by the species' look (pets.js). Each head: draw(g, mood, t)
 // paints the face; eyes / mouth are where the expression goes; ink is the eye color.
 function dogHead(L) {
+  const blaze = L.mask || (L.ear === 'up' && !L.saddle);  // corgis and huskies have a white stripe up the face
   return {
-    eyes: [[18, 25], [30, 25]], mouth: [24, 35], ink: L.e ?? '#2a1408',
+    eyes: [[17, 25], [31, 25]], mouth: [24, 37], ink: L.e ?? '#3a2010', big: true,
     draw(g, mood) {
-      const droop = mood === 'sad' ? 4 : mood === 'expecting' || mood === 'happy' ? -3 : 0;
-      if (L.ear === 'flop') { ellipse(g, 11, 25 + droop, 4, 9, L.d); ellipse(g, 37, 25 + droop, 4, 9, L.d); }
+      const droop = mood === 'sad' ? 4 : mood === 'expecting' || mood === 'happy' ? -2 : 0;
+      // ears attached to the head: soft rounded triangles, or long floppy ears
+      if (L.ear === 'flop') { ellipse(g, 9, 26 + droop, 5, 10, L.d); ellipse(g, 39, 26 + droop, 5, 10, L.d); ellipse(g, 9, 24 + droop, 3, 7, shade(L.d, 1.15)); ellipse(g, 39, 24 + droop, 3, 7, shade(L.d, 1.15)); }
       if (L.ear === 'up' || L.ear === 'big' || L.ear === 'bat') {
-        const h = L.ear === 'big' ? 14 : L.ear === 'bat' ? 9 : 10;
-        const w = L.ear === 'bat' ? 7 : 6;
-        for (let j = 0; j < h; j++) {
-          const half = L.ear === 'bat' ? w - Math.floor(Math.abs(j - h / 3) / 2) : Math.max(1, Math.round((w * j) / h));
-          rect(g, 13 - half, 4 + j + (droop > 0 ? 3 : 0), half * 2, 1, L.ear === 'up' && L.d !== L.c ? L.d : L.c);
-          rect(g, 35 - half, 4 + j + (droop > 0 ? 3 : 0), half * 2, 1, L.ear === 'up' && L.d !== L.c ? L.d : L.c);
-          if (j > 3 && half > 2) { rect(g, 13 - half + 2, 4 + j, half * 2 - 4, 1, '#f0a8a8'); rect(g, 35 - half + 2, 4 + j, half * 2 - 4, 1, '#f0a8a8'); }
-        }
+        const h = L.ear === 'big' ? 13 : L.ear === 'bat' ? 9 : 11;
+        const col = L.saddle ? L.d : L.c;
+        const tilt = droop > 0 ? 3 : 0;
+        [[13, -1], [35, 1]].forEach(([cx, side]) => {
+          for (let j = 0; j < h; j++) {
+            const k = j / (h - 1);
+            const half = Math.round(1 + k * 5 + (L.ear === 'bat' ? 1 : 0));
+            const ox = cx + side * Math.round((1 - k) * 2) + side * tilt * (1 - k);
+            rect(g, ox - half, 6 + j + tilt, half * 2 + 1, 1, col);
+            if (j > 2 && j < h - 1 && half > 2) rect(g, ox - half + 2, 6 + j + tilt, half * 2 - 3, 1, '#ffb0c0');
+          }
+        });
       }
-      ellipse(g, 24, 27, 13, 11, L.c); ellipse(g, 22, 23, 9, 6, L.coat === 'curly' ? L.w : L.c);
-      if (L.mask) { ellipse(g, 24, 32, 11, 7, L.w); rect(g, 22, 17, 4, 8, L.w); }
-      if (L.saddle) { rect(g, 13, 16, 22, 4, L.d); }
+      ellipse(g, 24, 27, 15, 13, L.c);                    // a big round face
+      ellipse(g, 22, 21, 9, 5, shade(L.c, 1.1));
+      if (L.mask) { ellipse(g, 24, 32, 12, 8, L.w); rect(g, 22, 14, 4, 12, L.w); }
+      else if (blaze) rect(g, 22, 14, 4, 10, L.w);
+      if (L.saddle) { ellipse(g, 24, 35, 7, 5, L.d); }     // a shepherd's dark muzzle
       if (L.coat === 'curly') for (let k = 0; k < 8; k++) disc(g, 14 + k * 3, 15 + (k % 2) * 2, 2, L.w);
-      if (L.coat === 'fluffy') { ellipse(g, 11, 33, 4, 5, L.w); ellipse(g, 37, 33, 4, 5, L.w); }
-      ellipse(g, 24, 33, L.flat ? 6 : 7, L.flat ? 4 : 5, L.w); if (!L.mask) rect(g, 23, 16, 2, 8, L.w);
-      ellipse(g, 24, L.flat ? 31 : 30, 2, 1, '#1a1020'); rect(g, 23, 29, 1, 1, '#5a5a6a');
-      if (L.flat) { rect(g, 18, 29, 3, 1, L.d); rect(g, 27, 29, 3, 1, L.d); }
+      if (L.coat === 'fluffy') { ellipse(g, 10, 33, 5, 6, L.w); ellipse(g, 38, 33, 5, 6, L.w); }
+      ellipse(g, 24, 34, 8, 6, L.saddle ? L.d : L.w);       // the snout
+      ellipse(g, 24, 31, 3, 2, '#1a1020'); rect(g, 22, 30, 2, 1, '#8a8a9a');  // a round nose
+      ellipse(g, 12, 32, 3, 2, 'rgba(255,140,170,0.55)'); ellipse(g, 36, 32, 3, 2, 'rgba(255,140,170,0.55)');  // rosy cheeks
     },
   };
 }
@@ -232,13 +245,13 @@ function eyes(g, head, mood, t) {
       return;
     }
     const big = mood === 'expecting';
-    const r = big ? 3 : 2;
+    const r = (head.big ? 3 : 2) + (big ? 1 : 0);  // dogs get big, shiny eyes
     const look = mood === 'focus' && t % 9 > 1.4 ? 1 : 0;  // mostly watching the chart, sometimes you
     disc(g, x, y, r + 1, INK);                               // a dark rim so the eye shows on any fur
     disc(g, x, y, r, head.ink);                              // the iris
     rect(g, x - (big ? 1 : 0) + look, y - (big ? 1 : 0), big ? 2 : 1, big ? 2 : 1, INK);  // the pupil
     rect(g, x - 1 + look, y - 1, 1, 1, WHITE);
-    if (big) { rect(g, x + 1, y + 1, 1, 1, WHITE); rect(g, x - 1, y - 2, 2, 1, WHITE); }
+    if (big || head.big) { rect(g, x + 1, y + 1, 1, 1, WHITE); rect(g, x - 1, y - 2, 2, 1, WHITE); }
   });
 }
 
@@ -253,6 +266,8 @@ function mouth(g, head, mood, t) {
     for (let i = -3; i <= 3; i++) rect(g, x + i, y + 1 + (i % 2 ? 1 : 0), 1, 1, INK);
   } else if (mood === 'pat') {
     rect(g, x - 2, y, 1, 1, INK); rect(g, x - 1, y + 1, 1, 1, INK); rect(g, x, y, 1, 1, INK); rect(g, x + 1, y + 1, 1, 1, INK); rect(g, x + 2, y, 1, 1, INK);
+  } else if (head.big) {  // a happy little "w"
+    rect(g, x - 3, y, 1, 1, INK); rect(g, x - 2, y + 1, 1, 1, INK); rect(g, x - 1, y, 1, 1, INK); rect(g, x, y, 1, 1, INK); rect(g, x + 1, y + 1, 1, 1, INK); rect(g, x + 2, y, 1, 1, INK);
   } else rect(g, x - 1, y + 1, 3, 1, INK);
 }
 

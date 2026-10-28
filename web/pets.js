@@ -126,86 +126,98 @@ function eyeAt(R, ex, ey, color, darkFur, size = 2) {
 
 // ---------------------------------------------------------------- dogs (detailed)
 
-const DOG_SIZE = { s: { bx: 7, ry: 4, leg: 4, hr: 4 }, m: { bx: 9, ry: 5, leg: 5, hr: 5 }, l: { bx: 11, ry: 5, leg: 7, hr: 6 } };
+const DOG_SIZE = { s: { bx: 6, ry: 5, leg: 3, hr: 5 }, m: { bx: 7, ry: 5, leg: 3, hr: 6 }, l: { bx: 9, ry: 6, leg: 4, hr: 7 } };
 
+// Dogs are drawn chibi-style: a big round head, a short snout, shiny eyes, rosy cheeks and a smile on a
+// round body with short legs.
 function dogT(g, x, y, s, t, L) {
   const { R, E } = mirror(g, x, y, s.dir);
   const Z = DOG_SIZE[L.size];
   const { bx, ry, hr } = Z;
-  const leg = L.legs === 'short' ? 3 : Z.leg;
+  const leg = L.legs === 'short' ? 2 : Z.leg;
   const c = L.c;
-  const sh = shade(c, 0.78);
+  const sh = shade(c, 0.8);
   const hl = shade(c, 1.15);
   const darkFur = dark(c);
-  const eye = L.e ?? INKY;
-  const paw = L.legs === 'short' || L.ear === 'big' || L.mask ? L.w : sh;
+  const eye = L.e ?? '#2a1810';
+  const paw = L.legs === 'short' || L.ear === 'big' || L.mask ? L.w : shade(c, 0.9);
   const step = s.moving ? Math.floor(t * 10) % 2 : 0;
   const wag = Math.round(Math.sin(t * (s.pose === 'sit' ? 16 : 8)) * 2);
+  const blaze = L.mask || L.ear === 'up' && !L.saddle;  // corgis and huskies have a white stripe up the face
 
   const head = (hx, hy, open, closed) => {
-    if (L.ear === 'flop') { E(hx - 3, hy + 1, 2, hr - 1, L.d); E(hx - 3, hy, 1, hr - 2, shade(L.d, 1.2)); }
-    if (L.ear === 'up') { ear(R, hx - 3, hy - hr + 3, 4, 5, sh, null); ear(R, hx, hy - hr + 3, 4, 5, L.d, PINK); }
-    if (L.ear === 'big') { ear(R, hx - 3, hy - hr + 3, 5, 7, sh, null); ear(R, hx + 1, hy - hr + 3, 5, 7, c, PINK); }
-    if (L.ear === 'bat') { E(hx - 3, hy - hr, 2, 3, sh); E(hx + 1, hy - hr, 2, 3, c); R(hx + 1, hy - hr - 1, 1, 3, PINK); }
-    E(hx, hy, hr, hr - 1, c);
-    E(hx - 1, hy - 2, hr - 2, 1, hl);
-    if (L.mask) { E(hx + 1, hy + 1, hr - 1, hr - 2, L.w); R(hx - hr + 1, hy - hr + 1, hr * 2 - 2, 2, L.d); }
-    if (L.coat === 'curly') { [-2, 0, 2].forEach((dx) => E(hx + dx, hy - hr, 2, 1, L.w)); }
-    if (L.coat === 'fluffy') E(hx - 2, hy + 2, 3, 2, L.w);
-    const ml = L.flat ? 2 : 4;
-    R(hx + hr - 2, hy, ml, 3, L.saddle ? L.d : L.w);   // the muzzle
-    R(hx + hr - 2 + ml, hy, 2, 2, '#1a1010'); R(hx + hr - 2 + ml, hy, 1, 1, '#6a6a7a');  // the nose
-    R(hx + hr - 1, hy + 2, ml, 1, sh);
-    if (open) { R(hx + hr, hy + 3, ml, 2, '#7a1020'); R(hx + hr + 1, hy + 4, 2, 1, '#ff7a9a'); }
-    if (closed) R(hx + 1, hy - 1, 3, 1, INKY); else eyeAt(R, hx + 1, hy - 2, eye, darkFur);
-    R(hx, hy - 3, 3, 1, sh);  // brow
+    // ears behind the head: soft rounded triangles, or long floppy ears
+    if (L.ear === 'flop') { E(hx - hr + 1, hy + 2, 2, hr - 1, L.d); E(hx - hr + 1, hy + 1, 1, hr - 2, shade(L.d, 1.2)); }
+    if (L.ear === 'up' || L.ear === 'big') {
+      const eh = L.ear === 'big' ? 6 : 5;
+      ear(R, hx - hr + 3, hy - hr + 3, 5, eh, L.saddle ? L.d : sh, null);
+      ear(R, hx + 1, hy - hr + 2, 5, eh, L.saddle ? L.d : c, PINK);
+    }
+    if (L.ear === 'bat') { E(hx - 3, hy - hr + 1, 2, 3, sh); E(hx + 2, hy - hr + 1, 2, 3, c); R(hx + 2, hy - hr, 1, 3, PINK); }
+    E(hx, hy, hr, hr - 1, c);                                // a big round head
+    E(hx - 1, hy - hr + 3, hr - 3, 1, hl);
+    if (L.mask) { E(hx + 1, hy + 2, hr - 2, hr - 3, L.w); R(hx - 1, hy - hr + 2, 2, hr - 1, L.w); }
+    else if (blaze) R(hx, hy - hr + 2, 2, hr - 1, L.w);
+    if (L.coat === 'curly') { [-2, 0, 2].forEach((dx) => disc(g, x + (hx + dx) * s.dir, y + hy - hr + 1, 2, L.w)); }
+    if (L.coat === 'fluffy') { E(hx - hr + 2, hy + 3, 2, 2, L.w); E(hx + hr - 2, hy + 3, 2, 2, L.w); }
+    // a short snout with a round nose and a little smile
+    const sx = hx + hr - 3;
+    E(sx + 1, hy + 2, 3, 2, L.saddle ? L.d : L.w);
+    R(sx + 3, hy, 2, 2, '#1a1010'); R(sx + 3, hy, 1, 1, '#7a7a8a');
+    if (open) { R(sx + 1, hy + 3, 3, 2, '#7a1020'); R(sx + 2, hy + 4, 2, 1, '#ff7a9a'); }
+    else { R(sx + 1, hy + 3, 1, 1, '#3a1a10'); R(sx + 3, hy + 3, 1, 1, '#3a1a10'); R(sx + 2, hy + 4, 1, 1, '#3a1a10'); }  // a "w" smile
+    // shiny eyes: the near one big, the far one peeking
+    if (closed) { R(hx, hy - 1, 3, 1, INKY); R(hx + 4, hy - 1, 2, 1, INKY); }
+    else {
+      if (darkFur) R(hx - 1, hy - 2, 4, 4, '#e8dcc8');
+      R(hx, hy - 1, 2, 3, eye); R(hx, hy - 1, 1, 1, '#ffffff'); R(hx + 1, hy + 1, 1, 1, shade(eye, 1.6));
+      R(hx + 4, hy - 1, 1, 2, eye);
+    }
+    R(hx - 1, hy + 2, 2, 1, '#ff9ab0');                        // rosy cheek
   };
 
   if (s.pose === 'sleep') {
     if (L.tail !== 'stub') R(-bx - 2, -3, bx, 2, L.tail === 'long' ? L.d : c);
-    E(0, -ry, bx + 1, ry, c); E(-1, -ry - 1, bx - 1, 1, hl); E(0, -2, bx - 2, 1, L.w);
+    E(0, -ry, bx + 1, ry, c); E(-1, -ry * 2 + 2, bx - 1, 1, hl); E(0, -2, bx - 2, 1, L.w);
     if (L.saddle || L.mask) E(-1, -ry - 1, bx - 2, 2, L.d);
-    head(bx + 1, -hr + 1, false, true);
-    wear(R, s.outfit, { neck: [bx - 1, -2], head: [bx + 1, -hr * 2 + 1], torso: [0, -ry, bx - 2] }, 2);
+    head(bx + 2, -hr + 1, false, true);
+    wear(R, s.outfit, { neck: [bx, -2], head: [bx + 2, -hr * 2 + 1], torso: [0, -ry, bx - 2] }, 2);
     return;
   }
   if (s.pose === 'sit') {
-    if (L.tail !== 'stub') R(-bx + wag, -2, bx - 2, 2, L.tail === 'long' ? L.d : c);
-    E(-2, -ry - 1, bx - 3, ry + 1, sh);                    // haunch
-    E(1, -leg - ry - 3, Math.max(4, bx - 4), ry + 3, c);    // chest, upright
-    E(2, -leg - ry - 2, 2, ry, L.w);
-    if (L.saddle || L.mask) E(-1, -leg - ry - 5, 3, ry, L.d);
+    if (L.tail !== 'stub') R(-bx + wag, -2, bx - 1, 2, L.tail === 'long' ? L.d : L.tail === 'curl' ? L.w : c);
+    E(-1, -ry, bx - 1, ry, sh);                               // haunch
+    E(1, -leg - ry - 2, bx - 2, ry + 2, c);                   // chest, upright
+    E(2, -leg - ry - 1, 3, ry, L.w);
+    if (L.saddle || L.mask) E(-2, -leg - ry - 3, 3, ry - 1, L.d);
     R(1, -leg - 2, 2, leg + 2, sh); R(4, -leg - 2, 2, leg + 2, c);
     R(1, -1, 3, 1, paw); R(4, -1, 3, 1, paw);
-    const hy = -leg - ry * 2 - hr;
-    head(4, hy, false, false);
-    wear(R, s.outfit, { neck: [3, hy + hr - 1], head: [4, hy - hr], torso: [1, -leg - ry - 3, 4] }, 2);
+    const hy = -leg - ry * 2 - hr + 3;
+    head(3, hy, false, false);
+    wear(R, s.outfit, { neck: [3, hy + hr - 1], head: [3, hy - hr], torso: [1, -leg - ry - 2, 4] }, 2);
     return;
   }
   const low = s.pose === 'dig' || s.pose === 'sniff' || s.pose === 'drink';
   const by = -leg - ry;
-  if (L.tail === 'long') for (let i = 0; i < 6; i++) R(-bx - 1 - Math.floor(i / 2), by - 1 - i + (i > 3 ? wag : 0), 2, 2, i > 3 ? L.d : c);
-  if (L.tail === 'curl') { R(-bx, by - ry - 1, 3, 2, c); R(-bx + 1, by - ry - 3, 2, 2, L.w); R(-bx + 3, by - ry - 2, 1, 2, c); }
-  if (L.tail === 'stub') R(-bx - 2, by - 2, 2, 2, c);
+  if (L.tail === 'long') for (let i = 0; i < 5; i++) R(-bx - 1 - Math.floor(i / 2), by - 1 - i + (i > 2 ? wag : 0), 3, 2, i > 2 ? shade(c, 1.1) : c);  // a feathered tail
+  if (L.tail === 'curl') { disc(g, x - (bx - 1) * s.dir, y + by - ry - 1, 2, c); disc(g, x - (bx - 1) * s.dir, y + by - ry - 2, 1, L.w); }
+  if (L.tail === 'stub') { R(-bx - 2, by - 2, 2, 2, c); R(-bx - 2, by - 2, 1, 1, L.w); }
   if (L.tail === 'pom') { R(-bx - 2, by - 2, 1, 4, c); disc(g, x - (bx + 3) * s.dir, y + by - 5, 2, L.w); }
-  // far legs, a shade darker
-  [[-bx + 3, step], [bx - 4, 1 - step]].forEach(([lx, lift]) => { R(lx, -leg - 1, 2, leg + 1 - lift, sh); R(lx, -1 - lift, 3, 1, shade(paw, 0.85)); });
-  E(0, by, bx, ry, c);
+  [[-bx + 3, step], [bx - 3, 1 - step]].forEach(([lx, lift]) => { R(lx, -leg - 1, 2, leg + 1 - lift, sh); R(lx, -1 - lift, 2, 1, shade(paw, 0.85)); });
+  E(0, by, bx, ry, c);                                        // a round body
   E(-1, by - ry + 1, bx - 2, 1, hl);
-  E(0, by + ry - 1, bx - 3, 1, L.w);
-  if (L.saddle) E(-1, by - 2, bx - 3, 2, L.d);
-  if (L.mask) E(0, by - 2, bx - 1, 2, L.d);
-  if (L.coat === 'fluffy') { E(bx - 3, by, 3, ry, L.w); for (let i = -bx + 1; i < bx; i += 3) R(i, by - ry - 1, 2, 1, c); }
+  E(1, by + ry - 2, bx - 2, 2, L.w);
+  if (L.saddle) E(-2, by - 2, bx - 3, 2, L.d);
+  if (L.mask) E(-1, by - 2, bx - 2, 2, L.d);
+  if (L.coat === 'fluffy') E(bx - 2, by + 1, 3, ry - 1, L.w);
   if (L.coat === 'curly') for (let i = -bx + 1; i < bx; i += 2) { R(i, by - ry, 1, 1, L.w); R(i + 1, by + ry - 1, 1, 1, L.w); }
-  // near legs with paws
-  [[-bx + 1, 1 - step], [bx - 2, step]].forEach(([lx, lift]) => { R(lx, -leg - 1, 2, leg + 1 - lift, c); R(lx, -1 - lift, 3, 1, paw); });
-  R(bx - 3, by - ry - 2, 4, ry + 1, c);  // the neck
-  const hx = low ? bx + 4 : bx + 2;
-  const hy = low ? by + 2 : by - ry - hr + 1;
+  [[-bx + 1, 1 - step], [bx - 1, step]].forEach(([lx, lift]) => { R(lx, -leg - 1, 2, leg + 1 - lift, c); R(lx, -1 - lift, 3, 1, paw); });
+  const hx = low ? bx + 4 : bx + 1;
+  const hy = low ? by + 1 : by - ry - hr + 4;
   head(hx, hy, s.pose === 'bark', false);
-  if (s.pose === 'dig') R(hx + hr + 4 + (Math.floor(t * 10) % 3), -2 - (Math.floor(t * 10) % 2), 2, 1, '#6b4220');
-  if (s.pose === 'drink') R(hx + hr + 2, -1, 4, 1, '#4dc3ff');
-  wear(R, s.outfit, { neck: [bx - 2, by - ry + 1], head: [hx, hy - hr], torso: [0, by - 1, bx - 3] }, 2);
+  if (s.pose === 'dig') R(hx + hr + 3 + (Math.floor(t * 10) % 3), -2 - (Math.floor(t * 10) % 2), 2, 1, '#6b4220');
+  if (s.pose === 'drink') R(hx + hr + 1, -1, 4, 1, '#4dc3ff');
+  wear(R, s.outfit, { neck: [bx - 1, by - ry + 2], head: [hx, hy - hr], torso: [0, by - 1, bx - 3] }, 2);
 }
 
 // ---------------------------------------------------------------- cats (detailed)
