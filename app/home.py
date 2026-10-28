@@ -148,7 +148,7 @@ FURNITURE = {  # name, price, footprint (w, h) in floor tiles
     "office_chair": ("Office chair", 80, (1, 1)), "easel": ("Easel", 90, (1, 1)), "vase": ("Vase", 35, (1, 1)),
     "coffee_table": ("Coffee table", 90, (2, 1)), "rug": ("Rug", 120, (3, 2)), "sink": ("Sink", 130, (1, 1)),
     "armchair": ("Armchair", 150, (1, 1)), "desk": ("Desk", 150, (2, 1)), "toilet": ("Toilet", 150, (1, 1)),
-    "mattress": ("Mattress", 60, (2, 2)), "old_laptop": ("Old laptop", 120, (1, 1)), "shower": ("Shower", 300, (1, 1)),
+    "mattress": ("Mattress", 60, (2, 3)), "old_laptop": ("Old laptop", 120, (1, 1)), "shower": ("Shower", 300, (1, 1)),
     "dresser": ("Dresser", 160, (2, 1)), "bookshelf": ("Bookshelf", 180, (2, 1)), "dining_table": ("Dining table", 200, (2, 2)),
     "guitar": ("Guitar", 200, (1, 1)), "counter": ("Kitchen counter", 220, (2, 1)), "wardrobe": ("Wardrobe", 250, (2, 1)),
     "record_player": ("Record player", 250, (1, 1)), "bed": ("Bed", 300, (2, 3)), "fish_tank": ("Fish tank", 350, (2, 1)),

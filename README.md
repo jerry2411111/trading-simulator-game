@@ -80,7 +80,8 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
   stone, wood deck, neon tiles, snow, circuit board, red lacquer tiles, royal lawn, zellige mosaic).
   Or buy a garden theme (Christmas, Chinese New Year, Cyberpunk, Halloween, Muslim garden, Royal garden): it cleans
   up everything, lays its ground, adds its decorations and dresses the trees; switch between owned themes
-  for free. The flower bed sits in the middle (8 flowers that grow as full piles, bloom in 8 hours and sell
+  for free. A stone road runs unbroken from the gate to the door, lined by two flower beds (6
+  spots, 8 flowers that grow as full piles, bloom in 8 hours and sell
   for twice the seed price); four tree spots: pine, maple, apple, sakura and six cyberpunk trees (synth
   pine, neon palm, data tree, holo bonsai, crystal tree, fiber-optic willow) that grow in 1–4 days, then
   give a harvest every day or two; bees build hives in the real trees. A pool, a play corner, birds.

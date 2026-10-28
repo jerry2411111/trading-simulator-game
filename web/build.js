@@ -758,17 +758,19 @@ const FURN = {
   sink(g, w, h, t) { top3(g, 1, 3, 14, 8, ['#ffffff', '#e8eef2', '#b8c4cc']); ellipse(g, 8, 7, 4, 2, '#a8b8c4'); rect(g, 8, 1, 1, 4, '#9aa8b4'); rect(g, 7, 1, 3, 1, '#c8d4dc'); rect(g, 1, 11, 14, 4, '#d0d8de'); rect(g, 7, 12, 2, 1, '#9aa8b4'); if (t % 1.5 < 0.25) rect(g, 8, 6, 1, 1, '#4dc3ff'); },
   armchair(g) { rect(g, 1, 1, 14, 6, '#24508a'); rect(g, 1, 1, 14, 1, '#4a7ac0'); rect(g, 1, 4, 3, 10, '#24508a'); rect(g, 12, 4, 3, 10, '#24508a'); top3(g, 4, 6, 8, 6, ['#6a9ae0', '#3f7fbf', '#2a5a90']); rect(g, 1, 12, 14, 3, '#1a3a68'); },
   desk(g) { top3(g, 1, 3, 30, 7, W); rect(g, 1, 10, 30, 5, W[2]); rect(g, 3, 11, 9, 3, W[1]); rect(g, 7, 12, 2, 1, '#ffd84a'); rect(g, 4, 1, 7, 5, '#f8f8f0'); rect(g, 5, 2, 4, 1, '#9a9aa8'); rect(g, 22, 0, 5, 6, '#2a2a34'); rect(g, 21, 0, 7, 2, '#ffe9a8'); },
-  mattress(g) {  // a thick mattress lying on the floor: quilted top, striped side, a pillow, a crumpled blanket
-    rect(g, 1, 27, 30, 3, 'rgba(0,0,0,0.35)');                                    // its shadow on the floor
-    rect(g, 2, 4, 28, 20, '#f0ece4'); rect(g, 1, 5, 30, 18, '#f0ece4');            // the top, rounded corners
-    rect(g, 2, 4, 28, 1, '#ffffff');
-    for (let i = 5; i < 29; i += 6) for (let j = 8; j < 23; j += 5) { rect(g, i, j, 1, 1, '#c8c0b4'); rect(g, i + 1, j + 1, 1, 1, '#ffffff'); }  // quilting buttons
-    rect(g, 1, 23, 30, 5, '#c8d0dc'); for (let i = 1; i < 31; i += 3) rect(g, i, 23, 1, 5, '#9aa8bc');  // the thick striped side
-    rect(g, 1, 23, 30, 1, '#a8a8b4'); rect(g, 2, 28, 28, 1, '#7a8494');
-    rect(g, 7, 5, 18, 6, '#ffffff'); rect(g, 6, 6, 20, 4, '#ffffff'); rect(g, 7, 10, 18, 1, '#d8d4cc'); rect(g, 9, 6, 4, 1, '#e8e4dc');  // the pillow, across the head end
-    for (let j = 0; j < 10; j++) rect(g, 3 - (j > 6 ? 1 : 0), 13 + j, 25 + (j > 6 ? 1 : 0), 1, j % 3 === 1 ? '#5a6a9a' : '#6a7aaa');  // the blanket over the lower half
-    rect(g, 0, 21, 4, 8, '#6a7aaa'); rect(g, 0, 28, 3, 1, '#4a5a8a'); rect(g, 1, 23, 1, 4, '#5a6a9a');  // hanging off the far side from the laptop
-    rect(g, 6, 13, 21, 1, '#8a9aca'); rect(g, 9, 17, 9, 1, '#8a9aca'); rect(g, 14, 20, 8, 1, '#4a5a8a');
+  mattress(g) {  // a thick mattress on the floor: head at the top short edge, a blanket across the lower part
+    rect(g, 1, 45, 30, 3, 'rgba(0,0,0,0.35)');                                    // its shadow on the floor
+    rect(g, 2, 2, 28, 38, '#f0ece4'); rect(g, 1, 3, 30, 36, '#f0ece4');            // the top, rounded corners
+    rect(g, 2, 2, 28, 1, '#ffffff');
+    for (let i = 5; i < 29; i += 6) for (let j = 16; j < 22; j += 5) { rect(g, i, j, 1, 1, '#c8c0b4'); rect(g, i + 1, j + 1, 1, 1, '#ffffff'); }  // quilting buttons
+    rect(g, 1, 39, 30, 6, '#c8d0dc'); for (let i = 1; i < 31; i += 3) rect(g, i, 39, 1, 6, '#9aa8bc');  // the thick striped foot end
+    rect(g, 1, 39, 30, 1, '#a8a8b4'); rect(g, 2, 44, 28, 1, '#7a8494');
+    rect(g, 6, 4, 20, 8, '#ffffff'); rect(g, 5, 5, 22, 6, '#ffffff'); rect(g, 6, 11, 20, 1, '#d8d4cc'); rect(g, 8, 5, 5, 1, '#e8e4dc');  // the pillow at the head
+    rect(g, 0, 22, 32, 20, '#6a7aaa');                                             // the blanket, side to side
+    rect(g, 0, 22, 32, 3, '#e8e4f0'); rect(g, 0, 25, 32, 1, '#4a5a8a');             // its folded-back top edge
+    for (let j = 28; j < 42; j += 4) rect(g, 2 + (j % 8), j, 26 - (j % 8), 1, '#5a6a9a');  // folds
+    rect(g, 6, 30, 10, 1, '#8a9aca'); rect(g, 16, 36, 9, 1, '#8a9aca');
+    rect(g, 0, 41, 32, 2, '#4a5a8a');                                              // draping over the foot
   },
   old_laptop(g, w, h, t) {  // a chunky old laptop with a cracked, flickering screen
     rect(g, 2, 9, 12, 5, '#3a3a40'); rect(g, 3, 10, 10, 3, '#2a2a30'); for (let i = 4; i < 12; i += 2) rect(g, i, 11, 1, 1, '#5a5a62');

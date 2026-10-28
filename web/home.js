@@ -1,4 +1,4 @@
-// Home: the garden (a wasteland you clean up and floor, the flower bed, trees with beehives, the pool,
+// Home: the garden (a wasteland you clean up and floor, the road lined with flower beds, trees with beehives, the pool,
 // pets, birds and bees, the house seen from outside), the house (rooms on a grid, furniture, your pets
 // living inside) and the aquarium (fish, sea life, the ice land). Animals run small state machines.
 import {
@@ -28,16 +28,14 @@ const ZONES = {  // the garden's parts; the house lot above them is always the h
   southwest: [{ x: 6, y: 160, w: 110, h: 44 }],
   southeast: [{ x: 140, y: 160, w: 110, h: 44 }],
 };
-const BED = { x: 128, y: 131, rx: 31, ry: 17 };
-const FLOWERS = [[110, 127], [128, 124], [146, 127], [112, 142], [128, 145], [144, 142]].map(([x, y]) => ({ x, y }));
+// Two long flower beds line the road through the middle of the garden, three flowers in each.
+const BEDS = [{ x: 96, y: 104, w: 24, h: 52 }, { x: 136, y: 104, w: 24, h: 52 }];
+const FLOWERS = [[108, 122], [108, 138], [108, 154], [148, 122], [148, 138], [148, 154]].map(([x, y]) => ({ x, y }));
 const SPOTS = [{ x: 26, y: 146 }, { x: 68, y: 156 }, { x: 188, y: 156 }, { x: 230, y: 146 }];
 const POOL = { x: 24, y: 170, w: 64, h: 24 };
 const LAWN = { x0: 10, x1: 246, y0: 92, y1: 200 };
-const STONES = [
-  ...Array.from({ length: 4 }, (_, k) => ({ x: 128 + (k % 2 ? 3 : -3), y: 92 + k * 6 })),
-  ...Array.from({ length: 8 }, (_, k) => ({ x: 128 + (k % 2 ? 3 : -3), y: 156 + k * 6 })),
-];
-const RING = Array.from({ length: 22 }, (_, k) => ({ x: BED.x + Math.round(Math.cos((k / 22) * 6.28) * (BED.rx + 6)), y: BED.y + Math.round(Math.sin((k / 22) * 6.28) * (BED.ry + 5)) }));
+// One unbroken stone road from the gate straight up to the door.
+const STONES = Array.from({ length: 19 }, (_, k) => ({ x: 128 + (k % 2 ? 3 : -3), y: 92 + k * 6 }));
 const LAMPS = [{ x: 98, y: 98 }, { x: 158, y: 98 }, { x: 110, y: 200 }, { x: 146, y: 200 }];
 const NATURAL = new Set(['pine', 'maple', 'apple']);  // bees only build hives in real trees
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -192,7 +190,7 @@ export function initHome(ctx) {
       const r = Math.random();
       if (r < 0.4) go(p, near(p, 45), 50, ['idle', rand(1, 4)]);
       else if (r < 0.6) hold(p, t, 'pushup', 2);
-      else if (r < 0.85) go(p, pick([...STONES, ...RING]), 50, ['bask', rand(4, 8)]);
+      else if (r < 0.85) go(p, pick(STONES), 50, ['bask', rand(4, 8)]);
       else go(p, pick(FLOWERS), 50, ['idle', 3]);
     },
     critter(p, t) {  // hamsters, rabbits, guinea pigs, hedgehogs, ferrets, chinchillas, gliders, marmosets, capybaras
@@ -210,7 +208,7 @@ export function initHome(ctx) {
     snake(p, t) {
       const r = Math.random();
       if (r < 0.35) go(p, near(p, 40), 6, ['idle', rand(3, 6)]);
-      else if (r < 0.7) go(p, pick([...STONES, ...RING]), 6, ['bask', rand(6, 12)]);
+      else if (r < 0.7) go(p, pick(STONES), 6, ['bask', rand(6, 12)]);
       else hold(p, t, 'sleep', rand(8, 14), 'z');
     },
     frog(p, t) {
@@ -353,26 +351,23 @@ export function initHome(ctx) {
       });
     });
     junk.sort((a, b) => a.y - b.y).forEach((j) => drawGarbage(q, j.kind, j.x, j.y));
-    // the flower bed: a stone curb and leafy ground cover, no bare dirt
+    // the flower beds along the road: a stone curb and leafy ground cover, no bare dirt
     if (clean('plaza')) {
-      ellipse(q, BED.x, BED.y + 1, BED.rx + 3, BED.ry + 3, '#1a1a24');
-      ellipse(q, BED.x, BED.y, BED.rx + 2, BED.ry + 2, '#9a9aa8');
-      for (let k = 0; k < 40; k++) {
-        const a = (k / 40) * 6.28;
-        rect(q, BED.x + Math.round(Math.cos(a) * (BED.rx + 2)), BED.y + Math.round(Math.sin(a) * (BED.ry + 2)), 2, 1, k % 2 ? '#c8c8d4' : '#6a6a78');
-      }
-      ellipse(q, BED.x, BED.y, BED.rx, BED.ry, '#173f24');
-      for (let i = 0; i < 260; i++) {
-        const a = hash(i) * 6.28;
-        const rr = Math.sqrt(hash(i + 70));
-        const x = BED.x + Math.round(Math.cos(a) * rr * (BED.rx - 2));
-        const y = BED.y + Math.round(Math.sin(a) * rr * (BED.ry - 2));
-        rect(q, x, y, 2, 1, i % 3 ? '#2a6a38' : '#3f8a48');
-        if (i % 7 === 0) rect(q, x, y - 1, 1, 1, '#7fd86a');
-      }
+      BEDS.forEach((b, bi) => {
+        rect(q, b.x - 2, b.y - 2, b.w + 4, b.h + 4, '#1a1a24');
+        rect(q, b.x - 1, b.y - 1, b.w + 2, b.h + 2, '#9a9aa8');
+        for (let k = 0; k < b.w + 2; k += 3) { rect(q, b.x - 1 + k, b.y - 1, 2, 1, '#c8c8d4'); rect(q, b.x - 1 + k, b.y + b.h, 2, 1, '#6a6a78'); }
+        for (let k = 0; k < b.h + 2; k += 3) { rect(q, b.x - 1, b.y - 1 + k, 1, 2, '#c8c8d4'); rect(q, b.x + b.w, b.y - 1 + k, 1, 2, '#6a6a78'); }
+        rect(q, b.x, b.y, b.w, b.h, '#173f24');
+        for (let i = 0; i < 110; i++) {
+          const x = b.x + Math.floor(hash(i + bi * 300) * (b.w - 2));
+          const y = b.y + Math.floor(hash(i * 3 + bi * 300 + 70) * (b.h - 1));
+          rect(q, x, y, 2, 1, i % 3 ? '#2a6a38' : '#3f8a48');
+          if (i % 7 === 0) rect(q, x, y - 1, 1, 1, '#7fd86a');
+        }
+      });
     }
-    // the stone road from the gate to the door, and around the bed
-    const road = clean('path') ? [...STONES, ...(clean('plaza') ? RING : [])] : [];
+    const road = STONES;  // the road is always there, through every part of the garden
     road.forEach((s, k) => {
       ellipse(q, s.x, s.y + 1, 4, 2, '#20202a');
       ellipse(q, s.x, s.y, 4, 2, '#a8a8b8');
@@ -1210,7 +1205,7 @@ export function initHome(ctx) {
     side.append(el('<div class="box-title">GARDEN</div>'));
     if (!selected) {
       const dirty = Object.keys(ZONES).filter((z) => !s.zones[z]).length;
-      side.append(el(`<p class="muted">${dirty ? `${dirty} of 6 parts are still wasteland (the front path is clean from the start): click one to clean it up, or buy a garden theme (Store) that cleans everything. ` : ''}Click the flower bed, a tree spot, a pet or any part of the garden. Hover a pet to pet it. Click the house to go inside.</p>`));
+      side.append(el(`<p class="muted">${dirty ? `${dirty} of 6 parts are still wasteland (the front path is clean from the start): click one to clean it up, or buy a garden theme (Store) that cleans everything. ` : ''}Click a flower spot by the road, a tree spot, a pet or any part of the garden. Hover a pet to pet it. Click the house to go inside.</p>`));
       renderThemes(s);
     }
     if (selected?.kind === 'zone') renderZone(selected.id);
