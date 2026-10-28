@@ -7,6 +7,9 @@ second by second, from a random day between 2020 and 2025. Educational only, not
 
 ## Run
 
+On Windows, double-click `start.bat` (the first run installs everything into a local `.venv`).
+Or by hand:
+
 ```
 pip install -r requirements.txt
 python -m app
