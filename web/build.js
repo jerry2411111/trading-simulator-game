@@ -758,11 +758,17 @@ const FURN = {
   sink(g, w, h, t) { top3(g, 1, 3, 14, 8, ['#ffffff', '#e8eef2', '#b8c4cc']); ellipse(g, 8, 7, 4, 2, '#a8b8c4'); rect(g, 8, 1, 1, 4, '#9aa8b4'); rect(g, 7, 1, 3, 1, '#c8d4dc'); rect(g, 1, 11, 14, 4, '#d0d8de'); rect(g, 7, 12, 2, 1, '#9aa8b4'); if (t % 1.5 < 0.25) rect(g, 8, 6, 1, 1, '#4dc3ff'); },
   armchair(g) { rect(g, 1, 1, 14, 6, '#24508a'); rect(g, 1, 1, 14, 1, '#4a7ac0'); rect(g, 1, 4, 3, 10, '#24508a'); rect(g, 12, 4, 3, 10, '#24508a'); top3(g, 4, 6, 8, 6, ['#6a9ae0', '#3f7fbf', '#2a5a90']); rect(g, 1, 12, 14, 3, '#1a3a68'); },
   desk(g) { top3(g, 1, 3, 30, 7, W); rect(g, 1, 10, 30, 5, W[2]); rect(g, 3, 11, 9, 3, W[1]); rect(g, 7, 12, 2, 1, '#ffd84a'); rect(g, 4, 1, 7, 5, '#f8f8f0'); rect(g, 5, 2, 4, 1, '#9a9aa8'); rect(g, 22, 0, 5, 6, '#2a2a34'); rect(g, 21, 0, 7, 2, '#ffe9a8'); },
-  mattress(g) {  // a bare mattress on the floor with a crumpled blanket
-    rect(g, 1, 4, 30, 26, '#d8d0c0'); rect(g, 1, 4, 30, 1, '#f0e8d8'); rect(g, 1, 29, 30, 2, '#a8a090');
-    for (let i = 4; i < 30; i += 6) for (let j = 8; j < 28; j += 6) rect(g, i, j, 1, 1, '#b8b0a0');
-    rect(g, 3, 6, 10, 5, '#f4f4f0'); rect(g, 4, 18, 24, 9, '#6a7a5a'); rect(g, 4, 18, 24, 1, '#8a9a7a'); rect(g, 20, 14, 7, 5, '#6a7a5a');
-    rect(g, 26, 8, 3, 2, '#c8a878');
+  mattress(g) {  // a thick mattress lying on the floor: quilted top, striped side, a pillow, a crumpled blanket
+    rect(g, 1, 27, 30, 3, 'rgba(0,0,0,0.35)');                                    // its shadow on the floor
+    rect(g, 2, 4, 28, 20, '#f0ece4'); rect(g, 1, 5, 30, 18, '#f0ece4');            // the top, rounded corners
+    rect(g, 2, 4, 28, 1, '#ffffff');
+    for (let i = 5; i < 29; i += 6) for (let j = 8; j < 23; j += 5) { rect(g, i, j, 1, 1, '#c8c0b4'); rect(g, i + 1, j + 1, 1, 1, '#ffffff'); }  // quilting buttons
+    rect(g, 1, 23, 30, 5, '#c8d0dc'); for (let i = 1; i < 31; i += 3) rect(g, i, 23, 1, 5, '#9aa8bc');  // the thick striped side
+    rect(g, 1, 23, 30, 1, '#a8a8b4'); rect(g, 2, 28, 28, 1, '#7a8494');
+    rect(g, 4, 6, 11, 6, '#ffffff'); rect(g, 4, 11, 11, 1, '#d8d4cc'); rect(g, 5, 7, 3, 1, '#e8e4dc');  // a puffy pillow
+    for (let j = 0; j < 9; j++) rect(g, 13 + (j % 3 === 0 ? 1 : 0), 14 + j, 17 - (j % 3 === 0 ? 1 : 0), 1, j % 3 === 1 ? '#5a6a9a' : '#6a7aaa');  // a blanket, half off
+    rect(g, 26, 23, 5, 6, '#6a7aaa'); rect(g, 27, 28, 4, 1, '#4a5a8a');
+    rect(g, 15, 16, 8, 1, '#8a9aca'); rect(g, 18, 19, 7, 1, '#4a5a8a');
   },
   old_laptop(g, w, h, t) {  // a chunky old laptop with a cracked, flickering screen
     rect(g, 2, 9, 12, 5, '#3a3a40'); rect(g, 3, 10, 10, 3, '#2a2a30'); for (let i = 4; i < 12; i += 2) rect(g, i, 11, 1, 1, '#5a5a62');
