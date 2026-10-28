@@ -40,10 +40,13 @@ class Day:
 class Stock:
     ticker: str                                   # real symbol: backend only
     alias: str                                    # the only name the player sees
-    daily: pd.DataFrame | None = None
-    minutes: pd.DataFrame | None = None           # regular-hours 1-minute bars
-    seconds: dict = field(default_factory=dict)   # date -> 1-second bars
+    joined: int                                   # session day index the stock was added on
+    scale: float | None = None                    # price factor: opens at $100 on the day it joined
+    daily: pd.DataFrame | None = None             # raw prices
+    minutes: pd.DataFrame | None = None           # raw regular-hours 1-minute bars
+    seconds: dict = field(default_factory=dict)   # date -> scaled 1-second bars
     fallback: set = field(default_factory=set)    # dates built from 1-minute bars
+    ind: dict = field(default_factory=dict)       # indicator cache for one day: {"date", "values"}
 
 
 class TokenBucket:
@@ -179,6 +182,14 @@ def minutes_to_seconds(minutes, day, prev_close):
     return fill_seconds(m.set_axis(m.index + pd.Timedelta(seconds=59)), day, prev_close)
 
 
+def rescale(bars, k):
+    """Prices times k, volume divided by k: dollar volume and percentage moves are unchanged."""
+    out = bars.copy()
+    out[["o", "h", "l", "c"]] *= k
+    out["v"] /= k
+    return out
+
+
 def regular_hours(df, days):
     mask = np.zeros(len(df), dtype=bool)
     for d in days:
@@ -212,8 +223,12 @@ class Cache:
         shutil.rmtree(self.root / ticker, ignore_errors=True)
 
     @staticmethod
-    def clear_all():
-        shutil.rmtree(CACHE_DIR, ignore_errors=True)
+    def prune(keep):
+        """Delete cached sessions whose id is not in `keep`."""
+        if CACHE_DIR.exists():
+            for folder in CACHE_DIR.iterdir():
+                if folder.name not in keep:
+                    shutil.rmtree(folder, ignore_errors=True)
 
 
 class Prefetcher:
@@ -270,12 +285,14 @@ class Prefetcher:
         daily = await self.client.bars([st.ticker], "1Day", start, s.days[s.first - 1].close)
         minutes = await self.fetch_minutes([st.ticker], 0, s.minute_end)
         st.daily, st.minutes = daily.get(st.ticker, empty_bars()), minutes[st.ticker]
+        first = st.minutes.loc[st.minutes.index >= s.days[st.joined].open, "o"]
+        st.scale = 100 / first.iloc[0] if len(first) else 1.0
         s.cache.save(st.ticker, "daily", st.daily)
         s.cache.save(st.ticker, "minutes", st.minutes)
 
     async def extend_minutes(self, upto):
         s = self.s
-        await self.listener.on_load(f"Downloading 1-minute bars for {s.days[upto].date}…")
+        await self.listener.on_load("Downloading 1-minute bars…")
         new = await self.fetch_minutes(list(s.stocks), s.minute_end + 1, upto)
         for t, st in s.stocks.items():
             st.minutes = pd.concat([st.minutes, new[t]])
@@ -284,7 +301,7 @@ class Prefetcher:
 
     async def load_seconds(self, st, day):
         s, name = self.s, f"sec_{day.date}"
-        label = f"Downloading {st.alias} trades for {day.date}"
+        label = f"Downloading {st.alias} trades"
         await self.listener.on_load(label, 0.0)
         bars = s.cache.load(st.ticker, name)
         if bars is None:
@@ -309,6 +326,6 @@ class Prefetcher:
             else:
                 bars = minutes_to_seconds(day_minutes, day, prev_close)
                 st.fallback.add(day.date)
-        st.seconds[day.date] = bars
+        st.seconds[day.date] = rescale(bars, st.scale)
         for old in sorted(st.seconds)[:-MAX_SECOND_DAYS]:
             del st.seconds[old]

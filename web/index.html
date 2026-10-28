@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="neon">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,14 +15,17 @@
   <main id="game" hidden>
     <header class="topbar">
       <span class="logo">TAPETRAINER</span>
-      <span id="date" class="num">—</span>
+      <span id="day" class="num">—</span>
       <span id="clock" class="num">--:--:--</span>
       <span id="speeds" class="group"></span>
       <span id="feed" class="badge"></span>
       <span id="fallback" class="badge warn" hidden></span>
+      <span id="ai-badge" class="badge" hidden>AI</span>
       <span id="bg-status" class="muted"></span>
       <button id="new-game">New game</button>
-      <button id="settings-btn">Settings</button>
+      <button id="stats-btn">Stats</button>
+      <button id="api-btn">API status</button>
+      <button id="menu-btn">Settings</button>
     </header>
 
     <aside class="left">
@@ -32,31 +35,145 @@
     </aside>
 
     <section class="center">
-      <div class="chart-tools group">
-        <button data-style="candle">Candle</button>
-        <button data-style="line">Line</button>
+      <div class="chart-tools">
+        <span class="group"><button data-style="candle">Candle</button><button data-style="line">Line</button></span>
         <label class="window-ctl">Window
           <input id="window" type="range" min="0" step="1">
           <span id="window-val" class="num"></span>
         </label>
+        <span id="chips" class="chips"></span>
       </div>
       <div id="chart"></div>
       <div id="overlay" class="window" hidden>
         <p id="overlay-title" class="num"></p>
         <p id="overlay-text"></p>
         <div class="progress"><div id="overlay-bar"></div></div>
-        <button id="overlay-btn" class="primary"></button>
+        <table id="overlay-summary" class="kv-table" hidden></table>
+        <div id="overlay-buttons" class="row centered"></div>
       </div>
     </section>
+
+    <aside class="right">
+      <div class="box">
+        <div class="box-title">EARNINGS</div>
+        <div class="kv"><span>Equity</span><b id="equity" class="num">—</b></div>
+        <div class="kv"><span>Today</span><b id="pnl-today" class="num">—</b></div>
+        <div class="kv"><span>Total</span><b id="pnl-total" class="num">—</b></div>
+        <div class="kv"><span>Leverage</span><b id="lev" class="num">—</b></div>
+      </div>
+      <div class="box">
+        <div class="box-title">ORDER</div>
+        <div class="row">
+          <select id="order-type">
+            <option value="MKT">MKT</option>
+            <option value="LMT">LMT</option>
+            <option value="IF_ABOVE">MKT if ≥</option>
+            <option value="IF_BELOW">MKT if ≤</option>
+          </select>
+          <input id="order-price" type="number" step="0.01" min="0" placeholder="price" disabled>
+        </div>
+        <label class="kv"><span>Size $</span><input id="dollars" type="number" min="1" step="100"></label>
+        <div class="trade-buttons">
+          <button id="buy" class="buy">BUY</button>
+          <button id="sell" class="sell">SELL</button>
+          <button id="close" class="close">CLOSE</button>
+        </div>
+        <button id="close-all">Close all</button>
+        <div id="position" class="muted"></div>
+        <ul id="pending" class="list"></ul>
+      </div>
+      <div class="box grow">
+        <div class="box-title">TRADES TODAY</div>
+        <ul id="fills" class="list"></ul>
+      </div>
+      <div class="box" id="ai-box" hidden>
+        <div class="box-title">AI TRADER</div>
+        <ul id="ai-log" class="list"></ul>
+      </div>
+    </aside>
   </main>
 
-  <dialog id="settings" class="window">
-    <div class="titlebar">Settings</div>
+  <dialog id="api" class="window">
+    <div class="titlebar">API status</div>
     <div class="window-body">
-      <p>Alpaca key: <span id="settings-feed"></span></p>
+      <p>Alpaca market data: <span id="api-feed"></span></p>
       <button id="change-key">Change key</button>
       <button id="forget-key">Forget key</button>
-      <button id="settings-close">Close</button>
+      <button data-close>Close</button>
+    </div>
+  </dialog>
+
+  <dialog id="menu" class="window wide">
+    <div class="titlebar">Settings — game paused</div>
+    <div class="window-body">
+      <nav class="group menu-tabs">
+        <button data-tab="style">UI style</button>
+        <button data-tab="trading">Trading</button>
+        <button data-tab="games">Save / load</button>
+        <button data-tab="ai">AI operation</button>
+      </nav>
+
+      <section data-panel="style">
+        <p>Choose a look:</p>
+        <div id="themes" class="group wrap"></div>
+      </section>
+
+      <section data-panel="trading">
+        <div class="form-grid">
+          <label>Starting capital $ <input id="set-capital" type="number" min="1" max="10000"></label>
+          <label>Leverage (1–100x) <input id="set-leverage" type="number" min="1" max="100" step="0.5"></label>
+          <label>Fee per share $ <input id="set-fee" type="number" min="0" step="0.001"></label>
+          <label>Minimum fee per order $ <input id="set-min-fee" type="number" min="0" step="0.5"></label>
+        </div>
+        <p class="small">Starting capital applies after Clear PnL or a new game. Leverage and fees apply now.</p>
+        <div class="row"><button id="apply-trading" class="primary">Apply</button><button id="clear-pnl">Clear PnL</button></div>
+      </section>
+
+      <section data-panel="games">
+        <div class="row"><input id="save-name" maxlength="40" placeholder="Name this save"><button id="save-game" class="primary">Save game</button></div>
+        <ul id="saves" class="list saves"></ul>
+      </section>
+
+      <section data-panel="ai">
+        <label class="check"><input id="ai-enabled" type="checkbox"> Let the AI trade (the clock waits while it decides)</label>
+        <div class="form-grid">
+          <label>Provider
+            <select id="ai-provider"><option value="anthropic">Anthropic</option><option value="openai">OpenAI-compatible</option></select>
+          </label>
+          <label>Model <input id="ai-model" spellcheck="false"></label>
+          <label>Base URL (optional) <input id="ai-base" spellcheck="false" placeholder="provider default"></label>
+          <label>AI API key <input id="ai-key" type="password" spellcheck="false" autocomplete="off"></label>
+          <label>Decide every (game seconds) <input id="ai-interval" type="number" min="5" step="5"></label>
+          <label>Max $ per order <input id="ai-max" type="number" min="1" step="100"></label>
+        </div>
+        <label class="check"><input id="ai-remember" type="checkbox"> Remember the key on this computer</label>
+        <p>Data the AI receives:
+          <label class="check inline"><input id="ai-price" type="checkbox"> Price</label>
+          <label class="check inline"><input id="ai-volume" type="checkbox"> Volume</label>
+          <label class="check inline"><input id="ai-indicators" type="checkbox"> Indicators</label>
+        </p>
+        <label>Prompt (role the AI plays)
+          <textarea id="ai-prompt" rows="7" spellcheck="false"></textarea>
+        </label>
+        <p class="small">The reply format (orders as JSON: stock, side, type MKT / LMT / IF_ABOVE / IF_BELOW, price, dollars) is added automatically after your prompt.</p>
+        <div class="row"><button id="ai-save" class="primary">Save AI settings</button><button id="ai-reset">Reset to standard prompt</button><span id="ai-status" class="muted"></span></div>
+      </section>
+
+      <footer class="row menu-foot">
+        <button id="exit-game" class="sell">Exit game</button>
+        <span class="small credit">Charts: <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></span>
+        <button data-close>Close</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog id="stats" class="window wide">
+    <div class="titlebar">Stats</div>
+    <div class="window-body">
+      <table id="stats-overall" class="kv-table"></table>
+      <div id="equity-chart"></div>
+      <div class="table-wrap"><table id="stats-days" class="grid-table"></table></div>
+      <div class="row"><button data-close>Close</button></div>
     </div>
   </dialog>
 

@@ -84,3 +84,14 @@ def forget_alpaca():
     data = _read()
     data.pop("alpaca", None)
     _write(data)
+
+
+def load_ai():
+    return _read().get("ai")
+
+
+def save_ai(settings):
+    """AI trader settings; the API key is included only if the player ticked "Remember"."""
+    data = _read()
+    data["ai"] = settings
+    _write(data)

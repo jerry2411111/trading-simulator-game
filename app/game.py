@@ -1,28 +1,28 @@
-"""Game session (days, stocks, one shared replay clock) and the player's commands."""
+"""Game session (days, stocks, one shared replay clock), the account, waiting orders, the AI trader,
+and the player's commands."""
 import asyncio
 import logging
 import random
 import string
 import uuid
+from dataclasses import asdict
 
 import httpx
 import numpy as np
+import pandas as pd
 
-from . import universe
-from .data import COLS, ET, AuthError, Cache, Prefetcher, Stock
+from . import agent, indicators, orders, saves, stats, universe
+from .account import MAX_CAPITAL, MAX_LEVERAGE, Account, OrderError
+from .data import COLS, ET, AuthError, Cache, Day, Prefetcher, Stock
 
 log = logging.getLogger(__name__)
 
-SPEEDS = (0, 1, 10, 60, 300)
+SPEEDS = (0, 1, 1.5, 2, 3, 5, 10, 60, 300)
 TICK = 0.1           # seconds between clock pushes: at most 10 WebSocket messages per second
 MAX_STOCKS = 5
 SESSION_DAYS = 7
-
-
-def rows(df):
-    """Bars as [time, o, h, l, c, v]; time is ET wall-clock seconds so the chart shows market time."""
-    t = df.index.tz_convert(ET).tz_localize(None).as_unit("s").asi8
-    return np.column_stack([t, df[COLS].to_numpy()]).round(4).tolist()
+PICK_TRIES = 5       # random start days to try before giving up on an empty stock pool
+AI_LOG = 30          # AI decisions kept for the log panel
 
 
 def alias(n):
@@ -30,11 +30,31 @@ def alias(n):
     return f"STOCK {string.ascii_uppercase[n % 26]}{n // 26 or ''}"
 
 
+def chart_times(index, day_no):
+    """Day number * 86400 + seconds since midnight ET: the chart gets times of day, never real dates."""
+    et = index.tz_convert(ET)
+    return np.asarray(day_no * 86400 + et.hour * 3600 + et.minute * 60 + et.second)
+
+
+def rows(df, day_no):
+    """Bars as [time, o, h, l, c, v]."""
+    return np.column_stack([chart_times(df.index, day_no), df[COLS].to_numpy()]).round(4).tolist()
+
+
+def clean(col):
+    return [None if np.isnan(v) else round(float(v), 6) for v in col]
+
+
+def public(record):
+    """A trade or waiting order without the real ticker."""
+    return {k: v for k, v in record.items() if k != "ticker"}
+
+
 class Session:
     """One random game: trading days (WARMUP days, then day 1 onward), the stock pool, loaded stocks."""
 
-    def __init__(self, days, first, pool):
-        self.id = uuid.uuid4().hex[:12]
+    def __init__(self, days, first, pool, sid=None):
+        self.id = sid or uuid.uuid4().hex[:12]
         self.days, self.first, self.pool = days, first, pool
         self.day_idx = first
         self.minute_end = min(first + SESSION_DAYS - 1, len(days) - 1)  # last day with 1-minute bars
@@ -44,7 +64,7 @@ class Session:
         self.wake = asyncio.Event()
 
     def new_stock(self, ticker):
-        st = Stock(ticker, alias(self.added))
+        st = Stock(ticker, alias(self.added), self.day_idx)
         self.added += 1
         return st
 
@@ -55,11 +75,27 @@ class Session:
     def day(self):
         return self.days[self.day_idx]
 
+    @property
+    def day_no(self):
+        return self.day_idx - self.first + 1
+
     def bars(self, ticker):
         return self.stocks[ticker].seconds[self.day.date]
 
     def ready(self):
         return bool(self.stocks) and all(self.day.date in st.seconds for st in self.stocks.values())
+
+    def to_dict(self):
+        return {"id": self.id, "days": [[d.date, d.open.isoformat(), d.close.isoformat()] for d in self.days],
+                "first": self.first, "day_idx": self.day_idx, "minute_end": self.minute_end, "pool": self.pool,
+                "stocks": [[t, st.alias, st.joined] for t, st in self.stocks.items()], "added": self.added}
+
+    @classmethod
+    def from_dict(cls, d):
+        s = cls([Day(x, pd.Timestamp(o), pd.Timestamp(c)) for x, o, c in d["days"]], d["first"], d["pool"], d["id"])
+        s.day_idx, s.minute_end, s.added = d["day_idx"], d["minute_end"], d["added"]
+        s.stocks = {t: Stock(t, a, j) for t, a, j in d["stocks"]}
+        return s
 
 
 class Game:
@@ -70,12 +106,22 @@ class Game:
         self.view = None          # ticker on the main chart
         self.pos = 1              # bars of the current day revealed so far
         self.speed = 0
-        self.picking = False
-        self.auth_failed = False
+        self.picking = self.auth_failed = self.over = False
         self.loading = None       # latest prefetch progress {"text", "progress"}
         self.ready_pushed = False
         self.worker = None
         self.rng = random.Random()
+        self.account = Account()
+        self.day_start = self.account.start  # equity when the current day began
+        self.days = []            # finished-day summaries since the last Clear PnL
+        self.curve = []           # [chart time, equity] each minute of finished days
+        self.today = []           # the same for the current day
+        self.pending = []         # waiting LMT / conditional orders
+        self.shown = set()        # indicators the player turned on
+        self.agent = agent.AgentConfig()
+        self.ai_log = []
+        self.ai_mark = 1          # bar of the last AI decision
+        self.thinking = False     # an AI decision is in flight: the clock waits
 
     # ----- state sent to the frontend
 
@@ -90,30 +136,79 @@ class Game:
             return "idle"
         if not self.s.ready():
             return "loading"
+        if self.over:
+            return "game_over"
         return "day_end" if self.pos >= len(self.s.bars(self.view)) else "ready"
 
     def status(self):
-        return {"type": "status", "phase": self.phase(), "speed": self.speed, "loading": self.loading}
+        return {"type": "status", "phase": self.phase(), "speed": self.speed, "loading": self.loading,
+                "thinking": self.thinking}
 
     def clock(self):
         return self.s.bars(self.view).index[self.pos - 1].tz_convert(ET).strftime("%H:%M:%S")
 
-    def prices(self):
-        return {st.alias: float(st.seconds[self.s.day.date]["c"].iloc[self.pos - 1]) for st in self.s.stocks.values()}
+    def time_at(self, i):
+        return int(chart_times(self.s.bars(self.view).index[i:i + 1], self.s.day_no)[0])
+
+    def prices(self, i=None):
+        """Close of bar i (default: the current bar) for every stock whose day is loaded."""
+        if self.s is None:
+            return {}
+        i, date = self.pos - 1 if i is None else i, self.s.day.date
+        return {t: float(st.seconds[date]["c"].iloc[i]) for t, st in self.s.stocks.items() if date in st.seconds}
+
+    def equity(self, i=None):
+        return self.account.equity(self.prices(i))
+
+    def point(self, i):
+        return [self.time_at(i), round(self.equity(i), 2)]
+
+    def values(self, st):
+        """All indicators of one stock for the whole current day (causal, so only prefixes are ever shown)."""
+        date = self.s.day.date
+        if st.ind.get("date") != date:
+            st.ind = {"date": date, "values": indicators.compute(st.seconds[date])}
+        return st.ind["values"]
+
+    def ind(self, a, b):
+        """Enabled indicators of the viewed stock for bars a..b-1."""
+        if not self.shown:
+            return {}
+        values = self.values(self.s.stocks[self.view])
+        return {name: [clean(col[a:b]) for col in values[name]] for name in self.shown}
+
+    def account_view(self):
+        a, prices = self.account, self.prices()
+        names = {t: st.alias for t, st in self.s.stocks.items()} if self.s else {}
+        eq = a.equity(prices)
+        return {"equity": eq, "cash": a.cash, "today": eq - self.day_start, "total": eq - a.start,
+                "positions": {names[t]: {"shares": n, "avg": a.cost[t], "pnl": n * (prices[t] - a.cost[t])}
+                              for t, n in a.shares.items()},
+                "pending": [public(o) for o in self.pending],
+                "settings": {k: getattr(a, k) for k in ("capital", "leverage", "fee_per_share", "min_fee")}}
+
+    def trades_today(self):
+        day = self.s.day_no if self.s else None
+        return [public(tr) for tr in self.account.trades if tr["day"] == day]
 
     def snapshot(self):
-        msg = {**self.status(), "type": "snapshot", "feed": self.client and self.client.feed,
-               "speeds": SPEEDS, "session": None}
         s = self.s
+        msg = {**self.status(), "type": "snapshot", "feed": self.client and self.client.feed, "speeds": SPEEDS,
+               "session": None, "account": self.account_view(), "trades": self.trades_today(),
+               "ai": {**self.agent.public(), "log": self.ai_log}}
         if s:
-            msg["session"] = {"date": s.day.date, "day": s.day_idx - s.first + 1,
-                              "last_day": s.day_idx == len(s.days) - 1,
-                              "stocks": [st.alias for st in s.stocks.values()],
-                              "view": s.stocks[self.view].alias,
+            msg["session"] = {"day": s.day_no, "last_day": s.day_idx == len(s.days) - 1,
+                              "stocks": [st.alias for st in s.stocks.values()], "view": s.stocks[self.view].alias,
                               "fallback": [st.alias for st in s.stocks.values() if s.day.date in st.fallback]}
             if s.ready():
-                msg.update(clock=self.clock(), prices=self.prices(), bars=rows(s.bars(self.view).iloc[: self.pos]))
+                msg.update(clock=self.clock(), prices=self.alias_prices(), ind=self.ind(0, self.pos),
+                           bars=rows(s.bars(self.view).iloc[: self.pos], s.day_no))
+            if msg["phase"] == "day_end" and self.days:
+                msg["summary"] = self.days[-1]
         return msg
+
+    def alias_prices(self):
+        return {self.s.stocks[t].alias: p for t, p in self.prices().items()}
 
     async def push_snapshot(self):
         self.ready_pushed = bool(self.s and self.s.ready())
@@ -122,7 +217,14 @@ class Game:
     async def push_status(self):
         await self.broadcast(self.status())
 
-    # ----- prefetch listener
+    async def push_account(self, fills=()):
+        await self.broadcast({"type": "account", "account": self.account_view(), "trades": self.trades_today(),
+                              "fills": [public(f) for f in fills]})
+
+    async def error(self, text):
+        await self.broadcast({"type": "error", "text": text})
+
+    # ----- prefetch listener and API key
 
     async def on_load(self, text, progress=None):
         self.loading = {"text": text, "progress": progress} if text else None
@@ -161,7 +263,7 @@ class Game:
         while True:
             await asyncio.sleep(TICK)
             now = loop.time()
-            if self.speed and self.phase() == "ready":
+            if self.speed and not self.thinking and self.phase() == "ready":
                 carry += self.speed * (now - last)
                 if carry >= 1:
                     step = int(carry)
@@ -172,13 +274,149 @@ class Game:
             last = now
 
     async def advance(self, step):
-        bars = self.s.bars(self.view)
-        old, self.pos = self.pos, min(self.pos + step, len(bars))
-        await self.broadcast({"type": "tick", "clock": self.clock(), "prices": self.prices(),
-                              "bars": rows(bars.iloc[old: self.pos])})
-        if self.pos == len(bars):
-            self.speed = 0
-            await self.push_status()
+        s = self.s
+        n = len(s.bars(self.view))
+        old, self.pos = self.pos, min(self.pos + step, n)
+        fills, rejected = self.fill_waiting(old, self.pos)
+        if not self.today:  # the day's curve starts from the equity the day began with
+            self.today.append([self.time_at(0), round(self.day_start, 2)])
+        for i in range((old // 60 + 1) * 60, self.pos + 1, 60):  # equity at each minute closed in this step
+            self.today.append(self.point(i - 1))
+        await self.broadcast({"type": "tick", "clock": self.clock(), "prices": self.alias_prices(),
+                              "bars": rows(s.bars(self.view).iloc[old: self.pos], s.day_no),
+                              "ind": self.ind(old, self.pos), "account": self.account_view()})
+        if fills or rejected:
+            await self.push_account(fills)
+            for text in rejected:
+                await self.error(text)
+        if self.equity() <= 0:
+            await self.game_over()
+        elif self.pos == n:
+            await self.end_day()
+        elif self.agent.enabled and self.agent.api_key and self.pos - self.ai_mark >= self.agent.interval:
+            self.ai_mark, self.thinking = self.pos, True
+            asyncio.create_task(self.decide())
+
+    def fill_waiting(self, a, b):
+        """Fill waiting orders on bars a..b-1; returns (trades, rejection messages)."""
+        fills, rejected = [], []
+        for o in list(self.pending):
+            hit = orders.first_fill(o, self.s.bars(o["ticker"]).iloc[a:b])
+            if hit is None:
+                continue
+            self.pending.remove(o)
+            try:
+                fills.append(self.execute(o["ticker"], o["side"], o["dollars"], at=a + hit[0], price=hit[1], by=o["by"]))
+            except OrderError as e:
+                rejected.append(f"{o['type']} {o['side']} {o['stock']} not filled: {e}")
+        return fills, rejected
+
+    def close_all(self):
+        return [self.execute(t, "close", 0) for t in list(self.account.shares)]
+
+    async def end_day(self):
+        self.pending.clear()  # day orders expire
+        self.close_all()      # positions never stay open overnight
+        p = self.point(self.pos - 1)
+        self.today[-1:] = [self.today[-1], p] if self.today[-1][0] != p[0] else [p]
+        day_trades = [tr for tr in self.account.trades if tr["day"] == self.s.day_no]
+        self.days.append(stats.day_summary(self.s.day_no, [e for _, e in self.today], day_trades))
+        self.curve += self.today
+        self.today, self.speed = [], 0
+        self.autosave()
+        await self.push_snapshot()
+
+    async def game_over(self):
+        self.pending.clear()
+        self.close_all()
+        self.over, self.speed = True, 0
+        self.autosave()
+        await self.push_snapshot()
+
+    # ----- orders
+
+    def execute(self, ticker, side, dollars, at=None, price=None, by="you"):
+        """Fill now (or at bar `at`, optionally at `price`) through the account; raises OrderError."""
+        s, at = self.s, self.pos - 1 if at is None else at
+        prices = self.prices(at)
+        if price is not None:
+            prices[ticker] = price
+        return self.account.order(ticker, side, dollars, prices, day=s.day_no, t=self.time_at(at),
+                                  stock=s.stocks[ticker].alias, ticker=ticker, by=by)
+
+    def place(self, ticker, side, kind, price, dollars, by):
+        """Market and close orders (and limit/conditional orders already reached) fill now; others wait.
+        Returns the trade, or None if the order is waiting."""
+        if side == "close" or kind == "MKT" or orders.marketable(kind, side, price, self.prices()[ticker]):
+            return self.execute(ticker, side, dollars, by=by)
+        self.pending.append({"id": uuid.uuid4().hex[:6], "ticker": ticker, "stock": self.s.stocks[ticker].alias,
+                             "side": side, "type": kind, "price": price, "dollars": dollars, "by": by})
+        return None
+
+    async def order(self, msg):
+        ticker = self.s.ticker_of(msg.get("stock"))
+        side, kind, price, dollars = msg.get("side"), msg.get("type", "MKT"), msg.get("price"), msg.get("dollars")
+        if self.phase() != "ready":
+            return await self.error("Trading is closed right now.")
+        if ticker is None or side not in agent.SIDES or kind not in orders.KINDS:
+            return
+        if not isinstance(dollars, (int, float)) or (kind != "MKT" and side != "close"
+                                                     and not (isinstance(price, (int, float)) and price > 0)):
+            return await self.error("Enter an order size, and a price for LMT / IF orders.")
+        try:
+            trade = self.place(ticker, side, kind, price, float(dollars), "you")
+        except OrderError as e:
+            return await self.error(str(e))
+        await self.after_trade([trade] if trade else [])
+
+    async def after_trade(self, trades):
+        self.autosave()
+        await self.push_account(trades)
+        if self.equity() <= 0:
+            await self.game_over()
+
+    # ----- AI trader
+
+    async def decide(self):
+        """One AI decision: the clock waits until it is done (at most agent.TIMEOUT seconds)."""
+        await self.push_status()
+        entry = {"time": self.clock(), "note": "", "orders": [], "results": []}
+        try:
+            text = await asyncio.wait_for(agent.ask(self.agent, agent.snapshot(self)), agent.TIMEOUT)
+            todo, entry["note"] = agent.parse(text, [st.alias for st in self.s.stocks.values()], self.agent.max_dollars)
+            entry["orders"] = todo
+            fills = []
+            for o in todo:
+                try:
+                    trade = self.place(self.s.ticker_of(o["stock"]), o["side"], o["type"], o["price"], o["dollars"], "AI")
+                    fills += [trade] if trade else []
+                    entry["results"].append("filled" if trade else "waiting")
+                except OrderError as e:
+                    entry["results"].append(f"rejected: {e}")
+            if todo:
+                await self.after_trade(fills)
+        except asyncio.TimeoutError:
+            entry["error"] = "no answer within 20 seconds: no trade"
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as e:
+            entry["error"] = f"{type(e).__name__}: {e}"[:300] + " (no trade)"
+        finally:
+            self.thinking = False
+        self.ai_log = (self.ai_log + [entry])[-AI_LOG:]
+        await self.broadcast({"type": "ai", "entry": entry})
+        await self.push_status()
+
+    def configure_ai(self, body):
+        """Update AI settings from the settings panel; an empty api_key keeps the current one."""
+        cfg = self.agent
+        key = (body.get("api_key") or "").strip() or cfg.api_key
+        fields = agent.AgentConfig.__dataclass_fields__
+        for k, v in body.items():
+            if k in fields and k != "api_key":
+                setattr(cfg, k, type(getattr(cfg, k))(v))
+        cfg.api_key = key
+        cfg.interval = max(5, cfg.interval)
+        cfg.prompt = cfg.prompt.strip() or agent.STANDARD_PROMPT
+        self.ai_mark = self.pos
 
     # ----- commands
 
@@ -193,45 +431,90 @@ class Game:
             await self.error("Couldn't reach Alpaca. Check your connection and try again.")
 
     async def dispatch(self, cmd, msg):
+        s = self.s
         if cmd == "new_game":
             await self.new_game()
         elif cmd == "add":
             await self.add_stock()
         elif cmd == "replace":
-            await self.replace_stock(self.s and self.s.ticker_of(msg.get("stock")))
+            await self.replace_stock(s and s.ticker_of(msg.get("stock")))
         elif cmd == "next_day":
             await self.next_day()
         elif cmd == "speed" and msg.get("value") in SPEEDS:
             self.speed = msg["value"]
             await self.push_status()
-        elif cmd == "view" and self.s and (ticker := self.s.ticker_of(msg.get("stock"))):
+        elif cmd == "view" and s and (ticker := s.ticker_of(msg.get("stock"))):
             self.view = ticker
             await self.push_snapshot()
+        elif cmd == "order" and s:
+            await self.order(msg)
+        elif cmd == "cancel":
+            self.pending = [o for o in self.pending if o["id"] != msg.get("id")]
+            await self.after_trade([])
+        elif cmd == "close_all" and self.phase() == "ready":
+            await self.after_trade(self.close_all())
+        elif cmd == "clear_pnl":
+            await self.clear_pnl()
+        elif cmd == "configure":
+            await self.configure(msg)
+        elif cmd == "indicators":
+            self.shown = set(msg.get("names") or ()) & set(indicators.NAMES)
+            await self.push_snapshot()
+        elif cmd == "stats":
+            await self.broadcast({"type": "stats", "overall": stats.overall(
+                self.days, self.account.trades, [e for _, e in self.curve + self.today]),
+                "days": self.days, "curve": self.curve + self.today})
 
-    async def error(self, text):
-        await self.broadcast({"type": "error", "text": text})
+    def reset_account(self):
+        self.account.reset()
+        self.days, self.curve, self.today, self.pending, self.over = [], [], [], [], False
+        self.day_start = self.account.start
+        if self.s and self.s.ready():
+            self.today = [self.point(self.pos - 1)]
+
+    async def clear_pnl(self):
+        self.reset_account()
+        self.autosave()
+        await self.push_snapshot()
+
+    async def configure(self, msg):
+        try:
+            capital, leverage, per_share, min_fee = (float(msg[k]) for k in ("capital", "leverage", "fee_per_share", "min_fee"))
+        except (KeyError, TypeError, ValueError):
+            return await self.error("Settings must be numbers.")
+        if not (0 < capital <= MAX_CAPITAL and 1 <= leverage <= MAX_LEVERAGE and per_share >= 0 and min_fee >= 0):
+            return await self.error(f"Capital must be $1–${MAX_CAPITAL:,.0f} and leverage 1x–{MAX_LEVERAGE:g}x.")
+        a = self.account
+        a.capital, a.leverage, a.fee_per_share, a.min_fee = capital, leverage, per_share, min_fee
+        self.autosave()
+        await self.push_account()
 
     async def new_game(self):
         if self.client is None or self.picking:
             return
         self.stop_worker()
         self.s, self.speed, self.picking = None, 0, True
-        Cache.clear_all()
         await self.push_snapshot()
+        pool = []
         try:
             days = await universe.trading_days(self.client)
-            first = universe.pick_start(days, self.rng)
-            pool = await universe.volatile_pool(self.client, days, first)
+            for _ in range(PICK_TRIES):
+                first = universe.pick_start(days, self.rng)
+                if pool := await universe.volatile_pool(self.client, days, first):
+                    break
         finally:
             self.picking = False
-        ticker = universe.pick(pool, (), self.rng)
-        if ticker is None:
+        if not pool:
             await self.push_snapshot()
-            return await self.error("No stocks had data on the picked day. Try New game again.")
+            return await self.error("Couldn't find stocks with enough data. Try New game again.")
+        Cache.prune(saves.session_ids())
         self.s = Session(days[first - universe.WARMUP:], universe.WARMUP, pool)
+        ticker = universe.pick(pool, (), self.rng)
         self.s.stocks[ticker] = self.s.new_stock(ticker)
-        self.view, self.pos = ticker, 1
+        self.view, self.pos, self.ai_mark = ticker, 1, 1
+        self.reset_account()
         self.start_worker()
+        self.autosave()
         await self.push_snapshot()
 
     async def add_stock(self):
@@ -243,6 +526,7 @@ class Game:
             return await self.error("No more stocks left in this game's pool.")
         s.stocks[ticker] = s.new_stock(ticker)
         s.wake.set()
+        self.autosave()
         await self.push_snapshot()
 
     async def replace_stock(self, old):
@@ -252,12 +536,16 @@ class Game:
         new = universe.pick(s.pool, s.stocks, self.rng)
         if new is None:
             return await self.error("No more stocks left in this game's pool.")
+        if old in self.account.shares:
+            self.execute(old, "close", 0)
+        self.pending = [o for o in self.pending if o["ticker"] != old]
         self.stop_worker()  # it may be downloading the old ticker
         s.stocks = {(new if t == old else t): (s.new_stock(new) if t == old else st) for t, st in s.stocks.items()}
         s.cache.drop_ticker(old)
         if self.view == old:
             self.view = new
         self.start_worker()
+        self.autosave()
         await self.push_snapshot()
 
     async def next_day(self):
@@ -265,6 +553,30 @@ class Game:
         if s is None or self.phase() != "day_end" or s.day_idx + 1 >= len(s.days):
             return
         s.day_idx += 1
-        self.pos, self.speed = 1, 0
+        self.pos, self.speed, self.ai_mark = 1, 0, 1
+        self.day_start = self.account.cash  # no positions overnight
         s.wake.set()
+        self.autosave()
         await self.push_snapshot()
+
+    # ----- saving
+
+    def to_dict(self):
+        s = self.s
+        equity = self.equity() if s and s.ready() else self.account.cash
+        return {"session": s.to_dict() if s else None, "view": self.view, "pos": self.pos,
+                "account": asdict(self.account), "day_start": self.day_start, "over": self.over,
+                "days": self.days, "curve": self.curve, "today": self.today, "pending": self.pending,
+                "summary": {"day": s.day_no if s else None, "equity": round(equity, 2)}}
+
+    def restore(self, d):
+        self.stop_worker()
+        self.s = Session.from_dict(d["session"]) if d.get("session") else None
+        self.view, self.pos, self.speed, self.ai_mark = d["view"], d["pos"], 0, d["pos"]
+        self.account = Account(**d["account"])
+        self.day_start, self.over = d["day_start"], d["over"]
+        self.days, self.curve, self.today, self.pending = d["days"], d["curve"], d["today"], d.get("pending", [])
+        self.start_worker()
+
+    def autosave(self):
+        saves.autosave(self.to_dict())

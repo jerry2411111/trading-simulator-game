@@ -9,7 +9,8 @@ import pandas as pd
 from .data import ET
 
 UNIVERSE = Path(__file__).with_name("universe.json")
-FIRST_START = "2024-01-02"
+FIRST_START = "2020-01-02"
+LAST_START = "2025-12-31"
 LOOKBACK = 20        # trading days used to rank intraday range
 WARMUP = 5           # trading days of 1-minute bars before day 1
 MARGIN = 10          # latest start = today minus this many trading days
@@ -24,8 +25,9 @@ async def trading_days(client):
 
 
 def pick_start(days, rng):
-    lo = next(i for i, d in enumerate(days) if d.date >= FIRST_START)
-    return rng.randint(lo, len(days) - MARGIN)
+    """Uniform over trading days in [FIRST_START, LAST_START], and at least MARGIN days before today."""
+    starts = [i for i, d in enumerate(days[: len(days) - MARGIN + 1]) if FIRST_START <= d.date <= LAST_START]
+    return rng.choice(starts)
 
 
 async def volatile_pool(client, days, first):

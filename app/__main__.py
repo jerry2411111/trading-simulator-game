@@ -6,8 +6,8 @@ import time
 import uvicorn
 import webview
 
+from . import main as server
 from .data import DATA_DIR
-from .main import app
 
 PORT = 8765  # fixed so the window's saved preferences (same origin) survive restarts
 
@@ -23,15 +23,16 @@ def pick_port():
 
 def main():
     port = pick_port()
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
-    thread = threading.Thread(target=server.run, daemon=True)
+    uv = uvicorn.Server(uvicorn.Config(server.app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=uv.run, daemon=True)
     thread.start()
-    while not server.started and thread.is_alive():
+    while not uv.started and thread.is_alive():
         time.sleep(0.05)
-    webview.create_window("TapeTrainer", f"http://127.0.0.1:{port}/", width=1280, height=800,
-                          min_size=(360, 520), background_color="#07040f")
+    window = webview.create_window("TapeTrainer", f"http://127.0.0.1:{port}/", width=1280, height=800,
+                                   min_size=(360, 520), background_color="#07040f")
+    server.exit_hook = window.destroy  # "Exit game" in the settings menu closes the window
     webview.start(private_mode=False, storage_path=str(DATA_DIR / "webview"))
-    server.should_exit = True
+    uv.should_exit = True  # the server autosaves on shutdown
     thread.join(timeout=5)
 
 

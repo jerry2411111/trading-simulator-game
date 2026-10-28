@@ -1,20 +1,42 @@
-// Main chart: price (candle or line, player's choice) on top, volume bars always below.
-// The view always shows the last N minutes (30 s to 120 min, player's choice) and follows the clock.
+// Main chart: price (candle or line) with trade triangles and indicator overlays, volume bars always below,
+// optional MACD / KDJ panes and a random-walk cone. Shows the last N minutes and follows the clock.
 import {
-  createChart, CandlestickSeries, LineSeries, HistogramSeries,
+  createChart, createSeriesMarkers, CandlestickSeries, LineSeries, HistogramSeries,
 } from 'https://unpkg.com/lightweight-charts@5.0.0/dist/lightweight-charts.standalone.production.mjs';
 
 const STYLE_KEY = 'tt.priceStyle';
 const WINDOW_KEY = 'tt.windowMinutes';
-const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const CONE = 300; // random-walk band horizon, seconds
+const CONE_Z = 1.96;
 
-function stored(key) {
+export function stored(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 
-function store(key, value) {
+export function store(key, value) {
   try { localStorage.setItem(key, value); } catch { /* storage unavailable: choice lasts this visit */ }
 }
+
+export const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// Chart times are day * 86400 + seconds since midnight: show only the time of day.
+const hms = (t) => new Date((t % 86400) * 1000).toISOString().slice(11, 19);
+
+export const INDICATORS = [
+  ['sma5', 'SMA5'], ['sma10', 'SMA10'], ['sma20', 'SMA20'], ['sma60', 'SMA60'], ['ema12', 'EMA12'],
+  ['ema26', 'EMA26'], ['boll', 'BOLL'], ['sar', 'SAR'], ['band', 'RW 95%'], ['macd', 'MACD'], ['kdj', 'KDJ'],
+];
+
+// Per indicator: own pane or overlay, and one entry per data column (color variable, dashed, dots, histogram).
+const LOOK = {
+  sma5: [{ color: '--accent' }], sma10: [{ color: '--accent2' }], sma20: [{ color: '--warn' }],
+  sma60: [{ color: '--up' }], ema12: [{ color: '--ink' }], ema26: [{ color: '--muted' }],
+  boll: [{ color: '--accent2', dashed: true }, { color: '--muted' }, { color: '--accent2', dashed: true }],
+  sar: [{ color: '--warn', dots: true }],
+  macd: [{ color: '--accent' }, { color: '--accent2' }, { hist: true }],
+  kdj: [{ color: '--accent' }, { color: '--accent2' }, { color: '--warn' }],
+};
+const PANES = new Set(['macd', 'kdj']);
 
 // Rows arrive as [time, open, high, low, close, volume], one per second.
 const candle = ([time, open, high, low, close]) => ({ time, open, high, low, close });
@@ -22,34 +44,31 @@ const point = ([time, , , , value]) => ({ time, value });
 
 export class PriceChart {
   constructor(el) {
-    this.up = css('--up');
-    this.down = css('--down');
-    this.count = 0;
+    this.rows = [];
+    this.ind = {};       // name -> columns of values aligned with rows
+    this.series = {};    // name -> chart series per column
+    this.trades = [];
     this.chart = createChart(el, {
       autoSize: true,
-      layout: {
-        background: { color: css('--panel') }, textColor: css('--ink'),
-        fontFamily: 'VT323, monospace', fontSize: 16,
-        panes: { separatorColor: css('--accent2') },
+      localization: { timeFormatter: hms },
+      timeScale: {
+        timeVisible: true, secondsVisible: true, minBarSpacing: 0.01,
+        tickMarkFormatter: (t) => (hms(t).endsWith(':00') ? hms(t).slice(0, 5) : hms(t)),
       },
-      grid: { vertLines: { color: css('--grid') }, horzLines: { color: css('--grid') } },
-      crosshair: { vertLine: { color: css('--accent') }, horzLine: { color: css('--accent') } },
-      timeScale: { timeVisible: true, secondsVisible: true, borderColor: css('--accent'), minBarSpacing: 0.01 },
-      rightPriceScale: { borderColor: css('--accent') },
       handleScroll: false,
       handleScale: false,
     });
-    const up = this.up, down = this.down;
-    this.candle = this.chart.addSeries(CandlestickSeries, {
-      upColor: up, downColor: down, wickUpColor: up, wickDownColor: down, borderVisible: false,
-    });
-    this.line = this.chart.addSeries(LineSeries, { color: css('--accent'), lineWidth: 2 });
+    this.candle = this.chart.addSeries(CandlestickSeries, { borderVisible: false });
+    this.line = this.chart.addSeries(LineSeries, { lineWidth: 2 });
     this.volume = this.chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false,
     }, 1);
-    this.chart.panes()[1].setHeight(110);
-    this.setStyle(stored(STYLE_KEY) === 'line' ? 'line' : 'candle');
+    this.el = el;
+    new ResizeObserver(() => this.layoutPanes()).observe(el);
+    this.markers = [createSeriesMarkers(this.candle), createSeriesMarkers(this.line)];
     this.minutes = Number(stored(WINDOW_KEY)) || 10;
+    this.applyTheme();
+    this.setStyle(stored(STYLE_KEY) === 'line' ? 'line' : 'candle');
   }
 
   get style() { return this.line.options().visible ? 'line' : 'candle'; }
@@ -60,6 +79,27 @@ export class PriceChart {
     store(STYLE_KEY, style);
   }
 
+  // Re-read the palette (after a UI style change) and redraw everything with it.
+  applyTheme() {
+    const c = (v) => css(v);
+    this.up = c('--up');
+    this.down = c('--down');
+    this.chart.applyOptions({
+      layout: {
+        background: { color: c('--panel') }, textColor: c('--ink'), fontFamily: 'VT323, monospace', fontSize: 16,
+        attributionLogo: false, panes: { separatorColor: c('--accent2') },
+      },
+      grid: { vertLines: { color: c('--grid') }, horzLines: { color: c('--grid') } },
+      crosshair: { vertLine: { color: c('--accent') }, horzLine: { color: c('--accent') } },
+      timeScale: { borderColor: c('--accent') },
+      rightPriceScale: { borderColor: c('--accent') },
+    });
+    this.candle.applyOptions({ upColor: this.up, downColor: this.down, wickUpColor: this.up, wickDownColor: this.down });
+    this.line.applyOptions({ color: c('--accent') });
+    this.setData(this.rows, this.ind);
+    this.setTrades(this.trades);
+  }
+
   setWindow(minutes) {
     this.minutes = minutes;
     store(WINDOW_KEY, minutes);
@@ -67,26 +107,118 @@ export class PriceChart {
   }
 
   follow() {
-    this.chart.timeScale().setVisibleLogicalRange({ from: this.count - this.minutes * 60, to: this.count + 3 });
+    const n = this.rows.length;
+    const ahead = this.ind.band ? CONE : 3;
+    this.chart.timeScale().setVisibleLogicalRange({ from: n - this.minutes * 60, to: n + ahead });
   }
 
   bar(r) { return { time: r[0], value: r[5], color: `${r[4] >= r[1] ? this.up : this.down}99` }; }
 
-  setBars(rows) {
+  setData(rows, ind) {
+    this.rows = rows;
+    this.ind = ind;
     this.candle.setData(rows.map(candle));
     this.line.setData(rows.map(point));
     this.volume.setData(rows.map((r) => this.bar(r)));
-    this.count = rows.length;
+    this.drawIndicators();
     this.follow();
   }
 
-  append(rows) {
+  append(rows, ind) {
+    const start = this.rows.length;
+    this.rows.push(...rows);
     for (const r of rows) {
       this.candle.update(candle(r));
       this.line.update(point(r));
       this.volume.update(this.bar(r));
     }
-    this.count += rows.length;
+    for (const [name, cols] of Object.entries(ind)) {
+      if (!this.ind[name]) continue;
+      cols.forEach((col, j) => {
+        this.ind[name][j].push(...col);
+        if (name === 'band') return; // the cone is redrawn from the latest value below
+        col.forEach((v, k) => v != null && this.series[name]?.[j]?.update(this.point(name, j, rows[k][0], v)));
+      });
+    }
+    if (this.ind.band) this.drawCone();
+    if (rows.length && start === 0) this.setTrades(this.trades);
     this.follow();
   }
+
+  point(name, j, time, value) {
+    const look = LOOK[name]?.[j];
+    return look?.hist ? { time, value, color: value >= 0 ? this.up : this.down } : { time, value };
+  }
+
+  drawIndicators() {
+    for (const list of Object.values(this.series)) list.forEach((s) => this.chart.removeSeries(s));
+    this.series = {};
+    for (const [name, cols] of Object.entries(this.ind)) {
+      if (name === 'band') { this.series.band = this.coneSeries(); continue; }
+      const pane = PANES.has(name) ? this.chart.panes().length : 0;
+      this.series[name] = LOOK[name].map((look, j) => {
+        const s = look.hist
+          ? this.chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane)
+          : this.chart.addSeries(LineSeries, {
+            color: css(look.color), lineWidth: 1, lineStyle: look.dashed ? 2 : 0, lineVisible: !look.dots,
+            pointMarkersVisible: !!look.dots, pointMarkersRadius: 1, priceLineVisible: false,
+            lastValueVisible: false, crosshairMarkerVisible: false,
+          }, pane);
+        s.setData(cols[j].flatMap((v, k) => (v == null ? [] : [this.point(name, j, this.rows[k][0], v)])));
+        return s;
+      });
+    }
+    requestAnimationFrame(() => this.layoutPanes()); // after the chart has created the new panes
+    if (this.ind.band) this.drawCone();
+  }
+
+  // Volume / MACD / KDJ panes each take a share of the height, so price keeps most of a small window.
+  layoutPanes() {
+    const h = Math.max(40, Math.round(this.el.clientHeight * 0.17));
+    this.chart.panes().slice(1).forEach((p) => p.setHeight(h));
+  }
+
+  coneSeries() {
+    const opts = {
+      color: css('--warn'), lineWidth: 1, lineStyle: 2, priceLineVisible: false,
+      lastValueVisible: false, crosshairMarkerVisible: false,
+    };
+    return [this.chart.addSeries(LineSeries, opts), this.chart.addSeries(LineSeries, opts)];
+  }
+
+  // 95% random-walk band for the next 5 minutes from the latest close and 1-second volatility.
+  drawCone() {
+    const last = this.rows.at(-1);
+    const sigma = this.ind.band[0].at(-1);
+    if (!last || sigma == null) return this.series.band.forEach((s) => s.setData([]));
+    const [t0, , , , c0] = last;
+    const side = (sign) => Array.from({ length: CONE + 1 }, (_, h) => (
+      { time: t0 + h, value: c0 * Math.exp(sign * CONE_Z * sigma * Math.sqrt(h)) }));
+    this.series.band[0].setData(side(1));
+    this.series.band[1].setData(side(-1));
+  }
+
+  // Buy fills: green triangle below the bar; sell fills: red triangle above.
+  setTrades(trades) {
+    this.trades = trades;
+    const known = new Set(this.rows.map((r) => r[0]));
+    const marks = trades.filter((t) => known.has(t.t)).sort((a, b) => a.t - b.t).map((t) => ({
+      time: t.t, position: t.qty > 0 ? 'belowBar' : 'aboveBar', shape: t.qty > 0 ? 'arrowUp' : 'arrowDown',
+      color: t.qty > 0 ? this.up : this.down, size: 1.4,
+    }));
+    this.markers.forEach((m) => m.setMarkers(marks));
+  }
+}
+
+export function equityChart(el, points) {
+  const chart = createChart(el, {
+    autoSize: true,
+    layout: { background: { color: css('--panel') }, textColor: css('--ink'), attributionLogo: false },
+    grid: { vertLines: { visible: false }, horzLines: { color: css('--grid') } },
+    localization: { timeFormatter: (t) => `Day ${Math.floor(t / 86400)} ${hms(t)}` },
+    timeScale: { tickMarkFormatter: (t) => `D${Math.floor(t / 86400)} ${hms(t).slice(0, 5)}` },
+  });
+  chart.addSeries(LineSeries, { color: css('--accent'), lineWidth: 2 }).setData(points.map(([time, value]) => ({ time, value })));
+  chart.timeScale().fitContent();
+  return chart;
 }

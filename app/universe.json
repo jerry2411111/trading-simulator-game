@@ -9,6 +9,7 @@
     "AMAT", "TSM", "META", "NFLX", "AMZN", "DELL", "ANET", "VRT", "APP", "TTD",
     "OKTA", "TWLO", "PINS", "SNAP", "LYFT", "UBER", "DASH", "ABNB", "ETSY", "CHWY",
     "W", "GME", "MRNA", "VKTX", "CRSP", "HIMS", "SOUN", "SMR", "OKLO", "CCJ",
-    "FCX", "BA"
+    "FCX", "BA", "AAPL", "MSFT", "GOOGL", "BABA", "AAL", "AMC", "PLUG", "SPCE", "XOM", "BAC",
+    "DIS"
   ]
 }
