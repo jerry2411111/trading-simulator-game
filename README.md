@@ -51,7 +51,8 @@ Tests: `python -m pytest`
   trades without fee or spread, 10% gives 30 of them, 5% pays five times the profit of your next closing
   trade, and 5% gives a piece for your collection. Multipliers never apply to losses.
 - **Collection:** 100 rare pieces (great artworks, tanks, dresses, crowns, jewels, classic cars, watches,
-  instruments, relics, legends), rare to mythic, won as slot machine gifts. They can't be sold.
+  instruments, relics, legends), rare to mythic, won as slot machine gifts and shown in lit glass
+  cabinets in a museum showcase (Collection button). They can't be sold.
 - **Stats:** end-of-day card and a Stats screen (return, max drawdown, Sharpe, Sortino, trades, win rate,
   fees, equity curve).
 - **Settings** (the game pauses while open): 5 UI styles, trading settings (spread, fees), Clear PnL,

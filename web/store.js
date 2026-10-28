@@ -154,9 +154,7 @@ export function initStore(ctx) {
     }));
     const entries = Object.entries(data.catalog);
     let cards = [];
-    if (!data.has_game) {
-      cards = [Object.assign(document.createElement('p'), { className: 'muted', textContent: 'Start a game first: every game has its own home and coins.' })];
-    } else if (tab === 'Mortgage') {
+    if (tab === 'Mortgage') {
       cards = mortgageTab();
     } else if (tab === 'Sell') {
       cards = Object.entries(s.inventory).filter(([, n]) => n > 0).map(([id, n]) => {
@@ -174,9 +172,12 @@ export function initStore(ctx) {
         const buildLock = info.kind === 'build' && ((id === 'aquarium' && !data.has_tank) || (id === 'iceland' && !s.aquarium));
         const locked = (lock && info.kind !== 'build') || iceLock || buildLock;
         const note = iceLock ? 'Needs the ice land' : buildLock ? (id === 'aquarium' ? 'Needs a fish tank' : 'Needs the aquarium') : '';
-        return card(id, info, info.price, own ? 'Owned' : locked ? 'Locked' : 'Buy', 'buy', own || locked || data.locked || data.coins < info.price, note);
+        const short = Math.ceil(info.price - data.coins);
+        const label = own ? 'Owned' : locked ? 'Locked' : short > 0 ? `Need ${short.toLocaleString()} more` : 'Buy';
+        return card(id, info, info.price, label, 'buy', own || locked || data.locked || short > 0, note);
       });
       if (lock) cards.unshift(Object.assign(document.createElement('p'), { className: 'muted lock-note', textContent: lock }));
+      if (data.coins <= 0) cards.unshift(Object.assign(document.createElement('p'), { className: 'muted lock-note', textContent: 'No coins yet: profit from trading in this game becomes coins. Your home starts as a concrete shack on a wasteland.' }));
     }
     $('store-grid').replaceChildren(...cards);
     $('wallet').innerHTML = [

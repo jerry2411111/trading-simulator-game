@@ -1,6 +1,6 @@
-// The collection: 100 rare pieces won from the slot machine, shown on a full-window shelf. Each piece is
-// drawn in code (40 x 32 pixels) from its category's template with its own colors and details.
-import { disc, ellipse, glow, hash, outlined, rect } from './pixel.js';
+// The collection: 100 rare pieces won from the slot machine, shown in lit glass cabinets in a museum
+// hall. Each piece is drawn in code (40 x 32 pixels) from its category's template with its own details.
+import { disc, ellipse, fitCanvas, glow, hash, mouse, outlined, rect, sprite } from './pixel.js';
 
 const $ = (id) => document.getElementById(id);
 export const RARITY = { rare: '#3fa8ff', epic: '#b45cff', legendary: '#ffc23a', mythic: '#ff4fd8' };
@@ -195,62 +195,138 @@ export function drawCollectible(g, item, t, owned = true) {
   outlined(g, 0, 0, 40, 32, '#0a0612', (sg) => DRAW[item.category](sg, item, t));
 }
 
-// ---------------------------------------------------------------- the collection screen
+// ---------------------------------------------------------------- the collection showcase
+
+// A museum hall with one lit glass cabinet per category: ten pieces on two glass shelves.
+const SW = 256;
+const SH = 184;
+const SLOT = { x0: 25, w: 42, top: [24, 86], h: 48 };
+const VELVET = { art: '#3a0e2a', tank: '#1e2a1a', dress: '#3a0e3e', crown: '#2a0a3a', jewel: '#0e1a3a', car: '#2a1010', watch: '#1a1a2e', instrument: '#2e1a0e', relic: '#2a1e0e', legend: '#0e2a2e' };
+const QUESTION = ['.qqq.', 'q...q', '...q.', '..q..', '.....', '..q..'];
+
+const slotAt = (i) => ({ x: SLOT.x0 + (i % 5) * SLOT.w, y: SLOT.top[Math.floor(i / 5)] });
+
+function drawHall(g, t) {
+  rect(g, 0, 0, SW, SH, '#140a26');
+  for (let x = 4; x < SW; x += 10) for (let y = 8; y < 118; y += 12) { rect(g, x + ((y / 12) % 2) * 5, y, 1, 1, '#2a1a44'); }  // wallpaper
+  rect(g, 0, 0, SW, 3, '#ff4fd8'); rect(g, 0, 3, SW, 1, '#7a1a6a');
+  rect(g, 0, 120, SW, 32, '#22122e'); rect(g, 0, 120, SW, 2, '#c8a020'); for (let x = 6; x < SW; x += 24) rect(g, x, 126, 18, 20, '#2a1838');  // wainscot
+  for (let y = 152; y < SH; y += 8) for (let x = 0; x < SW; x += 8) rect(g, x, y, 8, 8, ((x + y) / 8) % 2 ? '#2a2a3a' : '#3a3a4e');  // marble floor
+  rect(g, 0, 152, SW, 1, '#5a5a7a');
+  [6, 249].forEach((px) => { rect(g, px, 140, 2, 22, '#c8a020'); disc(g, px + 1, 139, 2, '#ffe14d'); });  // velvet rope
+  for (let x = 8; x < 249; x++) rect(g, x, 141 + Math.round(Math.sin(((x - 8) / 241) * Math.PI) * 6), 1, 2, '#a8102e');
+}
+
+function drawCabinet(g, cat, pieces, owned, hover, t) {
+  rect(g, 14, 8, 228, 146, '#120a06');                                  // frame
+  rect(g, 15, 9, 226, 144, '#5a2e14'); rect(g, 15, 9, 226, 1, '#8a4e24');
+  rect(g, 18, 12, 220, 138, '#c8a020'); rect(g, 20, 14, 216, 134, '#120a06');
+  rect(g, 22, 16, 212, 130, VELVET[cat]);
+  for (let x = 22; x < 234; x += 4) rect(g, x, 16, 1, 130, 'rgba(255,255,255,0.03)');
+  rect(g, 100, 5, 56, 6, '#c8a020'); rect(g, 102, 6, 52, 4, '#8a6a10');  // title plaque
+  [[22, 150], [228, 150]].forEach(([x, y]) => rect(g, x, y, 6, 6, '#3a1e0a'));  // legs
+  SLOT.top.forEach((y) => {                                              // glass shelves
+    rect(g, 22, y + SLOT.h + 6, 212, 2, 'rgba(160,230,255,0.45)');
+    rect(g, 22, y + SLOT.h + 8, 212, 1, 'rgba(0,0,0,0.4)');
+  });
+  pieces.forEach((item, i) => {
+    const { x, y } = slotAt(i);
+    const have = owned.has(item.id);
+    if (have) {                                                          // spotlight cone from the top
+      for (let k = 0; k < SLOT.h; k += 2) rect(g, x + 20 - k / 3, y + k - 6, (k / 3) * 2 + 2, 2, 'rgba(255,240,200,0.05)');
+      glow(g, x + 20, y + 22, 18, item.rarity === 'mythic' ? '255,79,216' : '255,230,170', 0.25);
+    }
+    rect(g, x + 8, y + SLOT.h + 2, 24, 4, have ? '#d8d0e0' : '#4a4058'); rect(g, x + 8, y + SLOT.h + 2, 24, 1, '#ffffff');  // pedestal
+    rect(g, x + 14, y + SLOT.h + 10, 12, 3, have ? '#c8a020' : '#3a2a44');  // brass name plate
+    if (have) rect(g, x + 19, y + SLOT.h + 11, 2, 1, RARITY[item.rarity]);
+    const art = scratchArt(item, have, t);
+    g.drawImage(art, x + 1, y + 12);
+    if (!have) sprite(g, QUESTION, { q: '#8a7aa8' }, x + 18, y + 20);
+    if (have && (item.rarity === 'mythic' || item.rarity === 'legendary') && (t * 2 + i) % 3 < 0.4) {
+      rect(g, x + 33, y + 12, 1, 3, '#ffffff'); rect(g, x + 32, y + 13, 3, 1, '#ffffff');
+    }
+    if (hover === i) { rect(g, x, y + 8, 42, 1, '#00e5ff'); rect(g, x, y + SLOT.h + 13, 42, 1, '#00e5ff'); rect(g, x, y + 8, 1, SLOT.h + 6, '#00e5ff'); rect(g, x + 41, y + 8, 1, SLOT.h + 6, '#00e5ff'); }
+  });
+  const shine = ((t * 30) % 400) - 80;                                   // a reflection sliding over the glass
+  for (let k = 0; k < 130; k++) { const sx = 22 + shine + k * 0.5; if (sx > 22 && sx < 230) rect(g, sx, 16 + k, 4, 1, 'rgba(255,255,255,0.06)'); }
+  rect(g, 22, 16, 212, 130, 'rgba(120,220,255,0.04)');
+}
+
+const arts = new Map();
+function scratchArt(item, have, t) {
+  let c = arts.get(item.id);
+  if (!c) { c = document.createElement('canvas'); c.width = 40; c.height = 32; arts.set(item.id, c); }
+  if (have || !c.drawn) { drawCollectible(c.getContext('2d'), item, t, have); c.drawn = !have; }
+  return c;
+}
 
 export function initCollection(ctx) {
+  const canvas = $('showcase');
+  const g = canvas.getContext('2d');
   let data = null;
+  let cat = 'art';
   let pick = null;
-  const canvases = [];
+  let hover = null;
+  let running = false;
 
-  function render() {
+  const pieces = () => Object.values(data.collection.items).filter((i) => i.category === cat);
+  const ownedMap = () => new Map(data.state.collection.map((c) => [c.id, c]));
+
+  function renderTabs() {
     const { items, categories } = data.collection;
-    const owned = new Map(data.state.collection.map((c) => [c.id, c]));
+    const owned = ownedMap();
     $('collection-count').textContent = `${owned.size} / 100`;
-    canvases.length = 0;
-    const shelves = Object.entries(categories).map(([cat, title]) => {
-      const sec = document.createElement('section');
-      sec.className = 'shelf';
-      const list = Object.values(items).filter((i) => i.category === cat);
-      sec.innerHTML = `<div class="box-title">${title.toUpperCase()} · ${list.filter((i) => owned.has(i.id)).length}/${list.length}</div>`;
-      const row = document.createElement('div');
-      row.className = 'shelf-row';
-      list.forEach((item) => {
-        const b = document.createElement('button');
-        b.className = 'piece';
-        b.style.borderColor = owned.has(item.id) ? RARITY[item.rarity] : '';
-        const c = document.createElement('canvas');
-        c.width = 40;
-        c.height = 32;
-        c.className = 'pixel';
-        canvases.push([c, item, owned.has(item.id)]);
-        b.append(c);
-        b.title = owned.has(item.id) ? item.name : '???';
-        b.onclick = () => { pick = item; detail(owned); };
-        row.append(b);
-      });
-      sec.append(row);
-      return sec;
-    });
-    $('collection-shelves').replaceChildren(...shelves);
-    detail(owned);
+    $('showcase-tabs').replaceChildren(...Object.entries(categories).map(([id, title]) => {
+      const b = document.createElement('button');
+      const n = Object.values(items).filter((i) => i.category === id && owned.has(i.id)).length;
+      b.textContent = `${title} ${n}/10`;
+      b.classList.toggle('active', id === cat);
+      b.onclick = () => { cat = id; pick = null; renderTabs(); detail(); };
+      return b;
+    }));
   }
 
-  function detail(owned) {
+  function detail() {
     const box = $('collection-detail');
-    if (!pick) { box.innerHTML = '<p class="muted">Every 5 trades you spin the slot machine; a GIFT adds a piece here. Rarer pieces come up less often. Collection pieces can never be sold.</p>'; return; }
+    const owned = ownedMap();
+    if (!pick) {
+      box.innerHTML = `<div class="box-title">${data.collection.categories[cat].toUpperCase()}</div>
+        <p class="muted">Every 5 trades the slot machine spins; a GIFT puts a new piece in its cabinet. Rarer pieces come up less often:
+        <span style="color:${RARITY.rare}">rare</span>, <span style="color:${RARITY.epic}">epic</span>,
+        <span style="color:${RARITY.legendary}">legendary</span>, <span style="color:${RARITY.mythic}">mythic</span>.
+        Collection pieces can never be sold. Click a piece to look closer.</p>`;
+      return;
+    }
     const have = owned.get(pick.id);
-    box.innerHTML = `<canvas id="piece-big" class="pixel" width="40" height="32"></canvas>
+    box.innerHTML = `<div class="box-title">${data.collection.categories[cat].toUpperCase()}</div><canvas id="piece-big" class="pixel" width="40" height="32"></canvas>
       <p><b>${have ? pick.name : '???'}</b><br><span style="color:${RARITY[pick.rarity]}">${pick.rarity.toUpperCase()}</span></p>
       <p>${have ? pick.note : 'Not found yet. Keep trading and spinning.'}</p>${have ? `<p class="muted">Won on day ${have.day}.</p>` : ''}`;
-    canvases.push([$('piece-big'), pick, Boolean(have)]);
   }
 
-  let running = false;
+  function fit() { fitCanvas(canvas, SW, SH); }
+  new ResizeObserver(fit).observe(canvas.parentElement);
+
+  canvas.onmousemove = (e) => {
+    if (!data) return;
+    const m = mouse(canvas, e);
+    hover = pieces().findIndex((_, i) => { const { x, y } = slotAt(i); return m.x >= x && m.x < x + SLOT.w && m.y >= y + 8 && m.y < y + SLOT.h + 14; });
+    if (hover < 0) hover = null;
+    canvas.style.cursor = hover == null ? 'default' : 'pointer';
+  };
+  canvas.onmouseleave = () => { hover = null; };
+  canvas.onclick = () => { if (hover != null) { pick = pieces()[hover]; detail(); } };
+
   function loop() {
     if (!running) return;
     const t = performance.now() / 1000;
-    canvases.forEach(([c, item, own]) => { if (own || !c.drawn) { drawCollectible(c.getContext('2d'), item, t, own); c.drawn = true; } });
-    setTimeout(() => requestAnimationFrame(loop), 100);
+    if (data) {
+      const owned = ownedMap();
+      drawHall(g, t);
+      drawCabinet(g, cat, pieces(), owned, hover, t);
+      const big = $('piece-big');
+      if (big && pick) drawCollectible(big.getContext('2d'), pick, t, owned.has(pick.id));
+    }
+    setTimeout(() => requestAnimationFrame(loop), 80);
   }
 
   return {
@@ -258,9 +334,10 @@ export function initCollection(ctx) {
       $('collection').hidden = false;
       data = await (await fetch('/api/home')).json();
       pick = null;
-      render();
-      running = true;
-      loop();
+      fit();
+      renderTabs();
+      detail();
+      if (!running) { running = true; loop(); }
     },
     close() { running = false; $('collection').hidden = true; },
   };
