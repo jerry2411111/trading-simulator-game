@@ -65,7 +65,7 @@ function closeScreens() {
   refreshCoins();
 }
 const screens = {
-  home: initHome({ toast, theme, coins: setCoins, onHome, openStore: (tab) => openScreen('store', tab), openPet: (id) => petWindow.open(id) }),
+  home: initHome({ toast, theme, coins: setCoins, onHome, openStore: (tab) => openScreen('store', tab), openPet: (id) => petWindow.open(id), backToTrading: () => closeScreens() }),
   store: initStore({ toast, coins: setCoins, onHome }),
   collection: initCollection({ toast }),
 };
@@ -262,6 +262,18 @@ function renderTabs() {
     b.innerHTML = `<b>${name}</b><span class="num">${state.prices?.[name]?.toFixed(2) ?? '—'}</span>`
       + (pos ? `<i class="${pos.shares > 0 ? 'up' : 'down'}">${pos.shares > 0 ? '▲' : '▼'}${Math.abs(pos.shares)}</i>` : '');
     b.onclick = () => send('view', { stock: name });
+    if (s.stocks.length > 1) {  // stop following this stock (one always stays)
+      const x = document.createElement('span');
+      x.className = 'tab-close';
+      x.textContent = '✕';
+      x.title = `Stop following ${name}`;
+      x.onclick = (e) => {
+        e.stopPropagation();
+        const note = pos ? ' Its position will be closed at the current price.' : '';
+        if (window.confirm(`Stop following ${name}?${note}`)) send('remove', { stock: name });
+      };
+      b.append(x);
+    }
     return b;
   }));
   $('add').disabled = !s || s.stocks.length >= 5;

@@ -765,10 +765,10 @@ const FURN = {
     for (let i = 5; i < 29; i += 6) for (let j = 8; j < 23; j += 5) { rect(g, i, j, 1, 1, '#c8c0b4'); rect(g, i + 1, j + 1, 1, 1, '#ffffff'); }  // quilting buttons
     rect(g, 1, 23, 30, 5, '#c8d0dc'); for (let i = 1; i < 31; i += 3) rect(g, i, 23, 1, 5, '#9aa8bc');  // the thick striped side
     rect(g, 1, 23, 30, 1, '#a8a8b4'); rect(g, 2, 28, 28, 1, '#7a8494');
-    rect(g, 4, 6, 11, 6, '#ffffff'); rect(g, 4, 11, 11, 1, '#d8d4cc'); rect(g, 5, 7, 3, 1, '#e8e4dc');  // a puffy pillow
-    for (let j = 0; j < 9; j++) rect(g, 13 + (j % 3 === 0 ? 1 : 0), 14 + j, 17 - (j % 3 === 0 ? 1 : 0), 1, j % 3 === 1 ? '#5a6a9a' : '#6a7aaa');  // a blanket, half off
-    rect(g, 26, 23, 5, 6, '#6a7aaa'); rect(g, 27, 28, 4, 1, '#4a5a8a');
-    rect(g, 15, 16, 8, 1, '#8a9aca'); rect(g, 18, 19, 7, 1, '#4a5a8a');
+    rect(g, 7, 5, 18, 6, '#ffffff'); rect(g, 6, 6, 20, 4, '#ffffff'); rect(g, 7, 10, 18, 1, '#d8d4cc'); rect(g, 9, 6, 4, 1, '#e8e4dc');  // the pillow, across the head end
+    for (let j = 0; j < 10; j++) rect(g, 3 - (j > 6 ? 1 : 0), 13 + j, 25 + (j > 6 ? 1 : 0), 1, j % 3 === 1 ? '#5a6a9a' : '#6a7aaa');  // the blanket over the lower half
+    rect(g, 0, 21, 4, 8, '#6a7aaa'); rect(g, 0, 28, 3, 1, '#4a5a8a'); rect(g, 1, 23, 1, 4, '#5a6a9a');  // hanging off the far side from the laptop
+    rect(g, 6, 13, 21, 1, '#8a9aca'); rect(g, 9, 17, 9, 1, '#8a9aca'); rect(g, 14, 20, 8, 1, '#4a5a8a');
   },
   old_laptop(g, w, h, t) {  // a chunky old laptop with a cracked, flickering screen
     rect(g, 2, 9, 12, 5, '#3a3a40'); rect(g, 3, 10, 10, 3, '#2a2a30'); for (let i = 4; i < 12; i += 2) rect(g, i, 11, 1, 1, '#5a5a62');

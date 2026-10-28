@@ -545,6 +545,8 @@ class Game:
             await self.add_stock()
         elif cmd == "replace":
             await self.replace_stock(s and s.ticker_of(msg.get("stock")))
+        elif cmd == "remove":
+            await self.remove_stock(s and s.ticker_of(msg.get("stock")))
         elif cmd == "next_day":
             await self.next_day()
         elif cmd == "speed" and msg.get("value") in SPEEDS:
@@ -705,6 +707,28 @@ class Game:
         self.start_worker()
         self.autosave()
         await self.push_snapshot()
+
+    async def remove_stock(self, old):
+        """Stop following a stock: its position is closed and its waiting orders cancelled. One must stay."""
+        s = self.s
+        if s is None or old not in s.stocks:
+            return
+        if len(s.stocks) < 2:
+            return await self.error("You need at least one stock.")
+        if old in self.account.shares:
+            if old not in self.prices():
+                return await self.error("Wait until its data has loaded: its position has to be closed first.")
+            self.settle([self.execute(old, "close", 0, by="auto")])
+        self.pending = [o for o in self.pending if o["ticker"] != old]
+        self.stop_worker()  # it may be downloading the removed ticker
+        del s.stocks[old]
+        s.cache.drop_ticker(old)
+        if self.view == old:
+            self.view = next(iter(s.stocks))
+        self.start_worker()
+        self.autosave()
+        await self.push_snapshot()
+        await self.push_account()
 
     async def next_day(self):
         s = self.s

@@ -18,7 +18,8 @@ const GW = 256;
 const GH = 208;
 const DOOR = { x: 128, y: 86 };
 const GARAGE = { x: 64, y: 86 };
-const WALL_T = 6;  // the garden wall's thickness  // the garage stands left of a small house
+const WALL_T = 6;  // the garden wall's thickness
+const SCREENS = new Set(['old_laptop', 'computer']);  // clicking these in the house goes back to trading  // the garage stands left of a small house
 const ZONES = {  // the garden's parts; the house lot above them is always the house's
   path: [{ x: 6, y: 86, w: 244, h: 14 }, { x: 116, y: 160, w: 24, h: 44 }],
   west: [{ x: 6, y: 100, w: 86, h: 60 }],
@@ -344,7 +345,9 @@ export function initHome(ctx) {
           for (let x = r.x + 12; x <= r.x + r.w - 12; x += 28) {
             const k = zi * 97 + ri * 31 + x * 0.13 + y * 0.71;
             if (hash(k) < 0.75) continue;  // a few pieces per part
-            junk.push({ x: x + Math.round((hash(k + 1) - 0.5) * 10), y: y - Math.round(hash(k + 2) * 5), kind: GARBAGE_KINDS[Math.floor(hash(k + 3) * GARBAGE_KINDS.length)] });
+            const jx = x + Math.round((hash(k + 1) - 0.5) * 10);
+            if (Math.abs(jx - DOOR.x) < 18) continue;  // the stone road from the gate to the door stays clear
+            junk.push({ x: jx, y: y - Math.round(hash(k + 2) * 5), kind: GARBAGE_KINDS[Math.floor(hash(k + 3) * GARBAGE_KINDS.length)] });
           }
         }
       });
@@ -1071,7 +1074,8 @@ export function initHome(ctx) {
       const p = editing || hoverExit ? null : petInsideAt(m);
       inside.forEach((q) => { q.petted = q === p; });
       canvas.style.cursor = p ? 'grab' : 'pointer';
-      canvas.title = hoverExit ? 'Go out to the garden' : '';
+      const screen = !editing && !p && SCREENS.has(furnitureAt(hoverTile)?.item);
+      canvas.title = hoverExit ? 'Go out to the garden' : screen ? 'Back to trading' : '';
     }
   };
   canvas.onmouseleave = () => { hoverPet = null; hoverExit = false; inside.forEach((q) => { q.petted = false; }); hoverTile = null; };
@@ -1129,6 +1133,7 @@ export function initHome(ctx) {
       if (G(p) === 'lion') shake = t + 0.5;
       return;
     }
+    if (SCREENS.has(furnitureAt(tile)?.item)) return ctx.backToTrading();  // the laptop takes you back to the charts
     const indoor = [...inside.values()].filter((q) => q.place === 'house' && q.status !== 'dead');
     const buddy = indoor.find((q) => q.id === data.companion) ?? indoor[0];
     if (!buddy) return;
@@ -1292,7 +1297,7 @@ export function initHome(ctx) {
     renderPetList(s);
     side.append(button(editing ? 'Done arranging' : 'Arrange furniture', () => { editing = !editing; holding = null; selected = null; renderSide(); }, editing ? 'active' : 'primary'));
     if (!editing) {
-      side.append(el('<p class="muted">Your pets live here and use the furniture. Hover a pet to pet it, click it for a trick, click the floor to call your companion. Click the front door (bottom) to go back out.</p>'));
+      side.append(el('<p class="muted">Your pets live here and use the furniture. Hover a pet to pet it, click it for a trick, click the floor to call your companion. Click the front door (bottom) to go back out, or the laptop to go back to trading.</p>'));
       renderStatusLine();
       return;
     }

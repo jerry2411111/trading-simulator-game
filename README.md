@@ -65,6 +65,8 @@ Tests: `python -m pytest`
 - **Your pet:** the head of your companion pet next to the chart. Focused when you're flat, expecting
   when your open position is winning, anxious when it's losing, happy (+$) or sad (−$) when a trade
   closes. Hover it to pat it. Pick the companion in the garden; hide it in Settings → UI style.
+- Stocks: add up to 5, replace one, or stop following one with the ✕ on its tab (its position closes; one
+  always stays).
 - Keyboard: B buy, S sell, C close, Space pause / resume, 1–5 switch stock.
 
 ## Home and Store
