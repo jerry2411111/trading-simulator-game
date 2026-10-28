@@ -23,6 +23,7 @@ TICK = 0.1           # seconds between clock pushes: at most 10 WebSocket messag
 MAX_STOCKS = 5
 SESSION_DAYS = 7
 PICK_TRIES = 5       # random start days to try before giving up on an empty stock pool
+VOLATILITY = 3.0     # new games make every price move 3x bigger (games saved before keep 1x)
 AI_LOG = 30          # AI decisions kept for the log panel
 REVEAL_SECONDS = 2 * 3600  # the 2-hour range reveal
 
@@ -62,6 +63,7 @@ class Session:
         self.minute_end = min(first + SESSION_DAYS - 1, len(days) - 1)  # last day with 1-minute bars
         self.stocks = {}          # real ticker -> Stock; tickers never leave the backend
         self.added = 0
+        self.amp = VOLATILITY     # how much bigger every price move is
         self.cache = Cache(self.id)
         self.wake = asyncio.Event()
 
@@ -90,12 +92,13 @@ class Session:
     def to_dict(self):
         return {"id": self.id, "days": [[d.date, d.open.isoformat(), d.close.isoformat()] for d in self.days],
                 "first": self.first, "day_idx": self.day_idx, "minute_end": self.minute_end, "pool": self.pool,
-                "stocks": [[t, st.alias, st.joined] for t, st in self.stocks.items()], "added": self.added}
+                "stocks": [[t, st.alias, st.joined] for t, st in self.stocks.items()], "added": self.added, "amp": self.amp}
 
     @classmethod
     def from_dict(cls, d):
         s = cls([Day(x, pd.Timestamp(o), pd.Timestamp(c)) for x, o, c in d["days"]], d["first"], d["pool"], d["id"])
         s.day_idx, s.minute_end, s.added = d["day_idx"], d["minute_end"], d["added"]
+        s.amp = d.get("amp", 1.0)  # games saved before the 3x volatility keep their prices
         s.stocks = {t: Stock(t, a, j) for t, a, j in d["stocks"]}
         return s
 

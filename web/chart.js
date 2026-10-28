@@ -176,7 +176,7 @@ export class PriceChart {
     for (const list of Object.values(this.series)) list.forEach((s) => this.chart.removeSeries(s));
     this.series = {};
     for (const [name, cols] of Object.entries(this.ind)) {
-      if (name === 'band') { this.series.band = this.coneSeries(); continue; }
+      if (name === 'band') { this.series.band = this.coneSeries(); this.coneAt = null; continue; }
       const pane = PANES.has(name) ? this.chart.panes().length : 0;
       this.series[name] = look(name).map((col, j) => {
         const s = col.hist
@@ -219,12 +219,16 @@ export class PriceChart {
     return [this.chart.addSeries(LineSeries, opts), this.chart.addSeries(LineSeries, opts)];
   }
 
-  // 95% random-walk band for the next 5 minutes from the latest close and 1-second volatility.
+  // 95% random-walk band, fixed at the start of each 5-minute block (from the 1-second volatility of the
+  // 15 minutes before it) and reaching the block's end, so the price can be watched moving through it.
   drawCone() {
-    const last = this.rows.at(-1);
-    const sigma = this.ind.band[0].at(-1);
-    if (!last || sigma == null) return this.series.band.forEach((s) => s.setData([]));
-    const [t0, , , , c0] = last;
+    const n = this.rows.length;
+    const k = n - 1 - ((n - 1) % CONE);  // one bar per second from the open: blocks start every 300 bars
+    const sigma = this.ind.band[0][k];
+    if (!n || sigma == null) { this.coneAt = null; return this.series.band.forEach((s) => s.setData([])); }
+    if (this.coneAt === k) return;
+    this.coneAt = k;
+    const [t0, , , , c0] = this.rows[k];
     const side = (sign) => Array.from({ length: CONE + 1 }, (_, h) => (
       { time: t0 + h, value: c0 * Math.exp(sign * CONE_Z * sigma * Math.sqrt(h)) }));
     this.series.band[0].setData(side(1));

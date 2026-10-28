@@ -96,14 +96,17 @@ def snapshot(game):
         sec = st.seconds[date].iloc[: game.pos]
         item = {"price": round(prices[t], 4)}
         if cols:
-            past = rescale(st.minutes[st.minutes.index < s.day.open], st.scale)[COLS]
+            past = rescale(st.minutes[st.minutes.index < s.day.open], st.scale, s.amp)[COLS]
             today = sec.resample("1min").agg({"o": "first", "h": "max", "l": "min", "c": "last", "v": "sum"})
             item["bars_1m"] = table(pd.concat([past, today]).tail(120), cols, label)
             item["bars_1s"] = table(sec.tail(60), cols, label)
         if cfg.share_indicators:
             values = indicators.latest(game.values(st, indicators.NAMES), game.pos - 1)
-            lo, hi = indicators.band(values["band"]["sigma_1s"] or 0.0, prices[t])
-            values["band"] |= {"lower_5m": round(lo, 4), "upper_5m": round(hi, 4)}
+            k = indicators.band_anchor(game.pos - 1)  # the band is fixed at the start of this 5-minute block
+            sigma = indicators.latest(game.values(st, ["band"]), k)["band"]["sigma_1s"] or 0.0
+            lo, hi = indicators.band(sigma, float(sec["c"].iloc[k]))
+            values["band"] = {"sigma_1s": sigma, "block_start_price": round(float(sec["c"].iloc[k]), 4),
+                              "lower_at_block_end": round(lo, 4), "upper_at_block_end": round(hi, 4)}
             item["indicators"] = values
         stocks[st.alias] = item
     return {"time": game.clock(), "day": s.day_no, "stocks": stocks,

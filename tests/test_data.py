@@ -1,6 +1,8 @@
 import pandas as pd
 
-from app.data import Day, trades_to_seconds
+import pytest
+
+from app.data import Day, rescale, trades_to_seconds
 
 
 def test_trades_to_seconds_ohlcv_and_forward_fill():
@@ -20,3 +22,12 @@ def test_trades_to_seconds_ohlcv_and_forward_fill():
     assert bars.iloc[2].tolist() == [9.8, 9.8, 9.8, 9.8, 0]      # empty: forward-filled close
     assert bars.iloc[3].tolist() == [11.0, 11.0, 11.0, 11.0, 13]  # flagged print: volume only
     assert bars.iloc[4].tolist() == [11.0, 11.0, 11.0, 11.0, 0]
+
+
+def test_rescale_opens_at_100_and_triples_moves():
+    bars = pd.DataFrame({"o": [50.0], "h": [51.0], "l": [49.5], "c": [50.5], "v": [1000.0]})
+    out = rescale(bars, 2.0, amp=3.0)                   # $50 -> $100, then every move from $100 is 3x
+    assert out["o"][0] == pytest.approx(100.0)
+    assert out["c"][0] == pytest.approx(100 * 1.01 ** 3)  # +1% becomes about +3%
+    assert out["h"][0] > out["c"][0] > out["o"][0] > out["l"][0] and out["v"][0] == 500
+    assert rescale(bars, 2.0)["c"][0] == pytest.approx(101.0)

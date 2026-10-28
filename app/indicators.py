@@ -15,8 +15,8 @@ NAMES = ([f"ma{n}" for n in MA_PERIODS] + [f"ema{n}" for n in EMA_PERIODS]
 PERIODIC = re.compile(r"^(ma|ema)(\d+)$")
 COLUMNS = {"boll": ["upper", "mid", "lower"], "macd": ["macd", "signal", "hist"], "kdj": ["k", "d", "j"],
            "band": ["sigma_1s"]}
-BAND_WINDOW = 600    # seconds of history behind the random-walk band (10 minutes)
-BAND_HORIZON = 300   # seconds ahead the band reaches (5 minutes)
+BAND_WINDOW = 900    # seconds of history behind the random-walk band (15 minutes)
+BAND_HORIZON = 300   # the band is anchored at the start of each 5-minute block and reaches its end
 BAND_Z = 1.96        # 95% two-sided
 
 
@@ -101,6 +101,12 @@ def walk_sigma(c, n=BAND_WINDOW):
     P * exp(+-1.96 * sigma * sqrt(h)) for h seconds with 95% probability."""
     r = np.diff(np.log(c), prepend=np.nan)
     return rolling(r, n, np.std)
+
+
+def band_anchor(i, h=BAND_HORIZON):
+    """Bar index where the band through bar i is anchored: the start of its 5-minute block (bars are one
+    per second from the 9:30 open, so blocks start at multiples of 300)."""
+    return i - i % h
 
 
 def band(sigma, price, h=BAND_HORIZON):

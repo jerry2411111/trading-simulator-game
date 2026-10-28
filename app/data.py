@@ -182,10 +182,11 @@ def minutes_to_seconds(minutes, day, prev_close):
     return fill_seconds(m.set_axis(m.index + pd.Timedelta(seconds=59)), day, prev_close)
 
 
-def rescale(bars, k):
-    """Prices times k, volume divided by k: dollar volume and percentage moves are unchanged."""
+def rescale(bars, k, amp=1.0):
+    """Prices times k (so the stock opens at $100 on the day it joined), with every move from $100 made
+    `amp` times bigger in percentage terms: 100 * (p / 100) ** amp. Volume is divided by k."""
     out = bars.copy()
-    out[["o", "h", "l", "c"]] *= k
+    out[["o", "h", "l", "c"]] = 100 * (out[["o", "h", "l", "c"]] * k / 100) ** amp
     out["v"] /= k
     return out
 
@@ -326,6 +327,6 @@ class Prefetcher:
             else:
                 bars = minutes_to_seconds(day_minutes, day, prev_close)
                 st.fallback.add(day.date)
-        st.seconds[day.date] = rescale(bars, st.scale)
+        st.seconds[day.date] = rescale(bars, st.scale, s.amp)
         for old in sorted(st.seconds)[:-MAX_SECOND_DAYS]:
             del st.seconds[old]
