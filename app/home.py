@@ -6,8 +6,8 @@ Coins = this game's trading profit
       - spending (purchases, cleanup, floors, food). Every coin movement is logged.
 
 Things can be mortgaged for dollars paid into the trading account: one house, building or piece of
-furniture (a house is worth $20,000 plus its price), or the whole home (worth $20,000 plus everything in
-it; it locks the home until paid back).
+furniture (a house is worth $20,000 plus its price and its furniture), or the whole home (worth $20,000
+plus everything in it except pets; it locks the home until paid back).
 Each mortgage picks a plan from PLANS: how much of the value is lent and the daily interest. Interest is
 paid every trading day from the account's cash at the close (interest only; paying the loan back takes
 the same dollars out again); if the cash can't cover it, the bank takes the mortgaged thing (and the loan
@@ -353,11 +353,11 @@ def _pledged(d, kind, ref):
 
 
 def home_value(d):
-    """What everything in the home cost: houses, buildings, furniture, animals, plants, cleanup and floors."""
+    """What the home is worth to the bank: houses, buildings, furniture, water animals, plants, cleanup and
+    floors. Pets (and their clothes) never count."""
     value = sum(HOUSES[h][1] for h in d["houses"]) + sum(BUILD[b][1] for b in BUILD if d[b])
     value += sum(FURNITURE[f["item"]][1] for _, f in _furniture(d))
     value += sum(FURNITURE[k][1] * n for k, n in d["inventory"].items() if k in FURNITURE)
-    value += sum(PETS[p["type"]][1] + sum(CATALOG[c]["price"] for c in p.get("outfits", [])) for p in d["pets"])
     value += sum(CATALOG[a["type"]]["price"] for a in d["aquatic"])
     value += sum(CATALOG[p["type"]]["price"] for p in d["flowers"] + d["trees"] if p)
     value += sum(ZONES[z][1] + (FLOORS[v["floor"]][1] if v["floor"] else 0) for z, v in d["zones"].items())
@@ -366,19 +366,24 @@ def home_value(d):
 
 def loan_offers(d):
     """Everything that can be mortgaged now: [{kind, ref, label, value}]; the loan is a plan's share of the
-    value. A house is worth the $20,000 base plus its price; the whole home is worth the base plus
-    everything in it, less what is already mortgaged (so the base is never counted twice)."""
+    value. A house is worth the $20,000 base plus its price plus the furniture in it (that isn't mortgaged
+    on its own); the whole home is worth the base plus everything in it except pets, less what is already
+    mortgaged (so nothing is counted twice)."""
     if locked(d):
         return []
     taken = {(loan["kind"], loan["ref"]) for loan in d["loans"]}
-    offers = [{"kind": "house", "ref": h, "label": HOUSES[h][0], "value": HOME_LOAN_BASE + HOUSES[h][1]} for h in d["houses"]]
+    pledged_houses = {ref for kind, ref in taken if kind == "house"}
+    def furnished(h):
+        return sum(FURNITURE[f["item"]][1] for f in d["layouts"].get(h, []) if ("furniture", f["id"]) not in taken)
+    offers = [{"kind": "house", "ref": h, "label": f"{HOUSES[h][0]} (with its furniture)",
+               "value": HOME_LOAN_BASE + HOUSES[h][1] + furnished(h)} for h in d["houses"]]
     offers += [{"kind": "build", "ref": b, "label": BUILD[b][0].split(" (")[0], "value": BUILD[b][1]} for b in BUILD if d[b]]
     offers += [{"kind": "furniture", "ref": f["id"], "label": f"{FURNITURE[f['item']][0]} ({HOUSES[h][0].lower()})",
-                "value": FURNITURE[f["item"]][1]} for h, f in _furniture(d)]
+                "value": FURNITURE[f["item"]][1]} for h, f in _furniture(d) if h not in pledged_houses]
     offers = [o for o in offers if (o["kind"], o["ref"]) not in taken]
     pledged = sum(loan["value"] for loan in d["loans"] if loan["kind"] != "all")
     whole = max(0, HOME_LOAN_BASE + home_value(d) - pledged)
-    return [{"kind": "all", "ref": "all", "label": "The whole home (garden, houses and everything in them)", "value": whole}] + offers
+    return [{"kind": "all", "ref": "all", "label": "The whole home (garden, houses and everything in them except pets)", "value": whole}] + offers
 
 
 def _mortgage(d, body):
@@ -425,11 +430,11 @@ def charge_interest(home, cash):
 
 
 def _foreclose(d, loan):
-    """The bank takes what was mortgaged; the debt goes with it. Coins and the collection stay."""
+    """The bank takes what was mortgaged; the debt goes with it. Coins, pets and the collection stay."""
     d["loans"].remove(loan)
     kind, ref = loan["kind"], loan["ref"]
     if kind == "all":
-        keep = {k: d[k] for k in ("income", "spent", "log", "collection")}
+        keep = {k: d[k] for k in ("income", "spent", "log", "collection", "pets", "companion")}  # pets were never pledged
         d.clear()
         d.update(new())
         d.update(keep)

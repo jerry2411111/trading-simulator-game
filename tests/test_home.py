@@ -163,13 +163,15 @@ def test_interest_is_paid_daily_and_unpaid_interest_forecloses():
         h("sell", item="modern")
 
 
-def test_foreclosing_the_whole_home_keeps_coins_and_collection():
+def test_foreclosing_the_whole_home_keeps_coins_pets_and_collection():
     h = Home()
     h("buy", item="cat")
     h.d["collection"] = [{"id": "hope", "t": 0, "day": 1}]
-    h("mortgage", kind="all", ref="all", plan="p50")   # $10,125 at 0.01%: about $1.01 a day
+    h("buy", item="sofa")
+    h("mortgage", kind="all", ref="all", plan="p50")   # $10,200 at 0.01%: $1.02 a day (the cat doesn't count)
     d, paid, notes = home.charge_interest(h.d, cash=1)
-    assert d["pets"] == [] and d["loans"] == [] and d["collection"][0]["id"] == "hope"
+    assert d["inventory"] == {} and d["loans"] == [] and d["collection"][0]["id"] == "hope"
+    assert [p["type"] for p in d["pets"]] == ["cat"]                # pets are never taken
     assert home.coins(d, RICH) == home.coins(h.d, RICH)
 
 
@@ -202,3 +204,16 @@ def test_pricey_pets_have_their_own_clothes():
     assert h("wear", id=corgi, item=None)["state"]["pets"][0]["wearing"] is None
     with pytest.raises(home.HomeError, match="Buy"):
         h("wear", id=corgi, item="corgi.sweater")
+
+
+def test_a_house_mortgages_with_its_furniture_and_pets_never_count():
+    h = Home()
+    h("buy", item="sofa")
+    h("place", item="sofa", x=4, y=0, rot=0)
+    h("buy", item="corgi")
+    offers = {(o["kind"], o["ref"]): o["value"] for o in h("buy", item="toilet")["loan_offers"]}
+    assert offers[("house", "shack")] == 20_000 + 0 + 400                 # base + shack + the sofa in it
+    assert offers[("all", "all")] == 20_000 + 400 + 150                   # + the toilet in the inventory, no corgi
+    sofa = next(f for f in h.d["layouts"]["shack"] if f["item"] == "sofa")["id"]
+    v = h("mortgage", kind="furniture", ref=sofa, plan="p50")
+    assert {(o["kind"], o["ref"]): o["value"] for o in v["loan_offers"]}[("house", "shack")] == 20_000

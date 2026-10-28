@@ -95,8 +95,9 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
   manta ray, shark, whale), then build the ice land in it for penguins, seals and sea dogs. Water animals
   get hungry after 2 days but never die.
 - **Store:** buy everything; sell unused furniture, seeds and saplings back at half price.
-- **Mortgage:** a house, building, piece of furniture or the whole home (worth $20,000 plus everything
-  in it; that locks the home until it's paid back), on one of four plans: 150% of the value at 0.5% a
+- **Mortgage:** a house (worth $20,000 plus its price and the furniture in it), a building, a piece of
+  furniture or the whole home (worth $20,000 plus everything in it except pets; that locks the home until
+  it's paid back), on one of four plans: 150% of the value at 0.5% a
   day, 100% at 0.25%, 70% at 0.05% or 50% at 0.01%. The dollars go into the trading account and are not
   profit; paying back takes them out again. Interest is paid every trading day (interest only) from the
   account's cash at the close and counts as a loss; if the cash can't cover it, the bank takes the

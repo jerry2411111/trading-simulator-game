@@ -139,7 +139,7 @@ export function initStore(ctx) {
     const plans = Object.entries(data.plans);  // [id, [share, rate]]
     const intro = document.createElement('div');
     intro.className = 'mortgage';
-    intro.innerHTML = '<p>Mortgage a house, a building, a piece of furniture or the whole home (worth $20,000 plus everything in it; '
+    intro.innerHTML = '<p>Mortgage a house (worth $20,000 plus its price and its furniture), a building, a piece of furniture or the whole home (worth $20,000 plus everything in it except pets; '
       + 'that locks the home until you pay it back) for <b>dollars in your trading account</b>. This is the only way to add money.</p>'
       + `<p>Plans: ${plans.map(([, [share, rate]]) => `<b>${pct(share)}</b> of the value at <b>${pct(rate)}</b> a day`).join(' · ')}.</p>`
       + '<p>Interest is taken from your cash at the close of every trading day; you only pay interest until you pay the loan back '
