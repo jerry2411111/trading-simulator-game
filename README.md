@@ -72,12 +72,15 @@ Tests: `python -m pytest`
 Every game has its own home, saved with the game. Coins = this game's trading profit + income from the
 home − what you spend. The game pauses while you're in Home, Store or Collection.
 
-- **Garden:** starts as a wasteland of rubble, tires and trash. Pay to clean up each of its six parts,
-  then lay a floor (lawn, clover & moss, zen gravel, red brick, stone paving, wood deck, neon tiles).
-  The flower bed sits in the middle (8 flowers that grow as full piles, bloom in 8 hours and sell for
-  twice the seed price); four tree spots (pine, maple, apple, sakura: grow in 1–3 days, then give a
-  harvest every day or two; bees build a hive in the grown trees, sakura petals fall); a pool; a play
-  corner. Birds fly over and land in the trees.
+- **Garden:** starts as a wasteland: plain neon ground (big black tiles with blue and pink edges) with
+  garbage on it. Pay to clean up each of its six parts, then lay a floor (lawn, clover, gravel, brick,
+  stone, wood deck, neon tiles, snow, circuit board, red lacquer tiles, royal lawn, zellige mosaic).
+  Or buy a garden theme (Christmas, Chinese New Year, Cyberpunk, Muslim garden, Royal garden): it cleans
+  up everything, lays its ground, adds its decorations and dresses the trees; switch between owned themes
+  for free. The flower bed sits in the middle (8 flowers that grow as full piles, bloom in 8 hours and sell
+  for twice the seed price); four tree spots: pine, maple, apple, sakura and six cyberpunk trees (synth
+  pine, neon palm, data tree, holo bonsai, crystal tree, fiber-optic willow) that grow in 1–4 days, then
+  give a harvest every day or two; bees build hives in the real trees. A pool, a play corner, birds.
 - **Pets:** 38 kinds: 10 dog breeds (Corgi, German Shepherd, Labrador, Golden Retriever, Poodle,
   Husky, French Bulldog, Bichon Frise, Pomeranian, Chihuahua), 10 cat breeds (Siamese, Orange Tabby,
   British and American Shorthair, Ragdoll, Persian, Maine Coon, Scottish Fold, Russian Blue, Bengal),
@@ -88,9 +91,11 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
   store won't sell more. Pets can't be sold, only released for nothing. Pets of 1,000 coins or more open a
   portrait window in the house (pat, treat, play) and have three outfits designed for their breed.
   Each eats at a different price; hungry after 2 days without food, dead after 7 (real days).
-- **House:** a concrete shack to start; modern or European house (level 2); modern tower, Chinese
-  palace or European palace (level 3). Better houses are bigger in the garden and inside; the European
-  palace fills the whole garden. Rooms are divided by walls; 37 kinds of furniture to place and rotate.
+- **House:** a concrete shack to start; country house (4,000) or modern house (level 2); modern villa,
+  modern tower, Chinese palace, Muslim palace, St Sophia cathedral or the golden palace (level 3). Better
+  houses are bigger in the garden and inside; the palaces fill the whole garden. Rooms are divided by
+  walls; 48 kinds of furniture to place and rotate, plus paintings and windows that hang on the back wall.
+  Click the front door to go back out.
 - **Fish and the aquarium:** a fish tank unlocks 12 kinds of fish (they swim in the tank). Upgrade it to
   the aquarium for sea life (starfish, seahorse, jellyfish, lionfish, moray eel, octopus, sea turtle,
   manta ray, shark, whale), then build the ice land in it for penguins, seals and sea dogs. Water animals

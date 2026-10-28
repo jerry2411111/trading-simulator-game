@@ -141,7 +141,7 @@ def test_collection_gifts_are_unique_until_complete():
 
 def test_catalog_ids_are_unique():
     tables = (home.PETS, home.FLOWERS, home.TREES, home.ZONES, home.FLOORS, home.HOUSES, home.FURNITURE,
-              home.FISH, home.SEA, home.ICE, home.BUILD, home.CLOTHES)
+              home.FISH, home.SEA, home.ICE, home.BUILD, home.CLOTHES, home.THEMES)
     assert sum(len(t) for t in tables) == len(home.CATALOG)  # no id is shadowed by another kind
 
 
@@ -217,3 +217,29 @@ def test_a_house_mortgages_with_its_furniture_and_pets_never_count():
     sofa = next(f for f in h.d["layouts"]["shack"] if f["item"] == "sofa")["id"]
     v = h("mortgage", kind="furniture", ref=sofa, plan="p50")
     assert {(o["kind"], o["ref"]): o["value"] for o in v["loan_offers"]}[("house", "shack")] == 20_000
+
+
+def test_a_garden_theme_cleans_everything_and_can_be_switched():
+    h = Home()
+    v = h("buy", item="christmas")
+    assert set(v["state"]["zones"]) == set(home.ZONES) and v["state"]["zones"]["west"] == {"floor": "snow"}
+    assert v["coins"] == RICH - 3000                                  # the cleanup is included
+    h("buy", item="cyberpunk")
+    v = h("theme", item="christmas")                                  # owned themes switch for free
+    assert v["state"]["theme"] == "christmas" and v["coins"] == RICH - 8000
+    with pytest.raises(home.HomeError, match="store"):
+        h("theme", item="royal")
+
+
+def test_wall_pieces_hang_side_by_side_on_the_back_wall():
+    h = Home()
+    for item in ("painting_sunset", "window_arched", "sofa"):
+        h("buy", item=item)
+    h("place", item="painting_sunset", x=0, y=-1, rot=0)
+    with pytest.raises(home.HomeError):
+        h("place", item="window_arched", x=1, y=-1, rot=0)            # overlaps the 2-wide painting
+    with pytest.raises(home.HomeError):
+        h("place", item="window_arched", x=3, y=2, rot=0)             # not on the floor
+    h("place", item="window_arched", x=2, y=-1, rot=0)
+    v = h("place", item="sofa", x=0, y=0, rot=0)                      # the floor below is still free
+    assert len(v["state"]["layouts"]["shack"]) == 3

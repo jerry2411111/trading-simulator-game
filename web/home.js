@@ -4,8 +4,11 @@
 import {
   drawBee, drawBird, drawFloor, drawGarbage, drawFlower, drawHive, drawPet, drawPool, drawTree, GARBAGE_KINDS, PET_SIZE,
 } from './art.js';
-import { drawFurniture, drawHouse, drawRoom, HOUSE_W, ROOM, roomSize, TILE, tileOrigin, wallPieces } from './build.js';
+import {
+  drawFurniture, drawHouse, drawRoom, drawWallPiece, HOUSE_W, ROOM, roomSize, TILE, tileOrigin, WALL_H, wallPieces,
+} from './build.js';
 import { petGroup } from './pets.js';
+import { decorItems, dressTree, weather } from './themes.js';
 import { AQ, drawAquarium, drawSea } from './sea.js';
 import { disc, ellipse, fitCanvas, glow, hash, icon, mouse, now, rect } from './pixel.js';
 
@@ -32,6 +35,7 @@ const STONES = [
 ];
 const RING = Array.from({ length: 22 }, (_, k) => ({ x: BED.x + Math.round(Math.cos((k / 22) * 6.28) * (BED.rx + 6)), y: BED.y + Math.round(Math.sin((k / 22) * 6.28) * (BED.ry + 5)) }));
 const LAMPS = [{ x: 98, y: 98 }, { x: 158, y: 98 }, { x: 110, y: 200 }, { x: 146, y: 200 }];
+const NATURAL = new Set(['pine', 'maple', 'apple']);  // bees only build hives in real trees
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -398,6 +402,7 @@ export function initHome(ctx) {
 
     const items = [];
     items.push({ y: DOOR.y, draw: () => drawHouse(g, st().house, DOOR.x, DOOR.y, t) });
+    if (st().theme) items.push(...decorItems(g, st().theme, t));
     st().trees.forEach((tr, i) => { if (tr && tr.type === 'sakura' && stage(tr) === 3) for (let k = 0; k < 26; k++) rect(g, SPOTS[i].x - 14 + hash(k) * 28, SPOTS[i].y - 4 + hash(k + 40) * 9, 1, 1, k % 3 ? '#ffb4d4' : '#ffe4ef'); });
     st().flowers.forEach((f, i) => {
       const s = FLOWERS[i];
@@ -415,7 +420,8 @@ export function initHome(ctx) {
           if (tr) {
             const sg = stage(tr);
             drawTree(g, tr.type, s.x, s.y, sg, t, i, sg === 3 && treeReady(tr));
-            if (sg === 3 && tr.type !== 'sakura') {  // bees build a hive over the first day after it is grown
+            if (sg === 3 && st().theme) dressTree(g, st().theme, s.x, s.y, t, i);
+            if (sg === 3 && NATURAL.has(tr.type)) {  // bees build a hive over the first day after it is grown
               const level = Math.min(1, (t0() - grownAt(tr)) / 86400);
               drawHive(g, s.x - 8, s.y - 20, level);
             }
@@ -456,7 +462,7 @@ export function initHome(ctx) {
       } else if (tr.type === 'maple') {
         for (let k = 0; k < 3; k++) { const p = (t * 0.08 + hash(k + 5)) % 1; rect(g, s.x - 10 + hash(k) * 20 + Math.sin(t + k) * 3, s.y - 30 + p * 32, 2, 1, '#ec7228'); }
       }
-      if (tr.type !== 'sakura') {
+      if (NATURAL.has(tr.type)) {
         const level = Math.min(1, (t0() - grownAt(tr)) / 86400);
         const hive = { x: s.x - 8, y: s.y - 14 };
         const flowers = bloomed();
@@ -485,6 +491,7 @@ export function initHome(ctx) {
     }
     birds.flock.forEach((b) => drawBird(g, b.x, b.y, t, b.i));
     if (birds.perch) drawBird(g, birds.perch.x, birds.perch.y, t, 9, birds.perch.landed);
+    if (st().theme) weather(g, st().theme, t, GW, GH);
   }
 
   function strokeBox(x, y, w, h, c) {
@@ -504,12 +511,18 @@ export function initHome(ctx) {
       : y < at && at < y + h && x < a1 && a0 < x + w));
   }
 
+  const onWall = (item) => cat(item).wall;
   function fits(item, x, y, rot, skip) {
     const [gw, gh] = grid();
+    if (onWall(item)) {  // paintings and windows hang side by side on the back wall
+      const w = cat(item).size[0];
+      return y === -1 && x >= 0 && x + w <= gw
+        && layout().every((f) => f.id === skip || !onWall(f.item) || x >= f.x + cat(f.item).size[0] || f.x >= x + w);
+    }
     const [w, h] = size(item, rot);
     if (x < 0 || y < 0 || x + w > gw || y + h > gh || crossesWall(x, y, w, h)) return false;
     return layout().every((f) => {
-      if (f.id === skip || (f.item === 'rug') !== (item === 'rug')) return true;
+      if (f.id === skip || onWall(f.item) || (f.item === 'rug') !== (item === 'rug')) return true;
       const [fw, fh] = size(f.item, f.rot);
       return !(x < f.x + fw && f.x < x + w && y < f.y + fh && f.y < y + h);
     });
@@ -519,7 +532,7 @@ export function initHome(ctx) {
     const [gw, gh] = grid();
     const b = Array.from({ length: gw }, () => new Array(gh).fill(false));
     layout().forEach((f) => {
-      if (f.item === 'rug') return;
+      if (f.item === 'rug' || onWall(f.item)) return;
       const [w, h] = size(f.item, f.rot);
       for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) b[f.x + i][f.y + j] = true;
     });
@@ -591,6 +604,12 @@ export function initHome(ctx) {
     plant_pot: ['sniff', false, 'is sniffing the plant'], big_plant: ['sniff', false, 'is hiding behind the big plant'],
     vase: ['sniff', false, 'is about to knock over the vase'],
     wardrobe: ['hide', false, 'is hiding in the wardrobe'], dresser: ['hide', true, 'is sitting on the dresser'],
+    cat_tree: ['rest', true, 'is lounging on the climbing tower'], mirror: ['watch', false, 'is staring at itself in the mirror'],
+    hammock: ['rest', true, 'is swinging in the hammock'], mini_bar: ['beg', false, 'is sniffing the mini bar'],
+    jukebox: ['play', false, 'is dancing to the jukebox'], drum_kit: ['play', false, 'is banging the drums'],
+    vending: ['beg', false, 'is begging at the vending machine'], treadmill: ['play', true, 'is running on the treadmill'],
+    pool_table: ['watch', true, 'is batting the pool balls around'], massage_chair: ['rest', true, 'is getting a massage'],
+    grand_fireplace: ['rest', false, 'is warming up by the grand fire'],
     bookshelf: ['hide', false, 'is napping by the books'], desk: ['hide', true, 'is lying on the desk'],
     coffee_table: ['watch', true, 'is sitting on the coffee table'], floor_lamp: ['watch', false, 'is chasing the lamp light'],
   };
@@ -703,15 +722,33 @@ export function initHome(ctx) {
     g.drawImage(scratch, (-w * TILE) / 2 - 1, (-h * TILE) / 2 - 1);
     g.restore();
   }
+  const WALL_TOP = 9;
+  function drawWall(item, gx, t, alpha) {
+    const w = cat(item).size[0] * TILE;
+    const c = drawWall.c ?? (drawWall.c = document.createElement('canvas'));
+    c.width = w + 2;
+    c.height = WALL_H + 2;
+    const cg = c.getContext('2d');
+    cg.translate(1, 1);
+    drawWallPiece(cg, item, w, t);
+    g.save();
+    g.globalAlpha = alpha;
+    g.drawImage(c, ROOM.side + gx * TILE - 1, WALL_TOP - 1);
+    g.restore();
+  }
   const tankFish = () => st().aquatic.filter((a) => cat(a.type).kind === 'fish').map((a) => a.type);
 
   function drawHouseView(t) {
     const [gw, gh] = grid();
     drawRoom(g, st().house, gw, gh, t, editing);
+    layout().filter((f) => onWall(f.item)).forEach((f) => {
+      drawWall(f.item, f.x, t, holding?.id === f.id ? 0.35 : 1);
+      if (editing && selected === f.id) strokeBox(ROOM.side + f.x * TILE, WALL_TOP, cat(f.item).size[0] * TILE, WALL_H, '#00e5ff');
+    });
     layout().filter((f) => f.item === 'rug').forEach((f) => drawItem(f.item, f.x, f.y, f.rot, t, false));
     const home = () => [...inside.values()].filter((p) => p.place === 'house' && p.status !== 'dead');
     const using = new Set(home().filter((p) => p.act && !p.path.length).map((p) => p.act.id));
-    const stand = layout().filter((f) => f.item !== 'rug').map((f) => ({
+    const stand = layout().filter((f) => f.item !== 'rug' && !onWall(f.item)).map((f) => ({
       key: f.y + size(f.item, f.rot)[1],
       draw: () => {
         drawItem(f.item, f.x, f.y, f.rot, t, using.has(f.id), holding?.id === f.id ? 0.35 : 1);
@@ -737,7 +774,12 @@ export function initHome(ctx) {
     });
     stand.sort((a, b) => a.key - b.key).forEach((it) => it.draw());
     drawExit(t);
-    if (editing && holding && hoverTile) {
+    if (editing && holding && hoverTile && onWall(holding.item)) {
+      const ok = fits(holding.item, hoverTile.x, -1, 0, holding.id);
+      drawWall(holding.item, hoverTile.x, t, 0.7);
+      g.fillStyle = ok ? 'rgba(0,255,159,0.25)' : 'rgba(255,42,109,0.35)';
+      g.fillRect(ROOM.side + hoverTile.x * TILE, WALL_TOP, cat(holding.item).size[0] * TILE, WALL_H);
+    } else if (editing && holding && hoverTile) {
       const ok = fits(holding.item, hoverTile.x, hoverTile.y, holding.rot, holding.id);
       drawItem(holding.item, hoverTile.x, hoverTile.y, holding.rot, t, false, 0.7);
       const [w, h] = size(holding.item, holding.rot);
@@ -899,8 +941,9 @@ export function initHome(ctx) {
       return Math.abs(m.x - px) <= w / 2 && m.y <= py + 2 && m.y >= py - h;
     });
   }
-  const tileAt = (m) => ({ x: Math.floor((m.x - ROOM.side) / TILE), y: Math.floor((m.y - ROOM.wall) / TILE) });
+  const tileAt = (m) => ({ x: Math.floor((m.x - ROOM.side) / TILE), y: m.y < ROOM.wall ? -1 : Math.floor((m.y - ROOM.wall) / TILE) });
   const furnitureAt = (tile) => [...layout()].reverse().find((f) => {
+    if (onWall(f.item)) return tile.y === -1 && tile.x >= f.x && tile.x < f.x + cat(f.item).size[0];
     const [w, h] = size(f.item, f.rot);
     return tile.x >= f.x && tile.x < f.x + w && tile.y >= f.y && tile.y < f.y + h;
   });
@@ -951,7 +994,8 @@ export function initHome(ctx) {
     const tile = tileAt(m);
     if (editing) {
       if (holding) {
-        if (!fits(holding.item, tile.x, tile.y, holding.rot, holding.id)) return ctx.toast("It doesn't fit there.");
+        if (onWall(holding.item)) { tile.y = -1; holding.rot = 0; }
+        if (!fits(holding.item, tile.x, tile.y, holding.rot, holding.id)) return ctx.toast(onWall(holding.item) ? 'Hang it on the back wall, next to the other pieces.' : "It doesn't fit there.");
         const ok = holding.id
           ? await act('move', { id: holding.id, x: tile.x, y: tile.y, rot: holding.rot })
           : await act('place', { item: holding.item, x: tile.x, y: tile.y, rot: holding.rot });
@@ -979,7 +1023,7 @@ export function initHome(ctx) {
 
   document.addEventListener('keydown', (e) => {
     if ($('home').hidden || view !== 'house' || !editing) return;
-    if (e.key.toLowerCase() === 'r' && holding) holding.rot = (holding.rot + 1) % 4;
+    if (e.key.toLowerCase() === 'r' && holding && !onWall(holding.item)) holding.rot = (holding.rot + 1) % 4;
     if (e.key === 'Escape') { holding = null; renderSide(); }
   });
 
@@ -1045,7 +1089,8 @@ export function initHome(ctx) {
     side.append(el('<div class="box-title">GARDEN</div>'));
     if (!selected) {
       const dirty = Object.keys(ZONES).filter((z) => !s.zones[z]).length;
-      side.append(el(`<p class="muted">${dirty ? `${dirty} of 6 parts are still wasteland: click one to clean it up. ` : ''}Click the flower bed, a tree spot, a pet or any part of the garden. Hover a pet to pet it. Click the house to go inside.</p>`));
+      side.append(el(`<p class="muted">${dirty ? `${dirty} of 6 parts are still wasteland: click one to clean it up, or buy a garden theme (Store) that cleans everything. ` : ''}Click the flower bed, a tree spot, a pet or any part of the garden. Hover a pet to pet it. Click the house to go inside.</p>`));
+      renderThemes(s);
     }
     if (selected?.kind === 'zone') renderZone(selected.id);
     if (selected?.kind === 'flower' || selected?.kind === 'tree') {
@@ -1066,7 +1111,7 @@ export function initHome(ctx) {
           side.append(button(`Pick and sell (+${c.sells} coins)`, () => act('harvest', { where, slot: selected.i }), 'primary'));
         } else {
           const next = Math.max(plant.harvested ?? 0, grownAt(plant)) + c.every * 3600 - t0();
-          const hive = plant.type === 'sakura' ? '' : ` Bees are ${t0() - grownAt(plant) < 86400 ? 'building a hive in it' : 'living in their hive'}.`;
+          const hive = !NATURAL.has(plant.type) ? '' : ` Bees are ${t0() - grownAt(plant) < 86400 ? 'building a hive in it' : 'living in their hive'}.`;
           side.append(el(`<p><b>${c.name}</b> is grown. Harvest of ${c.yield} coins every ${c.every} h; next ${until(next)}.${hive}</p>`));
           if (next <= 0) side.append(button(`Harvest (+${c.yield} coins)`, () => act('harvest', { where, slot: selected.i }), 'primary'));
         }
@@ -1087,6 +1132,16 @@ export function initHome(ctx) {
       }
     }
     renderPetList(s);
+  }
+
+  function renderThemes(s) {
+    side.append(el('<div class="box-title">GARDEN THEME</div>'));
+    const row = document.createElement('div');
+    row.className = 'group wrap';
+    row.append(button('None', () => act('theme', { item: null }), s.theme ? '' : 'active'));
+    s.themes.forEach((id) => row.append(button(cat(id).name.replace(' garden', ''), () => act('theme', { item: id }), s.theme === id ? 'active' : '')));
+    row.append(button('More in the store', () => ctx.openStore('Garden themes')));
+    side.append(row);
   }
 
   function renderPetList(s) {
@@ -1125,7 +1180,7 @@ export function initHome(ctx) {
       renderStatusLine();
       return;
     }
-    side.append(el(`<p class="muted">${holding ? `Placing ${cat(holding.item).name}: click a spot, R rotates, Esc cancels. Furniture can't cross walls.` : 'Pick an item below, or click furniture in the room.'}</p>`));
+    side.append(el(`<p class="muted">${holding ? (onWall(holding.item) ? `Hanging ${cat(holding.item).name}: click a spot on the back wall, Esc cancels.` : `Placing ${cat(holding.item).name}: click a spot, R rotates, Esc cancels. Furniture can't cross walls.`) : 'Pick an item below, or click furniture in the room (or a painting / window on the wall).'}</p>`));
     if (holding) side.append(button('Rotate (R)', () => { holding.rot = (holding.rot + 1) % 4; }));
     const sel = layout().find((f) => f.id === selected);
     if (sel && !holding) {

@@ -1,15 +1,16 @@
 // Store: buy pets, seeds, saplings, houses, furniture, fish and sea life with coins; sell unused items
 // back; mortgage the home for trading dollars and pay loans back.
-import { drawFlower, drawPet, drawPool, drawTree } from './art.js';
-import { drawFurniture, drawHouse, HOUSE_W, TILE } from './build.js';
+import { drawFloor, drawFlower, drawPet, drawPool, drawTree } from './art.js';
+import { decorItems, dressTree } from './themes.js';
+import { drawFurniture, drawHouse, drawWallPiece, HOUSE_W, TILE, WALL_H } from './build.js';
 import { drawPetHead } from './buddy.js';
 import { drawSea } from './sea.js';
 import { rect } from './pixel.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['Pets', 'Pet clothes', 'Flowers', 'Trees', 'Garden & houses', 'Furniture', 'Fish', 'Sea life', 'Mortgage', 'Sell'];
+const TABS = ['Pets', 'Pet clothes', 'Flowers', 'Trees', 'Garden themes', 'Garden & houses', 'Furniture', 'Fish', 'Sea life', 'Mortgage', 'Sell'];
 const KINDS = {
-  Pets: ['pet'], Flowers: ['flower'], Trees: ['tree'], 'Garden & houses': ['house'], Furniture: ['furniture'],
+  Pets: ['pet'], Flowers: ['flower'], Trees: ['tree'], 'Garden themes': ['theme'], 'Garden & houses': ['house'], Furniture: ['furniture'],
   Fish: ['fish'], 'Sea life': ['sea', 'ice'],
 };
 const BUILD_TAB = { pool: 'Garden & houses', aquarium: 'Fish', iceland: 'Sea life' };
@@ -21,13 +22,14 @@ function preview(id, info) {
   const g = c.getContext('2d');
   const size = {
     pet: [36, 27], flower: [26, 20], tree: [46, 56], house: [HOUSE_W[id] + 8, 110], fish: [26, 18],
-    sea: SEA_SIZE[id] ?? [26, 26], ice: [26, 24], build: [72, 40], clothes: [48, 48],
+    sea: SEA_SIZE[id] ?? [26, 26], ice: [26, 24], build: [72, 40], clothes: [48, 48], theme: [96, 60],
   }[info.kind] ?? [info.size[0] * TILE + 2, info.size[1] * TILE + 2];
   [c.width, c.height] = size;
   if (info.kind === 'pet') drawPet(g, id, 18, 24, { dir: 1, pose: id === 'parrot' ? 'perch' : 'idle' }, 0);
   else if (info.kind === 'clothes') { [c.width, c.height] = [48, 48]; drawPetHead(g, info.pet, 'happy', 0.2, '#00e5ff', false, { style: info.style, color: info.color }, false); }
   else if (info.kind === 'flower') drawFlower(g, id, 13, 19, 3, 0);
   else if (info.kind === 'tree') drawTree(g, id, 23, 54, 3, 0, 0, false);
+  else if (info.kind === 'theme') themePreview(g, id, info);
   else if (info.kind === 'house') drawHouse(g, id, size[0] / 2, 108, 0);
   else if (['fish', 'sea', 'ice'].includes(info.kind)) {
     rect(g, 0, 0, size[0], size[1], '#0e3a6a');
@@ -41,7 +43,7 @@ function preview(id, info) {
     }
   } else {
     g.translate(1, 1);
-    drawFurniture(g, id, info.size[0] * TILE, info.size[1] * TILE, 0);
+    if (info.wall) { [c.width, c.height] = [info.size[0] * TILE + 2, WALL_H + 2]; g.translate(1, 1); drawWallPiece(g, id, info.size[0] * TILE, 0); } else drawFurniture(g, id, info.size[0] * TILE, info.size[1] * TILE, 0);
   }
   const out = crop(c);
   out.className = 'pixel';
@@ -51,6 +53,16 @@ function preview(id, info) {
   out.style.width = `${Math.round(out.width * scale)}px`;
   out.style.height = `${Math.round(out.height * scale)}px`;
   return out;
+}
+
+// A garden theme: its ground with two of its decorations and a dressed tree on it.
+function themePreview(g, id, info) {
+  drawFloor(g, 0, 0, 96, 60, info.ground, 1);
+  drawTree(g, 'apple', 30, 56, 3, 0.4, 0, false);
+  dressTree(g, id, 30, 56, 0.4, 0);
+  decorItems(g, id, 0.4).slice(0, 2).forEach((it, i) => {
+    g.save(); g.translate(i ? 30 : 46, -it.y + 58); it.draw(); g.restore();
+  });
 }
 
 // The drawn part of a canvas (non-transparent pixels plus a 1-pixel margin) as a new canvas.
@@ -77,7 +89,8 @@ function detail(info) {
   if (info.kind === 'flower') return `Blooms in ${info.hours} h, sells for ${info.sells}`;
   if (info.kind === 'tree') return `Grows in ${info.hours} h, then +${info.yield} every ${info.every} h`;
   if (info.kind === 'house') return `Level ${info.level} · ${info.grid[0]}×${info.grid[1]} floor`;
-  if (info.kind === 'furniture') return `${info.size[0]}×${info.size[1]} tiles`;
+  if (info.kind === 'theme') return 'Cleans up the whole garden, lays its ground, decorates it and dresses the trees';
+  if (info.kind === 'furniture') return info.wall ? `Hangs on the wall · ${info.size[0]} wide` : `${info.size[0]}×${info.size[1]} tiles`;
   if (['fish', 'sea', 'ice'].includes(info.kind)) return `Food: ${info.meal} coins a meal`;
   return { pool: 'Goes in the pool corner (clean it first)', aquarium: 'Holds sea life; fish move in too', iceland: 'Penguins and seals live on it' }[info.id] ?? '';
 }
@@ -224,7 +237,7 @@ export function initStore(ctx) {
       const builds = entries.filter(([id, info]) => info.kind === 'build' && BUILD_TAB[id] === tab);
       const items = entries.filter(([, info]) => KINDS[tab].includes(info.kind)).sort((a, b) => a[1].price - b[1].price);
       cards = [...builds, ...items].map(([id, info]) => {
-        const own = (info.kind === 'house' && s.houses.includes(id)) || (info.kind === 'build' && s[id]);
+        const own = (info.kind === 'house' && s.houses.includes(id)) || (info.kind === 'build' && s[id]) || (info.kind === 'theme' && s.themes.includes(id));
         const iceLock = info.kind === 'ice' && !s.iceland;
         const buildLock = info.kind === 'build' && ((id === 'aquarium' && !data.has_tank) || (id === 'iceland' && !s.aquarium));
         const full = info.kind === 'pet' && !(data.pet_room.garden || data.pet_room.house);

@@ -59,6 +59,8 @@ PETS = {  # name, price (close to what the pet costs in real life), cost of one 
 }
 PREMIUM_AT = 1000                                 # pets this pricey get a portrait window and clothes
 GARDEN_PETS, HOUSE_PETS = 5, 3                    # how many pets fit outside and inside
+WALL_ITEMS = {"painting_portrait", "painting_sunset", "painting_mountain", "painting_abstract", "painting_neon",
+              "window_round", "window_arched", "window_panorama"}
 CLOTH_STYLES = {  # name, price
     "bandana": ("bandana", 30), "yuzu": ("yuzu hat", 25), "bowtie": ("bow tie", 40), "scarf": ("scarf", 45),
     "flower": ("flower crown", 60), "vest": ("vest", 70), "sweater": ("sweater", 80), "hoodie": ("hoodie", 90),
@@ -96,6 +98,10 @@ FLOWERS = {  # name, price
 TREES = {  # name, price, hours to grow up, harvest (coins), hours between harvests
     "pine": ("Pine", 60, 24, 8, 24), "maple": ("Maple", 80, 36, 20, 48),
     "apple": ("Apple tree", 120, 48, 15, 24), "sakura": ("Sakura", 600, 72, 30, 24),
+    # cyberpunk trees
+    "synth_pine": ("Synth pine", 700, 36, 25, 24), "neon_palm": ("Neon palm", 900, 48, 35, 24),
+    "data_tree": ("Data tree", 1200, 60, 45, 24), "holo_bonsai": ("Holo bonsai", 1500, 72, 55, 24),
+    "crystal": ("Crystal tree", 2000, 72, 70, 24), "fiber_willow": ("Fiber-optic willow", 2500, 96, 90, 24),
 }
 ZONES = {  # name, cleanup price; what each zone holds is in ZONE_OF
     "path": ("Front path", 40), "plaza": ("Flower bed plaza", 80), "west": ("West lawn", 120),
@@ -105,11 +111,20 @@ ZONE_OF = {"flowers": ["plaza"] * FLOWER_SLOTS, "trees": ["west", "west", "east"
 FLOORS = {  # name, price per zone
     "lawn": ("Lawn", 60), "clover": ("Clover & moss", 80), "gravel": ("Zen gravel", 90), "brick": ("Red brick", 140),
     "stone": ("Stone paving", 160), "deck": ("Wood deck", 200), "neon": ("Neon tiles", 300),
+    "snow": ("Snow", 120), "circuit": ("Circuit board", 200), "redtile": ("Red lacquer tiles", 160),
+    "royal_lawn": ("Royal lawn", 180), "zellige": ("Zellige mosaic", 220),
+}
+THEMES = {  # name, price, its ground: a whole-garden look; buying one also cleans up every wasteland part
+    "christmas": ("Christmas garden", 3000, "snow"), "cny": ("Chinese New Year garden", 4000, "redtile"),
+    "cyberpunk": ("Cyberpunk garden", 5000, "circuit"), "muslim": ("Muslim garden", 6000, "zellige"),
+    "royal": ("Royal garden", 8000, "royal_lawn"),
 }
 HOUSES = {  # name, price, level, floor grid (w, h)
-    "shack": ("Concrete shack", 0, 1, (9, 6)), "modern": ("Modern house", 8000, 2, (13, 8)),
-    "euro": ("European house", 9000, 2, (13, 8)), "tower": ("Modern tower", 25000, 3, (18, 10)),
-    "palace_cn": ("Chinese palace", 30000, 3, (20, 11)), "palace_eu": ("European palace", 35000, 3, (24, 12)),
+    "shack": ("Concrete shack", 0, 1, (9, 6)), "euro": ("Country house", 4000, 2, (13, 8)),
+    "modern": ("Modern house", 8000, 2, (13, 8)), "villa": ("Modern villa", 20000, 3, (18, 10)),
+    "tower": ("Modern tower", 25000, 3, (18, 10)), "palace_cn": ("Chinese palace", 30000, 3, (20, 11)),
+    "palace_eu": ("Muslim palace", 35000, 3, (24, 12)), "church": ("St Sophia cathedral", 40000, 3, (20, 11)),
+    "palace_gold": ("Golden palace", 60000, 3, (24, 12)),
 }
 # Inner walls on tile edges: ("v", x, y0, y1, doors) is the wall left of column x for rows y0..y1-1,
 # ("h", y, x0, x1, doors) the wall above row y for columns x0..x1-1; doors are open rows / columns.
@@ -120,6 +135,9 @@ WALLS = {
     "tower": [("v", 6, 0, 10, [2, 7]), ("v", 12, 0, 10, [4]), ("h", 5, 12, 18, [15]), ("h", 5, 0, 6, [3])],
     "palace_cn": [("v", 6, 0, 11, [3, 8]), ("v", 14, 0, 11, [3, 8]), ("h", 5, 0, 6, [3]), ("h", 5, 14, 20, [17])],
     "palace_eu": [("h", 5, 0, 24, [3, 12, 20]), ("v", 8, 5, 12, [8]), ("v", 16, 5, 12, [8]), ("v", 6, 0, 5, [2]), ("v", 18, 0, 5, [2])],
+    "villa": [("v", 7, 0, 10, [2, 7]), ("h", 5, 12, 18, [14]), ("v", 12, 0, 5, [2])],
+    "church": [("v", 4, 0, 11, [2, 8]), ("v", 16, 0, 11, [2, 8])],
+    "palace_gold": [("h", 4, 0, 24, [2, 9, 14, 21]), ("v", 6, 4, 12, [8]), ("v", 18, 4, 12, [8])],
 }
 FURNITURE = {  # name, price, footprint (w, h) in floor tiles
     "chair": ("Chair", 40, (1, 1)), "cat_bed": ("Pet bed", 40, (1, 1)), "plant_pot": ("Potted plant", 25, (1, 1)),
@@ -135,6 +153,16 @@ FURNITURE = {  # name, price, footprint (w, h) in floor tiles
     "bathtub": ("Bathtub", 600, (2, 1)), "double_bed": ("Double bed", 600, (3, 3)), "fridge": ("Fridge", 700, (1, 1)),
     "fireplace": ("Fireplace", 800, (2, 1)), "computer": ("Computer desk", 900, (2, 1)), "arcade": ("Arcade machine", 1200, (1, 1)),
     "piano": ("Piano", 1500, (2, 1)),
+    "cat_tree": ("Pet climbing tower", 180, (1, 1)), "mirror": ("Standing mirror", 160, (1, 1)),
+    "hammock": ("Hammock", 220, (2, 1)), "mini_bar": ("Mini bar", 600, (2, 1)), "jukebox": ("Jukebox", 650, (1, 1)),
+    "drum_kit": ("Drum kit", 700, (2, 1)), "vending": ("Neon vending machine", 750, (1, 1)),
+    "treadmill": ("Treadmill", 800, (1, 2)), "pool_table": ("Pool table", 900, (3, 2)),
+    "massage_chair": ("Massage chair", 1100, (1, 1)), "grand_fireplace": ("Grand stone fireplace", 1500, (3, 1)),
+    # hung on the back wall (the second number is unused: wall pieces take one row of wall)
+    "painting_portrait": ("Painting: portrait", 150, (1, 1)), "painting_sunset": ("Painting: sunset", 220, (2, 1)),
+    "painting_mountain": ("Painting: mountains", 260, (2, 1)), "painting_abstract": ("Painting: abstract", 340, (2, 1)),
+    "painting_neon": ("Painting: neon city", 480, (2, 1)), "window_round": ("Round window", 200, (1, 1)),
+    "window_arched": ("Arched window", 300, (1, 1)), "window_panorama": ("Panorama window", 700, (3, 1)),
 }
 FISH = {  # name, price, meal (fish live in the house fish tank, and in the aquarium once built)
     "guppy": ("Guppy", 8, 0.2), "danio": ("Zebra danio", 10, 0.2), "tetra": ("Neon tetra", 12, 0.2),
@@ -165,7 +193,8 @@ CATALOG = {
        for k, (n, p, h, y, e) in TREES.items()},
     **{k: {"kind": "house", "name": n, "price": p, "level": lv, "grid": g, "walls": WALLS[k]}
        for k, (n, p, lv, g) in HOUSES.items()},
-    **{k: {"kind": "furniture", "name": n, "price": p, "size": s} for k, (n, p, s) in FURNITURE.items()},
+    **{k: {"kind": "furniture", "name": n, "price": p, "size": s, "wall": k in WALL_ITEMS} for k, (n, p, s) in FURNITURE.items()},
+    **{k: {"kind": "theme", "name": n, "price": p, "ground": gr} for k, (n, p, gr) in THEMES.items()},
     **{k: {"kind": "floor", "name": n, "price": p} for k, (n, p) in FLOORS.items()},
     **{k: {"kind": "zone", "name": n, "price": p} for k, (n, p) in ZONES.items()},
     **{k: {"kind": "fish", "name": n, "price": p, "meal": m} for k, (n, p, m) in FISH.items()},
@@ -184,7 +213,7 @@ def new():
     return {"income": 0.0, "spent": 0.0, "log": [], "house": "shack", "houses": ["shack"],
             "pool": False, "aquarium": False, "iceland": False, "zones": {}, "pets": [], "companion": None,
             "aquatic": [], "aqua_fed": time.time(), "flowers": [None] * FLOWER_SLOTS, "trees": [None] * TREE_SLOTS,
-            "inventory": {}, "layouts": {}, "loans": [], "collection": []}
+            "inventory": {}, "layouts": {}, "loans": [], "collection": [], "themes": [], "theme": None}
 
 
 def normalize(d):
@@ -287,13 +316,19 @@ def _crosses_wall(house, x, y, w, h):
 def _fits(d, item, x, y, rot, skip=None, house=None, only=None):
     house = house or d["house"]
     gw, gh = HOUSES[house][3]
+    if item in WALL_ITEMS:  # on the back wall: one row, side by side
+        w = FURNITURE[item][2][0]
+        if not all(isinstance(v, int) for v in (x, y)) or y != -1 or x < 0 or x + w > gw:
+            return False
+        return all(f["id"] == skip or f["item"] not in WALL_ITEMS or x >= f["x"] + FURNITURE[f["item"]][2][0] or f["x"] >= x + w
+                   for f in (d["layouts"].get(house, []) if only is None else only))
     w, h = _footprint(item, rot)
     if not all(isinstance(v, int) for v in (x, y)) or x < 0 or y < 0 or x + w > gw or y + h > gh:
         return False
     if _crosses_wall(house, x, y, w, h):
         return False
     for f in d["layouts"].get(house, []) if only is None else only:
-        if f["id"] == skip or (f["item"] == "rug") != (item == "rug"):  # rugs lie under other furniture
+        if f["id"] == skip or f["item"] in WALL_ITEMS or (f["item"] == "rug") != (item == "rug"):  # rugs lie under furniture
             continue
         fw, fh = _footprint(f["item"], f["rot"])
         if x < f["x"] + fw and f["x"] < x + w and y < f["y"] + fh and f["y"] < y + h:
@@ -361,6 +396,7 @@ def home_value(d):
     value += sum(CATALOG[a["type"]]["price"] for a in d["aquatic"])
     value += sum(CATALOG[p["type"]]["price"] for p in d["flowers"] + d["trees"] if p)
     value += sum(ZONES[z][1] + (FLOORS[v["floor"]][1] if v["floor"] else 0) for z, v in d["zones"].items())
+    value += sum(THEMES[t][1] for t in d["themes"])
     return value
 
 
@@ -459,9 +495,17 @@ def _foreclose(d, loan):
     _log(d, f"Foreclosed: the bank took {loan['label'].split(' (')[0].lower()}", 0)
 
 
+def _apply_theme(d, theme):
+    """A garden theme cleans up every part of the garden and lays its own ground everywhere."""
+    d["theme"] = theme
+    if theme:
+        for zone in ZONES:
+            d["zones"][zone] = {"floor": THEMES[theme][2]}
+
+
 # ----- actions
 
-LOCKED_ACTIONS = {"buy", "sell", "clean", "floor", "plant", "dig", "stash", "house", "mortgage", "buy_clothes"}
+LOCKED_ACTIONS = {"buy", "sell", "clean", "floor", "plant", "dig", "stash", "house", "mortgage", "buy_clothes", "theme"}
 
 
 def act(home, action, body, pnl=0.0, cash=0.0):
@@ -487,6 +531,13 @@ def _act(d, action, body, now, cash):
         if info is None or info["kind"] in ("zone", "floor"):
             raise HomeError("Unknown item.")
         kind = info["kind"]
+        if kind == "theme":
+            if item in d["themes"]:
+                raise HomeError("You already own that theme: switch to it in the garden.")
+            _spend(d, info["price"], f"Bought the {info['name'].lower()}")
+            d["themes"].append(item)
+            _apply_theme(d, item)
+            return 0
         if (kind == "house" and item in d["houses"]) or (kind == "build" and d[item]):
             raise HomeError("You already own that.")
         if kind in AQUATIC:
@@ -528,6 +579,10 @@ def _act(d, action, body, now, cash):
             raise HomeError("That part is already clean.")
         _spend(d, ZONES[zone][1], f"Cleaned up the {ZONES[zone][0].lower()}")
         d["zones"][zone] = {"floor": None}
+    elif action == "theme":
+        if item is not None and item not in d["themes"]:
+            raise HomeError("Buy that garden theme in the store first.")
+        _apply_theme(d, item)
     elif action == "floor":
         zone = body.get("zone")
         if zone not in ZONES:
