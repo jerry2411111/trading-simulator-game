@@ -341,6 +341,8 @@ class Game:
     async def end_day(self):
         self.pending.clear()  # day orders expire
         self.close_all()      # positions never stay open overnight
+        self.home, interest, foreclosed = home.charge_interest(self.home, self.account.cash)
+        self.account.cash -= interest  # a cost, so it counts against profit
         p = self.point(self.pos - 1)
         self.today[-1:] = [self.today[-1], p] if self.today[-1][0] != p[0] else [p]
         day_trades = [tr for tr in self.account.trades if tr["day"] == self.s.day_no]
@@ -349,6 +351,10 @@ class Game:
         self.today, self.speed = [], 0
         self.autosave()
         await self.push_snapshot()
+        if interest:
+            await self.broadcast({"type": "notice", "text": f"Mortgage interest paid: ${interest:,.2f}."})
+        for text in foreclosed:
+            await self.error(text)
 
     async def game_over(self):
         self.pending.clear()

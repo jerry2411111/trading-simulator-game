@@ -90,7 +90,9 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
 - **Store:** buy everything; sell unused furniture, seeds and saplings back at half price.
 - **Mortgage:** one house, building or piece of furniture for 70% of its price, or the whole home for
   $20,000 + 70% of everything in it (that locks the home until it's paid back). The dollars go into the
-  trading account and are not profit; paying back takes them out again.
+  trading account and are not profit; paying back takes them out again. Each loan costs 0.5% interest
+  every trading day (interest only), paid from the account's cash at the close and counted as a loss;
+  if the cash can't cover it, the bank takes the mortgaged thing and the loan is gone.
 
 ## Universe
 

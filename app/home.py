@@ -7,7 +7,9 @@ Coins = this game's trading profit
 
 Things can be mortgaged for dollars paid into the trading account: one house, building or piece of
 furniture for 70% of its price, or the whole home for $20,000 + 70% of everything in it (which locks the
-home until it is paid back). Paying a loan back takes the same dollars out of the account.
+home until it is paid back). Paying a loan back takes the same dollars out of the account. Every loan
+costs 0.5% interest per trading day, paid from the account's cash at the close; if the cash can't cover
+it, the bank takes the mortgaged thing (and the loan is gone with it). Selling back pays half the price.
 
 The garden starts as a wasteland: each zone must be cleaned up before anything goes there, and can
 then get a new floor. Buying a fish tank unlocks fish; the tank can be upgraded to an aquarium for
@@ -27,6 +29,7 @@ TANK_FISH = 12                                    # fish a house fish tank holds
 AQUARIUM_ANIMALS = 40
 LOG_SIZE = 40
 MORTGAGE = 0.7                                    # a mortgage pays 70% of the price
+INTEREST = 0.005                                  # per trading day, on the loan amount (interest only)
 HOME_LOAN_BASE = 20_000                           # the whole home is worth at least this much as a loan
 
 PETS = {  # name, price, cost of one meal
@@ -324,6 +327,55 @@ def _redeem(d, body, cash):
     d["loans"].remove(loan)
     _log(d, f"Paid back the mortgage on {loan['label'].split(' (')[0].lower()}: -${loan['amount']:,.0f} from trading", 0)
     return -loan["amount"]
+
+
+def charge_interest(home, cash):
+    """The close of a trading day: each loan's interest is paid from `cash`, in order; a loan whose interest
+    can't be paid is foreclosed. Returns (new home, interest paid, [messages])."""
+    d = copy.deepcopy(home)
+    paid, notes = 0.0, []
+    for loan in list(d["loans"]):
+        if loan not in d["loans"]:  # already gone with a foreclosed house or building
+            continue
+        due = round(loan["amount"] * INTEREST, 2)
+        if cash - paid >= due:
+            paid += due
+        else:
+            _foreclose(d, loan)
+            notes.append(f"You couldn't pay ${due:,.2f} interest: the bank took {loan['label'].split(' (')[0].lower()}.")
+    if paid:
+        _log(d, f"Mortgage interest: -${paid:,.2f} from trading", 0)
+    return d, round(paid, 2), notes
+
+
+def _foreclose(d, loan):
+    """The bank takes what was mortgaged; the debt goes with it. Coins and the collection stay."""
+    d["loans"].remove(loan)
+    kind, ref = loan["kind"], loan["ref"]
+    if kind == "all":
+        keep = {k: d[k] for k in ("income", "spent", "log", "collection")}
+        d.clear()
+        d.update(new())
+        d.update(keep)
+    elif kind == "house":
+        d["houses"].remove(ref)
+        gone = {f["id"] for f in d["layouts"].pop(ref, [])}
+        d["loans"] = [x for x in d["loans"] if not (x["kind"] == "furniture" and x["ref"] in gone)]
+        if d["house"] == ref:
+            d["house"] = "shack"
+    elif kind == "build":
+        drop = {"pool": ["pool"], "aquarium": ["aquarium", "iceland"], "iceland": ["iceland"]}[ref]
+        for b in drop:
+            d[b] = False
+        d["loans"] = [x for x in d["loans"] if not (x["kind"] == "build" and x["ref"] in drop)]
+        lost = {"sea", "ice"} if "aquarium" in drop else {"ice"} if "iceland" in drop else set()
+        d["aquatic"] = [a for a in d["aquatic"] if CATALOG[a["type"]]["kind"] not in lost]
+    else:
+        for layout in d["layouts"].values():
+            layout[:] = [f for f in layout if f["id"] != ref]
+    if not d["aquarium"] and not has_tank(d):
+        d["aquatic"] = []  # no tank left: the fish go with it
+    _log(d, f"Foreclosed: the bank took {loan['label'].split(' (')[0].lower()}", 0)
 
 
 # ----- actions

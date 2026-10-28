@@ -141,3 +141,31 @@ def test_catalog_ids_are_unique():
     tables = (home.PETS, home.FLOWERS, home.TREES, home.ZONES, home.FLOORS, home.HOUSES, home.FURNITURE,
               home.FISH, home.SEA, home.ICE, home.BUILD)
     assert sum(len(t) for t in tables) == len(home.CATALOG)  # no id is shadowed by another kind
+
+
+def test_interest_is_paid_daily_and_unpaid_interest_forecloses():
+    h = Home()
+    h("buy", item="modern")
+    h("clean", zone="southwest")
+    h("buy", item="pool")
+    h("mortgage", kind="house", ref="modern")        # $5,600 loan: $28 a day
+    h("mortgage", kind="build", ref="pool")          # $1,750 loan: $8.75 a day
+    d, paid, notes = home.charge_interest(h.d, cash=100)
+    assert paid == 36.75 and not notes and len(d["loans"]) == 2
+    d, paid, notes = home.charge_interest(h.d, cash=30)   # pays the house's interest, not the pool's
+    assert paid == 28 and not d["pool"] and [x["ref"] for x in d["loans"]] == ["modern"] and "pool" in notes[0]
+    d, paid, notes = home.charge_interest(d, cash=0)      # now the house goes too
+    assert "modern" not in d["houses"] and d["house"] == "shack" and d["loans"] == []
+    h.d = d
+    with pytest.raises(home.HomeError):
+        h("sell", item="modern")
+
+
+def test_foreclosing_the_whole_home_keeps_coins_and_collection():
+    h = Home()
+    h("buy", item="cat")
+    h.d["collection"] = [{"id": "hope", "t": 0, "day": 1}]
+    h("mortgage", kind="all", ref="all")
+    d, paid, notes = home.charge_interest(h.d, cash=1)
+    assert d["pets"] == [] and d["loans"] == [] and d["collection"][0]["id"] == "hope"
+    assert home.coins(d, RICH) == home.coins(h.d, RICH)

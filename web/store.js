@@ -19,14 +19,14 @@ function preview(id, info) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
   const size = {
-    pet: [34, 24], flower: [26, 20], tree: [46, 54], house: [HOUSE_W[id] + 8, 104], fish: [26, 18],
+    pet: [36, 27], flower: [26, 20], tree: [46, 56], house: [HOUSE_W[id] + 8, 110], fish: [26, 18],
     sea: SEA_SIZE[id] ?? [26, 26], ice: [26, 24], build: [72, 40],
   }[info.kind] ?? [info.size[0] * TILE + 2, info.size[1] * TILE + 2];
   [c.width, c.height] = size;
-  if (info.kind === 'pet') drawPet(g, id, 17, 22, { dir: 1, pose: id === 'parrot' ? 'perch' : 'idle' }, 0);
+  if (info.kind === 'pet') drawPet(g, id, 18, 24, { dir: 1, pose: id === 'parrot' ? 'perch' : 'idle' }, 0);
   else if (info.kind === 'flower') drawFlower(g, id, 13, 19, 3, 0);
-  else if (info.kind === 'tree') drawTree(g, id, 23, 53, 3, 0, 0, id === 'apple');
-  else if (info.kind === 'house') drawHouse(g, id, size[0] / 2, 102, 0);
+  else if (info.kind === 'tree') drawTree(g, id, 23, 54, 3, 0, 0, false);
+  else if (info.kind === 'house') drawHouse(g, id, size[0] / 2, 108, 0);
   else if (['fish', 'sea', 'ice'].includes(info.kind)) {
     rect(g, 0, 0, size[0], size[1], '#0e3a6a');
     drawSea(g, id, size[0] / 2, info.kind === 'ice' ? size[1] - 3 : size[1] / 2, 1, 0, 'stand');
@@ -41,11 +41,32 @@ function preview(id, info) {
     g.translate(1, 1);
     drawFurniture(g, id, info.size[0] * TILE, info.size[1] * TILE, 0);
   }
-  c.className = 'pixel';
-  const scale = info.kind === 'house' ? Math.max(1, Math.floor(240 / c.width)) : Math.max(1, Math.min(6, Math.floor(108 / Math.max(c.width, c.height * 1.1))));
-  c.style.width = `${c.width * scale}px`;
-  c.style.height = `${c.height * scale}px`;
-  return c;
+  const out = crop(c);
+  out.className = 'pixel';
+  const [bw, bh] = info.kind === 'house' ? [320, 112] : [148, 104];  // the card's art box
+  const fit = Math.min(bw / out.width, bh / out.height, 6);
+  const scale = fit >= 1 ? Math.floor(fit * 2) / 2 : fit;
+  out.style.width = `${Math.round(out.width * scale)}px`;
+  out.style.height = `${Math.round(out.height * scale)}px`;
+  return out;
+}
+
+// The drawn part of a canvas (non-transparent pixels plus a 1-pixel margin) as a new canvas.
+function crop(c) {
+  const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+  let [x0, y0, x1, y1] = [c.width, c.height, -1, -1];
+  for (let y = 0; y < c.height; y++) {
+    for (let x = 0; x < c.width; x++) {
+      if (data[(y * c.width + x) * 4 + 3] > 0) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    }
+  }
+  if (x1 < 0) return c;
+  const out = document.createElement('canvas');
+  [x0, y0] = [Math.max(0, x0 - 1), Math.max(0, y0 - 1)];
+  out.width = Math.min(c.width, x1 + 2) - x0;
+  out.height = Math.min(c.height, y1 + 2) - y0;
+  out.getContext('2d').drawImage(c, -x0, -y0);
+  return out;
 }
 
 function detail(info) {
@@ -114,7 +135,9 @@ export function initStore(ctx) {
     intro.className = 'mortgage';
     intro.innerHTML = '<p>Mortgage things for <b>dollars in your trading account</b>: one house, building or piece of furniture '
       + 'for 70% of its price, or the whole home for $20,000 + 70% of everything in it (that locks the home until you pay it back). '
-      + 'Paying back takes the same dollars from your account\'s cash. This is the only way to add money to the account.</p>';
+      + 'This is the only way to add money to the account.</p><p><b>Interest: 0.5% of each loan every trading day</b>, taken from your '
+      + 'cash at the close (interest only: the loan itself stays until you pay it back, which takes the same dollars from your cash). '
+      + '<b class="down">If your cash can\'t cover the interest, the bank takes the mortgaged thing.</b> Selling things back pays half their price.</p>';
     out.push(intro);
     const list = (title, rows) => {
       const box = document.createElement('div');
@@ -137,8 +160,9 @@ export function initStore(ctx) {
       li.append(b);
       return li;
     };
-    list('YOUR LOANS', data.state.loans.map((l) => row(l.label, l.amount, 'Pay back', () => post('redeem', { id: l.id }), '')));
-    list('MORTGAGE', data.loan_offers.map((o) => row(o.label, o.amount, 'Mortgage', () => post('mortgage', { kind: o.kind, ref: o.ref }), o.kind === 'all' ? 'primary' : '')));
+    const perDay = (amount) => `interest $${(amount * 0.005).toFixed(2)} a day`;
+    list('YOUR LOANS', data.state.loans.map((l) => row(`${l.label} · ${perDay(l.amount)}`, l.amount, 'Pay back', () => post('redeem', { id: l.id }), '')));
+    list('MORTGAGE', data.loan_offers.map((o) => row(`${o.label} · ${perDay(o.amount)}`, o.amount, 'Mortgage', () => post('mortgage', { kind: o.kind, ref: o.ref }), o.kind === 'all' ? 'primary' : '')));
     return out;
   }
 
