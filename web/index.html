@@ -21,7 +21,6 @@
       <span id="feed" class="badge"></span>
       <span id="fallback" class="badge warn" hidden></span>
       <span id="bg-status" class="muted"></span>
-      <span class="spacer"></span>
       <button id="new-game">New game</button>
       <button id="settings-btn">Settings</button>
     </header>
@@ -36,6 +35,10 @@
       <div class="chart-tools group">
         <button data-style="candle">Candle</button>
         <button data-style="line">Line</button>
+        <label class="window-ctl">Window
+          <input id="window" type="range" min="5" max="120" step="5">
+          <span id="window-val" class="num"></span>
+        </label>
       </div>
       <div id="chart"></div>
       <div id="overlay" class="window" hidden>

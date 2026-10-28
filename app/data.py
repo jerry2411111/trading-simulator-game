@@ -19,6 +19,9 @@ TRADING_URL = "https://paper-api.alpaca.markets/v2"
 ET = "America/New_York"
 COLS = ["o", "h", "l", "c", "v"]
 MAX_SECOND_DAYS = 7   # 1-second days kept per ticker, on disk and in memory
+# Sale conditions whose price must not move the chart (out of sequence, average price, derivatively
+# priced, prior reference, contingent, official open/close re-prints, ...). Their volume still counts.
+NO_PRICE_CONDITIONS = frozenset("479BCGHMNPQRTUVWZ")
 HISTORY_DAYS = 730    # calendar days of daily bars before day 1
 
 
@@ -81,8 +84,8 @@ def bar_frame(items):
     return df[COLS + ["n"]].astype(float)
 
 
-def trade_frame(t, p, s):
-    return pd.DataFrame({"p": p, "s": s}, index=pd.to_datetime(t, utc=True, format="ISO8601"), dtype=float)
+def trade_frame(t, p, s, ok):
+    return pd.DataFrame({"p": p, "s": s, "ok": ok}, index=pd.to_datetime(t, utc=True, format="ISO8601"))
 
 
 class Alpaca:
@@ -131,19 +134,21 @@ class Alpaca:
             params["page_token"] = js["next_page_token"]
 
     async def trades(self, symbol, start, end, on_page=None):
-        """All trades between two timestamps as a price/size frame; `on_page(count)` after each page."""
+        """All trades between two timestamps: price, size and whether the price counts (`ok`).
+        `on_page(count)` is awaited after each page."""
         params = {"start": utc_z(start), "end": utc_z(end), "limit": 10000, "feed": self.feed}
-        t, p, s = [], [], []
+        t, p, s, ok = [], [], [], []
         while True:
             js = await self.get(f"{DATA_URL}/stocks/{symbol}/trades", params)
             for tr in js.get("trades") or []:
                 t.append(tr["t"])
                 p.append(tr["p"])
                 s.append(tr["s"])
+                ok.append(NO_PRICE_CONDITIONS.isdisjoint(tr.get("c") or ()))
             if on_page:
                 await on_page(len(t))
             if not js.get("next_page_token"):
-                return await asyncio.to_thread(trade_frame, t, p, s)
+                return await asyncio.to_thread(trade_frame, t, p, s, ok)
             params["page_token"] = js["next_page_token"]
 
 
@@ -158,10 +163,12 @@ def fill_seconds(bars, day, prev_close):
 
 
 def trades_to_seconds(trades, day, prev_close):
+    """1-second OHLCV: prices from trades flagged `ok`, volume from all trades."""
     t = trades[(trades.index >= day.open) & (trades.index < day.close)]
-    g = t.groupby(t.index.floor("1s"))
-    bars = pd.DataFrame({"o": g["p"].first(), "h": g["p"].max(), "l": g["p"].min(),
-                         "c": g["p"].last(), "v": g["s"].sum()})
+    px = t.loc[t["ok"], "p"]
+    g = px.groupby(px.index.floor("1s"))
+    bars = pd.DataFrame({"o": g.first(), "h": g.max(), "l": g.min(), "c": g.last(),
+                         "v": t["s"].groupby(t.index.floor("1s")).sum()})
     return fill_seconds(bars, day, prev_close)
 
 

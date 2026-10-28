@@ -14,6 +14,7 @@ LOOKBACK = 20        # trading days used to rank intraday range
 WARMUP = 5           # trading days of 1-minute bars before day 1
 MARGIN = 10          # latest start = today minus this many trading days
 TOP_FRACTION = 0.3
+MIN_TRADES = 250_000  # average trades/day; thinner stocks leave many empty seconds on the 1-second chart
 
 
 async def trading_days(client):
@@ -28,8 +29,8 @@ def pick_start(days, rng):
 
 
 async def volatile_pool(client, days, first):
-    """Top 30% of the universe by average (high - low) / open over the LOOKBACK days before day 1,
-    minus tickers that did not trade on day 1."""
+    """Liquid tickers (>= MIN_TRADES trades/day over the LOOKBACK days before day 1), at most 30% of the
+    universe, most volatile first by average (high - low) / open; minus tickers that did not trade on day 1."""
     tickers = json.loads(UNIVERSE.read_text())["tickers"]
     start = pd.Timestamp(days[first - LOOKBACK].date, tz="UTC")
     bars = await client.bars(tickers, "1Day", start, days[first].close)
@@ -38,11 +39,11 @@ async def volatile_pool(client, days, first):
     for sym, df in bars.items():
         dates = df.index.tz_convert(ET).strftime("%Y-%m-%d")
         before = df[dates < day1]
-        if len(before):
+        if len(before) and before["n"].mean() >= MIN_TRADES:
             score[sym] = ((before["h"] - before["l"]) / before["o"]).mean()
         if day1 in dates:
             traded.add(sym)
-    top = sorted(score, key=score.get, reverse=True)[: math.ceil(len(score) * TOP_FRACTION)]
+    top = sorted(score, key=score.get, reverse=True)[: math.ceil(len(tickers) * TOP_FRACTION)]
     return [t for t in top if t in traded]
 
 

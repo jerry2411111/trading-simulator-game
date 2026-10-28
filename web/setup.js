@@ -18,17 +18,21 @@ export function showSetup(root, { reason = '', onDone, onCancel = null }) {
   root.innerHTML = `
     <div class="window setup">
       <div class="titlebar">TapeTrainer Setup</div>
-      <div class="window-body">
-        ${reason ? `<p class="notice">${reason}</p>` : ''}
-        <h1>TapeTrainer replays REAL market data.</h1>
-        <p>Every game replays real trades from real US stocks on a random day since 2024. The data comes
-        from Alpaca, a US broker that gives free historical market data. To download it, you need your own
-        free Alpaca key. It takes about 3 minutes, costs nothing, needs no bank account or ID, and works
-        from any country. Your key and data stay on your computer; TapeTrainer never sends them anywhere else.</p>
-        <ol>${STEPS.map((s) => `<li>${s}</li>`).join('')}</ol>
-        <button type="button" id="open-alpaca">Open alpaca.markets ↗</button>
-        <p class="small">Alpaca may change its website; if a step looks different, look for 'API Keys' on the
-        Paper Trading dashboard. <a href="https://docs.alpaca.markets/" target="_blank" rel="noopener">Alpaca docs</a></p>
+      <div class="window-body setup-body">
+        <section>
+          ${reason ? `<p class="notice">${reason}</p>` : ''}
+          <h1>TapeTrainer replays REAL market data.</h1>
+          <p>Every game replays real trades from real US stocks on a random day since 2024. The data comes
+          from Alpaca, a US broker that gives free historical market data. To download it, you need your own
+          free Alpaca key. It takes about 3 minutes, costs nothing, needs no bank account or ID, and works
+          from any country. Your key and data stay on your computer; TapeTrainer never sends them anywhere else.</p>
+        </section>
+        <section>
+          <ol>${STEPS.map((s) => `<li>${s}</li>`).join('')}</ol>
+          <a class="button" href="https://alpaca.markets" target="_blank" rel="noopener">Open alpaca.markets ↗</a>
+          <p class="small">Alpaca may change its website; if a step looks different, look for 'API Keys' on the
+          Paper Trading dashboard. <a href="https://docs.alpaca.markets/" target="_blank" rel="noopener">Alpaca docs</a></p>
+        </section>
         <form id="key-form" autocomplete="off">
           <label>Key ID <input name="key_id" spellcheck="false" placeholder="PK…" required></label>
           <label>Secret Key
@@ -49,7 +53,6 @@ export function showSetup(root, { reason = '', onDone, onCancel = null }) {
   const form = root.querySelector('#key-form');
   const result = root.querySelector('#key-result');
   const submit = form.querySelector('[type=submit]');
-  root.querySelector('#open-alpaca').onclick = () => window.open('https://alpaca.markets', '_blank', 'noopener');
   root.querySelector('#toggle-secret').onclick = (e) => {
     const hidden = form.secret.type === 'password';
     form.secret.type = hidden ? 'text' : 'password';

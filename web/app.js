@@ -26,6 +26,7 @@ function startGame() {
   $('game').hidden = false;
   chart ??= new PriceChart($('chart'));
   markStyle();
+  showWindow();
   connect();
 }
 
@@ -139,6 +140,12 @@ document.querySelectorAll('[data-style]').forEach((b) => {
 });
 function markStyle() {
   document.querySelectorAll('[data-style]').forEach((b) => b.classList.toggle('active', b.dataset.style === chart.style));
+}
+
+$('window').oninput = () => { chart.setWindow(+$('window').value); showWindow(); };
+function showWindow() {
+  $('window').value = chart.minutes;
+  $('window-val').textContent = `${chart.minutes}m`;
 }
 
 $('new-game').onclick = () => send('new_game');
