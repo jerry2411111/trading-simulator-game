@@ -101,7 +101,7 @@ def snapshot(game):
             item["bars_1m"] = table(pd.concat([past, today]).tail(120), cols, label)
             item["bars_1s"] = table(sec.tail(60), cols, label)
         if cfg.share_indicators:
-            values = indicators.latest(game.values(st), game.pos - 1)
+            values = indicators.latest(game.values(st, indicators.NAMES), game.pos - 1)
             lo, hi = indicators.band(values["band"]["sigma_1s"] or 0.0, prices[t])
             values["band"] |= {"lower_5m": round(lo, 4), "upper_5m": round(hi, 4)}
             item["indicators"] = values

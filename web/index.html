@@ -44,6 +44,7 @@
         <span id="chips" class="chips"></span>
       </div>
       <div id="chart"></div>
+      <div id="ind-menu" class="window" hidden></div>
       <div id="overlay" class="window" hidden>
         <p id="overlay-title" class="num"></p>
         <p id="overlay-text"></p>
@@ -59,7 +60,7 @@
         <div class="kv"><span>Equity</span><b id="equity" class="num">—</b></div>
         <div class="kv"><span>Today</span><b id="pnl-today" class="num">—</b></div>
         <div class="kv"><span>Total</span><b id="pnl-total" class="num">—</b></div>
-        <div class="kv"><span>Leverage</span><b id="lev" class="num">—</b></div>
+        <div class="kv"><span>Buying power</span><b id="buying-power" class="num">—</b></div>
       </div>
       <div class="box">
         <div class="box-title">ORDER</div>
@@ -72,7 +73,15 @@
           </select>
           <input id="order-price" type="number" step="0.01" min="0" placeholder="price" disabled>
         </div>
-        <label class="kv"><span>Size $</span><input id="dollars" type="number" min="1" step="100"></label>
+        <label class="kv"><span>Leverage</span>
+          <select id="order-lev">
+            <option value="1">1x (no leverage)</option><option value="2">2x</option><option value="3">3x</option>
+            <option value="5">5x</option><option value="10">10x</option><option value="20">20x</option>
+            <option value="50">50x</option><option value="100">100x</option>
+          </select>
+        </label>
+        <label class="kv"><span id="size-label">Size $</span><input id="dollars" type="number" min="1" step="100"></label>
+        <div id="size-hint" class="muted"></div>
         <div class="trade-buttons">
           <button id="buy" class="buy">BUY</button>
           <button id="sell" class="sell">SELL</button>

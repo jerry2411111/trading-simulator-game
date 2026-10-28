@@ -30,10 +30,11 @@ Tests: `python -m pytest`
 - **Chart.** Price and volume are always shown; volume is always bars, price is candles or a line. A
   slider sets how much time is visible (30 seconds to 120 minutes); the view follows the clock. Buys are
   marked with green triangles, sells with red ones.
-- **Indicators** (toggle each): SMA 5/10/20/60, EMA 12/26, Bollinger (20, 2σ), Parabolic SAR, MACD,
-  KDJ, and a random-walk 95% band: from the last 10 minutes of 1-second volatility σ, the band
+- **Indicators:** MA (5/10/20/30/60/120) and EMA (5/9/12/20/26/50/100/200), each period ticked
+  separately and labeled in a legend; Bollinger (20, 2σ), Parabolic SAR, MACD, KDJ, and a random-walk
+  95% band: from the last 10 minutes of 1-second volatility σ, the band
   `P·exp(±1.96·σ·√h)` is drawn as a cone over the next 5 minutes.
-- **Speeds:** pause, ▶ (real time), 1.5x, 2x, 3x, 5x, 10x, 60x, 300x.
+- **Speeds:** pause, ▶ (real time), 1.5x, 2x, 3x, 5x, 10x, 60x.
 - **Orders:** MKT, LMT, and conditional "MKT if ≥ / ≤ price"; a fixed dollar size; BUY, SELL, CLOSE,
   Close all. No spread or slippage: market orders fill at the current 1-second close. Waiting orders
   and positions are closed at the end of each day.

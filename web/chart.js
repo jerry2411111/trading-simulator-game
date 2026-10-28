@@ -22,21 +22,34 @@ export const css = (name) => getComputedStyle(document.documentElement).getPrope
 // Chart times are day * 86400 + seconds since midnight: show only the time of day.
 const hms = (t) => new Date((t % 86400) * 1000).toISOString().slice(11, 19);
 
-export const INDICATORS = [
-  ['sma5', 'SMA5'], ['sma10', 'SMA10'], ['sma20', 'SMA20'], ['sma60', 'SMA60'], ['ema12', 'EMA12'],
-  ['ema26', 'EMA26'], ['boll', 'BOLL'], ['sar', 'SAR'], ['band', 'RW 95%'], ['macd', 'MACD'], ['kdj', 'KDJ'],
-];
+// Indicators with a period: the player ticks which periods to draw.
+export const PERIODIC = [['ma', 'MA', [5, 10, 20, 30, 60, 120]], ['ema', 'EMA', [5, 9, 12, 20, 26, 50, 100, 200]]];
+export const SINGLES = [['boll', 'BOLL'], ['sar', 'SAR'], ['band', 'RW 95%'], ['macd', 'MACD'], ['kdj', 'KDJ']];
+export const INDICATOR_NAMES = [...PERIODIC.flatMap(([k, , ps]) => ps.map((p) => `${k}${p}`)), ...SINGLES.map(([k]) => k)];
+const PERIOD_COLORS = ['--accent', '--accent2', '--warn', '--up', '--down', '--ink', '--muted', '--hi'];
+const DASHED = 2;
+const LARGE_DASHED = 3;
 
-// Per indicator: own pane or overlay, and one entry per data column (color variable, dashed, dots, histogram).
+// Per indicator: one entry per data column (color variable, line style, dots, histogram).
 const LOOK = {
-  sma5: [{ color: '--accent' }], sma10: [{ color: '--accent2' }], sma20: [{ color: '--warn' }],
-  sma60: [{ color: '--up' }], ema12: [{ color: '--ink' }], ema26: [{ color: '--muted' }],
-  boll: [{ color: '--accent2', dashed: true }, { color: '--muted' }, { color: '--accent2', dashed: true }],
+  boll: [{ color: '--accent2', style: DASHED }, { color: '--muted' }, { color: '--accent2', style: DASHED }],
   sar: [{ color: '--warn', dots: true }],
   macd: [{ color: '--accent' }, { color: '--accent2' }, { hist: true }],
   kdj: [{ color: '--accent' }, { color: '--accent2' }, { color: '--warn' }],
 };
 const PANES = new Set(['macd', 'kdj']);
+
+// MA lines are solid, EMA lines dashed; each period has its own color.
+export function look(name) {
+  const m = name.match(/^(ma|ema)(\d+)$/);
+  if (!m) return LOOK[name];
+  const periods = PERIODIC.find(([k]) => k === m[1])[2];
+  const shift = m[1] === 'ema' ? 3 : 0; // EMA colors start elsewhere in the palette than MA colors
+  return [{
+    color: PERIOD_COLORS[(periods.indexOf(+m[2]) + shift) % PERIOD_COLORS.length],
+    style: m[1] === 'ema' ? LARGE_DASHED : 0,
+  }];
+}
 
 // Rows arrive as [time, open, high, low, close, volume], one per second.
 const candle = ([time, open, high, low, close]) => ({ time, open, high, low, close });
@@ -65,6 +78,9 @@ export class PriceChart {
     }, 1);
     this.el = el;
     new ResizeObserver(() => this.layoutPanes()).observe(el);
+    this.legend = document.createElement('div');
+    this.legend.className = 'legend';
+    el.append(this.legend);
     this.markers = [createSeriesMarkers(this.candle), createSeriesMarkers(this.line)];
     this.minutes = Number(stored(WINDOW_KEY)) || 10;
     this.applyTheme();
@@ -146,8 +162,7 @@ export class PriceChart {
   }
 
   point(name, j, time, value) {
-    const look = LOOK[name]?.[j];
-    return look?.hist ? { time, value, color: value >= 0 ? this.up : this.down } : { time, value };
+    return look(name)?.[j]?.hist ? { time, value, color: value >= 0 ? this.up : this.down } : { time, value };
   }
 
   drawIndicators() {
@@ -156,12 +171,12 @@ export class PriceChart {
     for (const [name, cols] of Object.entries(this.ind)) {
       if (name === 'band') { this.series.band = this.coneSeries(); continue; }
       const pane = PANES.has(name) ? this.chart.panes().length : 0;
-      this.series[name] = LOOK[name].map((look, j) => {
-        const s = look.hist
+      this.series[name] = look(name).map((col, j) => {
+        const s = col.hist
           ? this.chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane)
           : this.chart.addSeries(LineSeries, {
-            color: css(look.color), lineWidth: 1, lineStyle: look.dashed ? 2 : 0, lineVisible: !look.dots,
-            pointMarkersVisible: !!look.dots, pointMarkersRadius: 1, priceLineVisible: false,
+            color: css(col.color), lineWidth: 1, lineStyle: col.style ?? 0, lineVisible: !col.dots,
+            pointMarkersVisible: !!col.dots, pointMarkersRadius: 1, priceLineVisible: false,
             lastValueVisible: false, crosshairMarkerVisible: false,
           }, pane);
         s.setData(cols[j].flatMap((v, k) => (v == null ? [] : [this.point(name, j, this.rows[k][0], v)])));
@@ -170,6 +185,17 @@ export class PriceChart {
     }
     requestAnimationFrame(() => this.layoutPanes()); // after the chart has created the new panes
     if (this.ind.band) this.drawCone();
+    this.drawLegend();
+  }
+
+  // Which line is which: a swatch in the line's color and style next to each shown indicator.
+  drawLegend() {
+    const label = (n) => SINGLES.find(([k]) => k === n)?.[1] ?? n.toUpperCase();
+    this.legend.innerHTML = INDICATOR_NAMES.filter((n) => this.ind[n]).map((n) => {
+      const c = n === 'band' ? { color: '--warn', style: DASHED } : look(n)[0];
+      const border = c.dots ? 'dotted' : c.style ? 'dashed' : 'solid';
+      return `<span><i style="border-top: 3px ${border} ${css(c.color)}"></i>${label(n)}</span>`;
+    }).join('');
   }
 
   // Volume / MACD / KDJ panes each take a share of the height, so price keeps most of a small window.

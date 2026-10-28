@@ -46,7 +46,7 @@ class Stock:
     minutes: pd.DataFrame | None = None           # raw regular-hours 1-minute bars
     seconds: dict = field(default_factory=dict)   # date -> scaled 1-second bars
     fallback: set = field(default_factory=set)    # dates built from 1-minute bars
-    ind: dict = field(default_factory=dict)       # indicator cache for one day: {"date", "values"}
+    ind: dict = field(default_factory=dict)       # indicator cache for one day: {"date", name: columns}
 
 
 class TokenBucket:

@@ -3,10 +3,16 @@
 Every indicator is causal: value i uses bars 0..i only. So a whole day can be computed once and the
 player is only ever sent the prefix up to the replay clock.
 """
+import re
+
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-NAMES = ["sma5", "sma10", "sma20", "sma60", "ema12", "ema26", "boll", "sar", "macd", "kdj", "band"]
+MA_PERIODS = (5, 10, 20, 30, 60, 120)
+EMA_PERIODS = (5, 9, 12, 20, 26, 50, 100, 200)
+NAMES = ([f"ma{n}" for n in MA_PERIODS] + [f"ema{n}" for n in EMA_PERIODS]
+         + ["boll", "sar", "macd", "kdj", "band"])
+PERIODIC = re.compile(r"^(ma|ema)(\d+)$")
 COLUMNS = {"boll": ["upper", "mid", "lower"], "macd": ["macd", "signal", "hist"], "kdj": ["k", "d", "j"],
            "band": ["sigma_1s"]}
 BAND_WINDOW = 600    # seconds of history behind the random-walk band (10 minutes)
@@ -103,13 +109,17 @@ def band(sigma, price, h=BAND_HORIZON):
     return price * np.exp(-w), price * np.exp(w)
 
 
-def compute(bars):
-    """{name: [column, ...]} for every indicator, aligned with `bars` (o/h/l/c frame)."""
+def compute_one(bars, name):
+    """[column, ...] of one indicator (see NAMES), aligned with `bars` (o/h/l/c frame)."""
     h, l, c = (bars[k].to_numpy(float) for k in "hlc")
-    out = {f"sma{n}": [sma(c, n)] for n in (5, 10, 20, 60)}
-    out |= {f"ema{n}": [ema(c, n)] for n in (12, 26)}
-    out |= {"boll": boll(c), "sar": [sar(h, l)], "macd": macd(c), "kdj": kdj(h, l, c), "band": [walk_sigma(c)]}
-    return out
+    if m := PERIODIC.match(name):
+        return [(sma if m[1] == "ma" else ema)(c, int(m[2]))]
+    return {"boll": lambda: boll(c), "sar": lambda: [sar(h, l)], "macd": lambda: macd(c),
+            "kdj": lambda: kdj(h, l, c), "band": lambda: [walk_sigma(c)]}[name]()
+
+
+def compute(bars):
+    return {name: compute_one(bars, name) for name in NAMES}
 
 
 def latest(values, i):

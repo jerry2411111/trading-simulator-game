@@ -1,11 +1,13 @@
 // Game screen: WebSocket state, top bar, stock tabs, chart, trading panel and keyboard shortcuts.
-import { INDICATORS, PriceChart, store, stored } from './chart.js';
+import {
+  INDICATOR_NAMES, PERIODIC, PriceChart, SINGLES, css, look, store, stored,
+} from './chart.js';
 import { fillTable, money, signed, summaryRows } from './format.js';
 import { applyStoredTheme, initMenus } from './menu.js';
 import { showSetup } from './setup.js';
 
 const $ = (id) => document.getElementById(id);
-const SPEEDS = [[0, '⏸'], [1, '▶'], [1.5, '1.5x'], [2, '2x'], [3, '3x'], [5, '5x'], [10, '10x'], [60, '60x'], [300, '300x']];
+const SPEEDS = [[0, '⏸'], [1, '▶'], [1.5, '1.5x'], [2, '2x'], [3, '3x'], [5, '5x'], [10, '10x'], [60, '60x']];
 const WINDOW_STEPS = [0.5, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120]; // chart window, minutes
 const AUTH_REASON = 'Alpaca stopped accepting your key, so the game is paused. Connect again to continue.';
 
@@ -14,7 +16,7 @@ let chart = null;
 let state = { phase: 'idle', session: null, account: null, trades: [], ai: { log: [] } };
 let lastSpeed = 1;
 let shown = new Set();
-try { shown = new Set(JSON.parse(stored('tt.indicators') || '[]')); } catch { /* keep none */ }
+try { shown = new Set(JSON.parse(stored('tt.indicators') || '[]').filter((n) => INDICATOR_NAMES.includes(n))); } catch { /* keep none */ }
 
 const send = (cmd, extra = {}) => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ cmd, ...extra }));
 const view = () => state.session?.view;
@@ -136,7 +138,8 @@ function renderAccount() {
   $('equity').textContent = money(a.equity);
   setPnl($('pnl-today'), a.today);
   setPnl($('pnl-total'), a.total);
-  $('lev').textContent = `${a.settings.leverage}x`;
+  $('buying-power').textContent = money(a.buying_power);
+  showLeverage(a.settings.leverage);
   const p = a.positions[view()];
   $('position').innerHTML = p
     ? `${p.shares > 0 ? 'LONG' : 'SHORT'} ${Math.abs(p.shares)} @ ${p.avg.toFixed(2)} · P/L <b class="${p.pnl >= 0 ? 'up' : 'down'}">${signed(p.pnl)}</b>`
@@ -253,32 +256,100 @@ function showWindow() {
   $('window-val').textContent = m < 1 ? `${m * 60}s` : `${m}m`;
 }
 
-function renderChips() {
-  $('chips').replaceChildren(...INDICATORS.map(([name, label]) => {
-    const b = document.createElement('button');
-    b.className = `chip${shown.has(name) ? ' active' : ''}`;
-    b.textContent = label;
-    b.onclick = () => {
-      if (shown.has(name)) shown.delete(name); else shown.add(name);
-      store('tt.indicators', JSON.stringify([...shown]));
-      renderChips();
-      send('indicators', { names: [...shown] });
-    };
-    return b;
-  }));
+// Indicator buttons: MA ▾ / EMA ▾ open a box of period checkboxes; the others toggle directly.
+let openGroup = null;
+
+function toggleIndicator(name) {
+  if (shown.has(name)) shown.delete(name); else shown.add(name);
+  store('tt.indicators', JSON.stringify([...shown]));
+  renderChips();
+  send('indicators', { names: [...shown] });
 }
 
+function chip(label, active) {
+  const b = document.createElement('button');
+  b.className = `chip${active ? ' active' : ''}`;
+  b.textContent = label;
+  return b;
+}
+
+function renderChips() {
+  const groups = PERIODIC.map(([key, label, periods]) => {
+    const b = chip(`${label} ▾`, periods.some((p) => shown.has(`${key}${p}`)));
+    b.dataset.group = key;
+    b.onclick = () => { openGroup = openGroup === key ? null : key; renderPeriodBox(); };
+    return b;
+  });
+  const singles = SINGLES.map(([name, label]) => {
+    const b = chip(label, shown.has(name));
+    b.onclick = () => toggleIndicator(name);
+    return b;
+  });
+  $('chips').replaceChildren(...groups, ...singles);
+  renderPeriodBox();
+}
+
+function renderPeriodBox() {
+  const box = $('ind-menu');
+  const group = PERIODIC.find(([key]) => key === openGroup);
+  box.hidden = !group;
+  if (!group) return;
+  const [key, label, periods] = group;
+  box.innerHTML = `<div class="box-title">${label} periods</div>${periods.map((p) => {
+    const c = look(`${key}${p}`)[0];
+    return `<label class="check"><input type="checkbox" data-name="${key}${p}"${shown.has(`${key}${p}`) ? ' checked' : ''}>`
+      + `<i class="swatch" style="border-top: 3px ${c.style ? 'dashed' : 'solid'} ${css(c.color)}"></i>${label}${p}</label>`;
+  }).join('')}`;
+  box.querySelectorAll('input').forEach((i) => { i.onchange = () => toggleIndicator(i.dataset.name); });
+  const host = box.parentElement.getBoundingClientRect();
+  const anchor = $('chips').querySelector(`[data-group="${key}"]`).getBoundingClientRect();
+  box.style.left = `${anchor.left - host.left}px`;
+  box.style.top = `${anchor.bottom - host.top + 4}px`;
+}
+
+document.addEventListener('click', (e) => {
+  if (openGroup && !e.target.closest('#ind-menu, [data-group]')) {
+    openGroup = null;
+    renderPeriodBox();
+  }
+});
+
 $('dollars').value = stored('tt.dollars') || 1000;
-$('dollars').onchange = () => store('tt.dollars', $('dollars').value);
+$('dollars').oninput = () => { store('tt.dollars', $('dollars').value); showSize(); };
 $('order-type').onchange = () => {
   const market = $('order-type').value === 'MKT';
   $('order-price').disabled = market;
   if (!market && !$('order-price').value) $('order-price').value = state.prices?.[view()]?.toFixed(2) ?? '';
+  showSize();
 };
+$('order-price').oninput = showSize;
+$('order-lev').onchange = () => send('leverage', { value: +$('order-lev').value });
+
+// With leverage the size field is margin: the order is margin x leverage.
+const leverage = () => state.account?.settings.leverage ?? 1;
+const orderDollars = () => +$('dollars').value * leverage();
+
+function showLeverage(lev) {
+  const sel = $('order-lev');
+  if (![...sel.options].some((o) => +o.value === lev)) sel.add(new Option(`${lev}x`, lev));
+  sel.value = String([...sel.options].find((o) => +o.value === lev).value);
+  $('size-label').textContent = lev > 1 ? 'Margin $' : 'Size $';
+  showSize();
+}
+
+function showSize() {
+  const lev = leverage();
+  const price = $('order-type').value === 'MKT' ? state.prices?.[view()] : +$('order-price').value;
+  const shares = price ? Math.floor(orderDollars() / price) : null;
+  const sh = shares == null ? '' : ` ≈ ${shares} sh`;
+  $('size-hint').textContent = lev > 1
+    ? `${money(+$('dollars').value)} margin × ${lev}x = ${money(orderDollars())} position${sh}`
+    : `${money(orderDollars())} position${sh}`;
+}
 
 function order(side) {
   const type = side === 'close' ? 'MKT' : $('order-type').value;
-  send('order', { stock: view(), side, type, price: +$('order-price').value || null, dollars: +$('dollars').value });
+  send('order', { stock: view(), side, type, price: +$('order-price').value || null, dollars: orderDollars() });
 }
 $('buy').onclick = () => order('buy');
 $('sell').onclick = () => order('sell');

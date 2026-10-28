@@ -17,7 +17,7 @@ from .data import COLS, ET, AuthError, Cache, Day, Prefetcher, Stock
 
 log = logging.getLogger(__name__)
 
-SPEEDS = (0, 1, 1.5, 2, 3, 5, 10, 60, 300)
+SPEEDS = (0, 1, 1.5, 2, 3, 5, 10, 60)
 TICK = 0.1           # seconds between clock pushes: at most 10 WebSocket messages per second
 MAX_STOCKS = 5
 SESSION_DAYS = 7
@@ -163,25 +163,28 @@ class Game:
     def point(self, i):
         return [self.time_at(i), round(self.equity(i), 2)]
 
-    def values(self, st):
-        """All indicators of one stock for the whole current day (causal, so only prefixes are ever shown)."""
+    def values(self, st, names):
+        """Indicators of one stock for the whole current day, computed once per day on first use.
+        They are causal, so the player and the AI are only ever given prefixes up to the clock."""
         date = self.s.day.date
         if st.ind.get("date") != date:
-            st.ind = {"date": date, "values": indicators.compute(st.seconds[date])}
-        return st.ind["values"]
+            st.ind = {"date": date}
+        for name in names:
+            if name not in st.ind:
+                st.ind[name] = indicators.compute_one(st.seconds[date], name)
+        return {name: st.ind[name] for name in names}
 
     def ind(self, a, b):
         """Enabled indicators of the viewed stock for bars a..b-1."""
-        if not self.shown:
-            return {}
-        values = self.values(self.s.stocks[self.view])
-        return {name: [clean(col[a:b]) for col in values[name]] for name in self.shown}
+        values = self.values(self.s.stocks[self.view], self.shown)
+        return {name: [clean(col[a:b]) for col in cols] for name, cols in values.items()}
 
     def account_view(self):
         a, prices = self.account, self.prices()
         names = {t: st.alias for t, st in self.s.stocks.items()} if self.s else {}
-        eq = a.equity(prices)
+        eq, exposure = a.equity(prices), a.exposure(prices)
         return {"equity": eq, "cash": a.cash, "today": eq - self.day_start, "total": eq - a.start,
+                "exposure": exposure, "buying_power": max(0.0, eq * a.leverage - exposure),
                 "positions": {names[t]: {"shares": n, "avg": a.cost[t], "pnl": n * (prices[t] - a.cost[t])}
                               for t, n in a.shares.items()},
                 "pending": [public(o) for o in self.pending],
@@ -457,6 +460,10 @@ class Game:
             await self.clear_pnl()
         elif cmd == "configure":
             await self.configure(msg)
+        elif cmd == "leverage" and isinstance(msg.get("value"), (int, float)) and 1 <= msg["value"] <= MAX_LEVERAGE:
+            self.account.leverage = float(msg["value"])
+            self.autosave()
+            await self.push_account()
         elif cmd == "indicators":
             self.shown = set(msg.get("names") or ()) & set(indicators.NAMES)
             await self.push_snapshot()
