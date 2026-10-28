@@ -118,6 +118,7 @@ class Game:
         self.today = []           # the same for the current day
         self.pending = []         # waiting LMT / conditional orders
         self.shown = set()        # indicators the player turned on
+        self.split = False        # split view: send every stock's bars, not just the viewed one
         self.agent = agent.AgentConfig()
         self.ai_log = []
         self.ai_mark = 1          # bar of the last AI decision
@@ -185,10 +186,10 @@ class Game:
         eq, exposure = a.equity(prices), a.exposure(prices)
         return {"equity": eq, "cash": a.cash, "today": eq - self.day_start, "total": eq - a.start,
                 "exposure": exposure, "buying_power": max(0.0, eq * a.leverage - exposure),
-                "positions": {names[t]: {"shares": n, "avg": a.cost[t], "pnl": n * (prices[t] - a.cost[t])}
+                "positions": {names[t]: {"shares": n, "avg": a.cost[t], "pnl": n * (a.mark(prices, t) - a.cost[t])}
                               for t, n in a.shares.items()},
                 "pending": [public(o) for o in self.pending],
-                "settings": {k: getattr(a, k) for k in ("capital", "leverage", "fee_per_share", "min_fee")}}
+                "settings": {k: getattr(a, k) for k in ("leverage", "fee_per_share", "min_fee", "spread")}}
 
     def trades_today(self):
         day = self.s.day_no if self.s else None
@@ -205,10 +206,17 @@ class Game:
                               "fallback": [st.alias for st in s.stocks.values() if s.day.date in st.fallback]}
             if s.ready():
                 msg.update(clock=self.clock(), prices=self.alias_prices(), ind=self.ind(0, self.pos),
-                           bars=rows(s.bars(self.view).iloc[: self.pos], s.day_no))
+                           bars=rows(s.bars(self.view).iloc[: self.pos], s.day_no), others=self.others(0, self.pos))
             if msg["phase"] == "day_end" and self.days:
                 msg["summary"] = self.days[-1]
         return msg
+
+    def others(self, a, b):
+        """Split view: bars a..b-1 of every stock except the viewed one, by alias."""
+        if not self.split:
+            return {}
+        s = self.s
+        return {st.alias: rows(st.seconds[s.day.date].iloc[a:b], s.day_no) for t, st in s.stocks.items() if t != self.view}
 
     def alias_prices(self):
         return {self.s.stocks[t].alias: p for t, p in self.prices().items()}
@@ -287,7 +295,8 @@ class Game:
             self.today.append(self.point(i - 1))
         await self.broadcast({"type": "tick", "clock": self.clock(), "prices": self.alias_prices(),
                               "bars": rows(s.bars(self.view).iloc[old: self.pos], s.day_no),
-                              "ind": self.ind(old, self.pos), "account": self.account_view()})
+                              "ind": self.ind(old, self.pos), "others": self.others(old, self.pos),
+                              "account": self.account_view()})
         if fills or rejected:
             await self.push_account(fills)
             for text in rejected:
@@ -309,7 +318,8 @@ class Game:
                 continue
             self.pending.remove(o)
             try:
-                fills.append(self.execute(o["ticker"], o["side"], o["dollars"], at=a + hit[0], price=hit[1], by=o["by"]))
+                fills.append(self.execute(o["ticker"], o["side"], o["dollars"], at=a + hit[0], price=hit[1],
+                                          by=o["by"], market=o["type"] != "LMT"))
             except OrderError as e:
                 rejected.append(f"{o['type']} {o['side']} {o['stock']} not filled: {e}")
         return fills, rejected
@@ -338,20 +348,21 @@ class Game:
 
     # ----- orders
 
-    def execute(self, ticker, side, dollars, at=None, price=None, by="you"):
-        """Fill now (or at bar `at`, optionally at `price`) through the account; raises OrderError."""
+    def execute(self, ticker, side, dollars, at=None, price=None, by="you", market=True):
+        """Fill now (or at bar `at`, optionally at `price`) through the account; market fills pay the
+        spread. Raises OrderError."""
         s, at = self.s, self.pos - 1 if at is None else at
         prices = self.prices(at)
         if price is not None:
             prices[ticker] = price
-        return self.account.order(ticker, side, dollars, prices, day=s.day_no, t=self.time_at(at),
+        return self.account.order(ticker, side, dollars, prices, market, day=s.day_no, t=self.time_at(at),
                                   stock=s.stocks[ticker].alias, ticker=ticker, by=by)
 
     def place(self, ticker, side, kind, price, dollars, by):
         """Market and close orders (and limit/conditional orders already reached) fill now; others wait.
         Returns the trade, or None if the order is waiting."""
         if side == "close" or kind == "MKT" or orders.marketable(kind, side, price, self.prices()[ticker]):
-            return self.execute(ticker, side, dollars, by=by)
+            return self.execute(ticker, side, dollars, by=by, market=kind != "LMT" or side == "close")
         self.pending.append({"id": uuid.uuid4().hex[:6], "ticker": ticker, "stock": self.s.stocks[ticker].alias,
                              "side": side, "type": kind, "price": price, "dollars": dollars, "by": by})
         return None
@@ -460,6 +471,11 @@ class Game:
             await self.clear_pnl()
         elif cmd == "configure":
             await self.configure(msg)
+        elif cmd == "deposit":
+            await self.deposit(msg.get("amount"))
+        elif cmd == "split":
+            self.split = bool(msg.get("on"))
+            await self.push_snapshot()
         elif cmd == "leverage" and isinstance(msg.get("value"), (int, float)) and 1 <= msg["value"] <= MAX_LEVERAGE:
             self.account.leverage = float(msg["value"])
             self.autosave()
@@ -486,15 +502,31 @@ class Game:
 
     async def configure(self, msg):
         try:
-            capital, leverage, per_share, min_fee = (float(msg[k]) for k in ("capital", "leverage", "fee_per_share", "min_fee"))
+            spread, per_share, min_fee = (float(msg[k]) for k in ("spread", "fee_per_share", "min_fee"))
         except (KeyError, TypeError, ValueError):
             return await self.error("Settings must be numbers.")
-        if not (0 < capital <= MAX_CAPITAL and 1 <= leverage <= MAX_LEVERAGE and per_share >= 0 and min_fee >= 0):
-            return await self.error(f"Capital must be $1–${MAX_CAPITAL:,.0f} and leverage 1x–{MAX_LEVERAGE:g}x.")
+        if min(spread, per_share, min_fee) < 0:
+            return await self.error("Spread and fees can't be negative.")
         a = self.account
-        a.capital, a.leverage, a.fee_per_share, a.min_fee = capital, leverage, per_share, min_fee
+        a.spread, a.fee_per_share, a.min_fee = spread, per_share, min_fee
         self.autosave()
         await self.push_account()
+
+    async def deposit(self, amount):
+        """Add (or, if negative, withdraw) money. The PnL baselines and the equity curve move with it,
+        so a deposit never shows up as profit."""
+        if not isinstance(amount, (int, float)) or not amount or abs(amount) > MAX_CAPITAL * 100:
+            return await self.error("Enter an amount to add, or a negative amount to withdraw.")
+        try:
+            self.account.deposit(float(amount), self.prices())
+        except OrderError as e:
+            return await self.error(str(e))
+        self.day_start += amount
+        for p in self.curve + self.today:
+            p[1] = round(p[1] + amount, 2)
+        self.autosave()
+        await self.push_account()
+        await self.broadcast({"type": "notice", "text": f"{'Added' if amount > 0 else 'Withdrew'} ${abs(amount):,.2f}."})
 
     async def new_game(self):
         if self.client is None or self.picking:

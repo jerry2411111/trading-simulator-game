@@ -6,7 +6,7 @@
   <title>TapeTrainer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Press+Start+2P&family=Rajdhani:wght@500;700&family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,6 +32,8 @@
       <div id="tabs"></div>
       <button id="add">+ Add</button>
       <button id="replace">↻ Replace</button>
+      <button id="split" hidden>⊞ Split view</button>
+      <button id="quick-save" class="quick-save" title="Save this game in the &quot;Quick save&quot; slot">💾 Quick save</button>
     </aside>
 
     <section class="center">
@@ -43,7 +45,9 @@
         </label>
         <span id="chips" class="chips"></span>
       </div>
-      <div id="chart"></div>
+      <div id="charts">
+        <div class="cell main"><div id="main-title" class="cell-title" hidden></div><div id="chart" class="cell-chart"></div></div>
+      </div>
       <div id="ind-menu" class="window" hidden></div>
       <div id="overlay" class="window" hidden>
         <p id="overlay-title" class="num"></p>
@@ -75,7 +79,7 @@
         </div>
         <label class="kv"><span>Leverage</span>
           <select id="order-lev">
-            <option value="1">1x (no leverage)</option><option value="2">2x</option><option value="3">3x</option>
+            <option value="1">1x (none)</option><option value="2">2x</option><option value="3">3x</option>
             <option value="5">5x</option><option value="10">10x</option><option value="20">20x</option>
             <option value="50">50x</option><option value="100">100x</option>
           </select>
@@ -128,13 +132,15 @@
       </section>
 
       <section data-panel="trading">
+        <label>Add money to the account $ (use a minus sign to withdraw)
+          <span class="row"><input id="deposit" type="number" step="100" placeholder="e.g. 5000 or -2000"><button id="apply-deposit" class="primary">Apply</button></span>
+        </label>
         <div class="form-grid">
-          <label>Starting capital $ <input id="set-capital" type="number" min="1" max="10000"></label>
-          <label>Leverage (1–100x) <input id="set-leverage" type="number" min="1" max="100" step="0.5"></label>
+          <label>Spread cost on MKT orders $ / share <input id="set-spread" type="number" min="0" step="0.01"></label>
           <label>Fee per share $ <input id="set-fee" type="number" min="0" step="0.001"></label>
           <label>Minimum fee per order $ <input id="set-min-fee" type="number" min="0" step="0.5"></label>
         </div>
-        <p class="small">Starting capital applies after Clear PnL or a new game. Leverage and fees apply now.</p>
+        <p class="small">Market buys fill the spread above the price, market sells the spread below it. Limit orders pay no spread. Leverage is set in the order panel.</p>
         <div class="row"><button id="apply-trading" class="primary">Apply</button><button id="clear-pnl">Clear PnL</button></div>
       </section>
 

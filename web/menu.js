@@ -31,18 +31,17 @@ export function initMenus(ctx) {
     ctx.openSetup();
   };
 
-  // ----- Settings: the game pauses while it is open and resumes at the same speed after
-  let resume = null;
+  // ----- Settings: the game pauses while it is open and starts again when it closes
+  let exiting = false;
   $('menu-btn').onclick = () => {
-    resume = ctx.state().speed || null;
-    if (resume) ctx.send('speed', { value: 0 });
+    exiting = false;
+    if (ctx.state().speed) ctx.send('speed', { value: 0 });
     fillTrading(ctx.state().account?.settings);
     showTab('style');
     $('menu').showModal();
   };
   $('menu').addEventListener('close', () => {
-    if (resume) ctx.send('speed', { value: resume });
-    resume = null;
+    if (!exiting) ctx.send('speed', { value: ctx.lastSpeed() });
   });
   document.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
   function showTab(tab) {
@@ -60,7 +59,7 @@ export function initMenus(ctx) {
     b.onclick = () => {
       document.documentElement.dataset.theme = id;
       store('tt.theme', id);
-      ctx.chart()?.applyTheme();
+      ctx.charts().forEach((c) => c?.applyTheme());
       markTheme();
     };
     return b;
@@ -72,20 +71,20 @@ export function initMenus(ctx) {
   // Trading
   function fillTrading(s) {
     if (!s) return;
-    $('set-capital').value = s.capital;
-    $('set-leverage').value = s.leverage;
+    $('set-spread').value = s.spread;
     $('set-fee').value = s.fee_per_share;
     $('set-min-fee').value = s.min_fee;
+    $('deposit').value = '';
   }
   $('apply-trading').onclick = () => {
-    ctx.send('configure', {
-      capital: +$('set-capital').value, leverage: +$('set-leverage').value,
-      fee_per_share: +$('set-fee').value, min_fee: +$('set-min-fee').value,
-    });
+    ctx.send('configure', { spread: +$('set-spread').value, fee_per_share: +$('set-fee').value, min_fee: +$('set-min-fee').value });
     ctx.toast('Trading settings applied.');
   };
+  $('apply-deposit').onclick = () => {
+    ctx.send('deposit', { amount: +$('deposit').value });
+    $('deposit').value = '';
+  };
   $('clear-pnl').onclick = () => {
-    resume = null;
     ctx.send('clear_pnl');
     $('menu').close();
   };
@@ -101,7 +100,6 @@ export function initMenus(ctx) {
       load.onclick = async () => {
         const r = await post(`/api/saves/${s.id}/load`, {});
         if (!r.ok) return ctx.toast(r.message);
-        resume = null;
         $('menu').close();
         ctx.toast(`Loaded "${s.name}".`);
       };
@@ -157,7 +155,7 @@ export function initMenus(ctx) {
 
   // Exit: autosaves; the desktop window closes itself
   $('exit-game').onclick = async () => {
-    resume = null;
+    exiting = true;
     const r = await post('/api/exit', {});
     if (!r.closing) {
       $('menu').close();

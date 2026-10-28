@@ -16,6 +16,7 @@ class Account:
     leverage: float = 1.0
     fee_per_share: float = 0.005
     min_fee: float = 1.0
+    spread: float = 0.0             # $ per share paid on market orders (buy above, sell below the price)
     start: float = 10_000.0         # starting capital in effect now
     cash: float = 10_000.0
     shares: dict = field(default_factory=dict)  # ticker -> signed shares (short < 0)
@@ -27,14 +28,26 @@ class Account:
         self.start = self.cash = self.capital
         self.shares, self.cost, self.trades, self.fees = {}, {}, [], 0.0
 
+    def mark(self, prices, key):
+        """Current price of a held stock; its entry price while that day's data is still loading."""
+        return prices.get(key, self.cost[key])
+
     def equity(self, prices):
-        return self.cash + sum(n * prices[t] for t, n in self.shares.items())
+        return self.cash + sum(n * self.mark(prices, t) for t, n in self.shares.items())
 
     def exposure(self, prices):
-        return sum(abs(n) * prices[t] for t, n in self.shares.items())
+        return sum(abs(n) * self.mark(prices, t) for t, n in self.shares.items())
 
-    def order(self, key, side, dollars, prices, **info):
-        """Buy, sell or close stock `key` at prices[key]; returns the trade record (with `info`) or raises OrderError."""
+    def deposit(self, amount, prices):
+        """Add money (or withdraw with a negative amount). Not profit: the PnL baseline moves with it."""
+        if amount < 0 and (self.cash + amount < 0 or self.equity(prices) + amount <= 0):
+            raise OrderError(f"You can withdraw at most ${max(0.0, min(self.cash, self.equity(prices))):,.2f} now.")
+        self.cash += amount
+        self.start += amount
+
+    def order(self, key, side, dollars, prices, market=True, **info):
+        """Buy, sell or close stock `key` at prices[key] (market orders pay the spread); returns the trade
+        record (with `info`) or raises OrderError."""
         price, held = prices[key], self.shares.get(key, 0)
         if side == "close":
             qty = -held
@@ -45,6 +58,8 @@ class Account:
             if n <= 0:
                 raise OrderError(f"${dollars:,.0f} doesn't buy one share at ${price:,.2f}.")
             qty = n if side == "buy" else -n
+        if market:
+            price += self.spread if qty > 0 else -self.spread
         if abs(held + qty) > abs(held):
             limit = self.equity(prices) * self.leverage
             if self.exposure(prices) + (abs(held + qty) - abs(held)) * price > limit:

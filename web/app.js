@@ -17,12 +17,15 @@ let state = { phase: 'idle', session: null, account: null, trades: [], ai: { log
 let lastSpeed = 1;
 let shown = new Set();
 try { shown = new Set(JSON.parse(stored('tt.indicators') || '[]').filter((n) => INDICATOR_NAMES.includes(n))); } catch { /* keep none */ }
+let split = stored('tt.split') === '1';
+const minis = new Map(); // split view: alias -> { cell, chart } for the stocks not on the main chart
 
 const send = (cmd, extra = {}) => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ cmd, ...extra }));
 const view = () => state.session?.view;
+const allCharts = () => [chart, ...[...minis.values()].map((m) => m.chart)];
 
 applyStoredTheme();
-const menus = initMenus({ send, state: () => state, chart: () => chart, openSetup, toast });
+const menus = initMenus({ send, state: () => state, charts: allCharts, lastSpeed: () => lastSpeed, openSetup, toast });
 
 function openSetup(reason = '', cancellable = false) {
   $('game').hidden = true;
@@ -45,7 +48,10 @@ function startGame() {
 function connect() {
   if (ws && ws.readyState <= WebSocket.OPEN) return;
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-  ws.onopen = () => send('indicators', { names: [...shown] });
+  ws.onopen = () => {
+    send('indicators', { names: [...shown] });
+    send('split', { on: split });
+  };
   ws.onmessage = (e) => handle(JSON.parse(e.data));
   ws.onclose = () => setTimeout(connect, 1000);
 }
@@ -56,14 +62,17 @@ function handle(m) {
       state = m;
       chart.setData(m.bars || [], m.ind || {});
       chart.setTrades(viewTrades());
+      renderMinis(m.others || {});
       render();
       break;
     case 'tick':
       Object.assign(state, { clock: m.clock, prices: m.prices, account: m.account });
       chart.append(m.bars, m.ind || {});
+      for (const [name, rows] of Object.entries(m.others || {})) minis.get(name)?.chart.append(rows, {});
       renderClock();
       renderTabs();
       renderAccount();
+      renderTitles();
       break;
     case 'status':
       Object.assign(state, { phase: m.phase, speed: m.speed, loading: m.loading, thinking: m.thinking });
@@ -72,6 +81,7 @@ function handle(m) {
     case 'account':
       Object.assign(state, { account: m.account, trades: m.trades });
       chart.setTrades(viewTrades());
+      for (const [name, mini] of minis) mini.chart.setTrades(state.trades.filter((t) => t.stock === name));
       renderAccount();
       renderTabs();
       m.fills.forEach((f) => toast(`${f.by === 'AI' ? 'AI: ' : ''}${f.qty > 0 ? 'Bought' : 'Sold'} ${Math.abs(f.qty)} ${f.stock} @ ${f.price.toFixed(2)}`));
@@ -84,12 +94,52 @@ function handle(m) {
       menus.showStats(m);
       break;
     case 'error':
+    case 'notice':
       toast(m.text);
       break;
   }
 }
 
 const viewTrades = () => state.trades.filter((t) => t.stock === view());
+
+// ----- split view: one small chart per other stock next to the main chart
+
+function renderMinis(others) {
+  const names = split ? Object.keys(others) : [];
+  for (const [name, mini] of minis) {
+    if (names.includes(name)) continue;
+    mini.chart.destroy();
+    mini.cell.remove();
+    minis.delete(name);
+  }
+  for (const name of names) {
+    if (!minis.has(name)) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.innerHTML = '<button class="cell-title" title="Show on the main chart"></button><div class="cell-chart"></div>';
+      cell.querySelector('button').onclick = () => send('view', { stock: name });
+      $('charts').append(cell);
+      minis.set(name, { cell, chart: new PriceChart(cell.querySelector('.cell-chart')) });
+    }
+    const mini = minis.get(name).chart;
+    mini.setData(others[name], {});
+    mini.setTrades(state.trades.filter((t) => t.stock === name));
+  }
+  const n = names.length + 1;
+  $('charts').style.gridTemplateColumns = `repeat(${n <= 3 ? n : n === 4 ? 2 : 3}, minmax(0, 1fr))`;
+  $('main-title').hidden = n === 1;
+  renderTitles();
+}
+
+function renderTitles() {
+  const title = (name) => {
+    const p = state.account?.positions[name];
+    const pos = p ? ` ${p.shares > 0 ? '▲' : '▼'}${Math.abs(p.shares)}` : '';
+    return `${name}  ${state.prices?.[name]?.toFixed(2) ?? ''}${pos}`;
+  };
+  if (view()) $('main-title').textContent = `${title(view())}  (main)`;
+  for (const [name, mini] of minis) mini.cell.querySelector('.cell-title').textContent = title(name);
+}
 
 // ----- rendering
 
@@ -125,6 +175,8 @@ function renderTabs() {
   }));
   $('add').disabled = !s || s.stocks.length >= 5;
   $('replace').disabled = !s;
+  $('split').hidden = !s || s.stocks.length < 2;
+  $('split').textContent = split ? '▣ Single view' : '⊞ Split view';
 }
 
 function setPnl(el, v) {
@@ -242,14 +294,14 @@ $('speeds').append(...SPEEDS.map(([speed, label]) => {
 }));
 
 document.querySelectorAll('[data-style]').forEach((b) => {
-  b.onclick = () => { chart.setStyle(b.dataset.style); markStyle(); };
+  b.onclick = () => { allCharts().forEach((c) => c.setStyle(b.dataset.style)); markStyle(); };
 });
 function markStyle() {
   document.querySelectorAll('[data-style]').forEach((b) => b.classList.toggle('active', b.dataset.style === chart.style));
 }
 
 $('window').max = WINDOW_STEPS.length - 1;
-$('window').oninput = () => { chart.setWindow(WINDOW_STEPS[+$('window').value]); showWindow(); };
+$('window').oninput = () => { allCharts().forEach((c) => c.setWindow(WINDOW_STEPS[+$('window').value])); showWindow(); };
 function showWindow() {
   const m = chart.minutes;
   $('window').value = WINDOW_STEPS.reduce((best, s, i) => (Math.abs(s - m) < Math.abs(WINDOW_STEPS[best] - m) ? i : best), 0);
@@ -358,6 +410,17 @@ $('close-all').onclick = () => send('close_all');
 $('new-game').onclick = () => send('new_game');
 $('add').onclick = () => send('add');
 $('replace').onclick = () => send('replace', { stock: view() });
+$('split').onclick = () => {
+  split = !split;
+  store('tt.split', split ? '1' : '0');
+  send('split', { on: split });
+};
+$('quick-save').onclick = async () => {
+  const r = await (await fetch('/api/saves', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Quick save' }),
+  })).json();
+  toast(r.ok ? 'Quick saved. Load it from Settings → Save / load.' : r.message);
+};
 
 // Keyboard: B buy, S sell, C close, Space pause/resume, 1-5 switch stock.
 document.addEventListener('keydown', (e) => {

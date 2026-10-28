@@ -77,7 +77,8 @@ export class PriceChart {
       priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false,
     }, 1);
     this.el = el;
-    new ResizeObserver(() => this.layoutPanes()).observe(el);
+    this.observer = new ResizeObserver(() => this.layoutPanes());
+    this.observer.observe(el);
     this.legend = document.createElement('div');
     this.legend.className = 'legend';
     el.append(this.legend);
@@ -85,6 +86,12 @@ export class PriceChart {
     this.minutes = Number(stored(WINDOW_KEY)) || 10;
     this.applyTheme();
     this.setStyle(stored(STYLE_KEY) === 'line' ? 'line' : 'candle');
+  }
+
+  destroy() {
+    this.observer.disconnect();
+    this.chart.remove();
+    this.legend.remove();
   }
 
   get style() { return this.line.options().visible ? 'line' : 'candle'; }
@@ -102,8 +109,8 @@ export class PriceChart {
     this.down = c('--down');
     this.chart.applyOptions({
       layout: {
-        background: { color: c('--panel') }, textColor: c('--ink'), fontFamily: 'VT323, monospace', fontSize: 16,
-        attributionLogo: false, panes: { separatorColor: c('--accent2') },
+        background: { color: c('--chart-bg') }, textColor: c('--ink'), fontFamily: c('--font-body'),
+        fontSize: parseInt(c('--chart-size'), 10), attributionLogo: false, panes: { separatorColor: c('--accent2') },
       },
       grid: { vertLines: { color: c('--grid') }, horzLines: { color: c('--grid') } },
       crosshair: { vertLine: { color: c('--accent') }, horzLine: { color: c('--accent') } },
@@ -239,7 +246,7 @@ export class PriceChart {
 export function equityChart(el, points) {
   const chart = createChart(el, {
     autoSize: true,
-    layout: { background: { color: css('--panel') }, textColor: css('--ink'), attributionLogo: false },
+    layout: { background: { color: css('--chart-bg') }, textColor: css('--ink'), fontFamily: css('--font-body'), attributionLogo: false },
     grid: { vertLines: { visible: false }, horzLines: { color: css('--grid') } },
     localization: { timeFormatter: (t) => `Day ${Math.floor(t / 86400)} ${hms(t)}` },
     timeScale: { tickMarkFormatter: (t) => `D${Math.floor(t / 86400)} ${hms(t).slice(0, 5)}` },

@@ -40,7 +40,8 @@ def load_autosave():
 
 
 def save(name, data):
-    sid = uuid.uuid4().hex[:8]
+    """Save under `name`; an existing save with the same name is replaced (that is how Quick save works)."""
+    sid = next((s["id"] for s in list_saves() if s["name"] == name), None) or uuid.uuid4().hex[:8]
     _write(_path(sid), {**data, "name": name, "saved_at": time.time()})
     return sid
 
