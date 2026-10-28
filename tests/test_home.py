@@ -94,12 +94,14 @@ def test_companion_falls_back_to_a_living_pet():
 def test_mortgage_one_house_then_the_whole_home_and_pay_back():
     h = Home()
     h("buy", item="modern")
-    h("mortgage", kind="house", ref="modern")
-    assert h.cash == 8000 * home.MORTGAGE
+    h("mortgage", kind="house", ref="modern", plan="p70")
+    assert h.cash == 8000 * 0.7
     with pytest.raises(home.HomeError):
-        h("mortgage", kind="house", ref="modern")   # already pledged
-    v = h("mortgage", kind="all", ref="all")      # $20,000 + 70% of what isn't pledged yet (nothing)
-    assert h.cash == pytest.approx(5600 + 20_000)
+        h("mortgage", kind="house", ref="modern", plan="p50")   # already pledged
+    with pytest.raises(home.HomeError, match="plan"):
+        h("mortgage", kind="all", ref="all", plan="p999")
+    v = h("mortgage", kind="all", ref="all", plan="p150")     # 150% of $20,000 + what isn't pledged (nothing)
+    assert h.cash == pytest.approx(5600 + 30_000)
     assert v["locked"] and v["loan_offers"] == []
     with pytest.raises(home.HomeError, match="mortgaged"):
         h("buy", item="cat")
@@ -107,7 +109,7 @@ def test_mortgage_one_house_then_the_whole_home_and_pay_back():
     h.cash = 100.0
     with pytest.raises(home.HomeError, match="cash"):
         h("redeem", id=whole["id"])
-    h.cash = 30_000.0
+    h.cash = 40_000.0
     v = h("redeem", id=whole["id"])
     assert h.cash == 10_000.0 and not v["locked"]
 
@@ -148,12 +150,12 @@ def test_interest_is_paid_daily_and_unpaid_interest_forecloses():
     h("buy", item="modern")
     h("clean", zone="southwest")
     h("buy", item="pool")
-    h("mortgage", kind="house", ref="modern")        # $5,600 loan: $28 a day
-    h("mortgage", kind="build", ref="pool")          # $1,750 loan: $8.75 a day
+    h("mortgage", kind="house", ref="modern", plan="p100")   # $8,000 loan at 0.25%: $20 a day
+    h("mortgage", kind="build", ref="pool", plan="p150")     # $3,750 loan at 0.5%: $18.75 a day
     d, paid, notes = home.charge_interest(h.d, cash=100)
-    assert paid == 36.75 and not notes and len(d["loans"]) == 2
+    assert paid == 38.75 and not notes and len(d["loans"]) == 2
     d, paid, notes = home.charge_interest(h.d, cash=30)   # pays the house's interest, not the pool's
-    assert paid == 28 and not d["pool"] and [x["ref"] for x in d["loans"]] == ["modern"] and "pool" in notes[0]
+    assert paid == 20 and not d["pool"] and [x["ref"] for x in d["loans"]] == ["modern"] and "pool" in notes[0]
     d, paid, notes = home.charge_interest(d, cash=0)      # now the house goes too
     assert "modern" not in d["houses"] and d["house"] == "shack" and d["loans"] == []
     h.d = d
@@ -165,7 +167,7 @@ def test_foreclosing_the_whole_home_keeps_coins_and_collection():
     h = Home()
     h("buy", item="cat")
     h.d["collection"] = [{"id": "hope", "t": 0, "day": 1}]
-    h("mortgage", kind="all", ref="all")
+    h("mortgage", kind="all", ref="all", plan="p50")   # $10,125 at 0.01%: about $1.01 a day
     d, paid, notes = home.charge_interest(h.d, cash=1)
     assert d["pets"] == [] and d["loans"] == [] and d["collection"][0]["id"] == "hope"
     assert home.coins(d, RICH) == home.coins(h.d, RICH)

@@ -6,10 +6,11 @@ Coins = this game's trading profit
       - spending (purchases, cleanup, floors, food). Every coin movement is logged.
 
 Things can be mortgaged for dollars paid into the trading account: one house, building or piece of
-furniture for 70% of its price, or the whole home for $20,000 + 70% of everything in it (which locks the
-home until it is paid back). Paying a loan back takes the same dollars out of the account. Every loan
-costs 0.5% interest per trading day, paid from the account's cash at the close; if the cash can't cover
-it, the bank takes the mortgaged thing (and the loan is gone with it). Selling back pays half the price.
+furniture, or the whole home (worth $20,000 plus everything in it; it locks the home until paid back).
+Each mortgage picks a plan from PLANS: how much of the value is lent and the daily interest. Interest is
+paid every trading day from the account's cash at the close (interest only; paying the loan back takes
+the same dollars out again); if the cash can't cover it, the bank takes the mortgaged thing (and the loan
+is gone with it). Selling back pays half the price.
 
 The garden starts as a wasteland: each zone must be cleaned up before anything goes there, and can
 then get a new floor. Buying a fish tank unlocks fish; the tank can be upgraded to an aquarium for
@@ -28,9 +29,10 @@ SELL_BACK = 0.5                                   # unused items sell back at ha
 TANK_FISH = 12                                    # fish a house fish tank holds before the aquarium
 AQUARIUM_ANIMALS = 40
 LOG_SIZE = 40
-MORTGAGE = 0.7                                    # a mortgage pays 70% of the price
-INTEREST = 0.005                                  # per trading day, on the loan amount (interest only)
-HOME_LOAN_BASE = 20_000                           # the whole home is worth at least this much as a loan
+PLANS = {  # mortgage plans: share of the value lent, interest per trading day on the loan
+    "p150": (1.50, 0.005), "p100": (1.00, 0.0025), "p70": (0.70, 0.0005), "p50": (0.50, 0.0001),
+}
+HOME_LOAN_BASE = 20_000                           # the whole home is worth this much plus what's in it
 
 PETS = {  # name, price, cost of one meal
     "turtle": ("Turtle", 60, 2), "lizard": ("Lizard", 150, 3), "cat": ("Cat", 250, 5),
@@ -196,7 +198,7 @@ def view(d, pnl):
     buddy = companion(d, now)
     return {"ok": True, "coins": coins(d, pnl), "trading": round(pnl, 2), "now": now,
             "state": {**d, "pets": [{**p, "status": pet_status(p, now)} for p in d["pets"]]}, "catalog": CATALOG,
-            "loan_offers": loan_offers(d), "locked": locked(d), "has_tank": has_tank(d), "companion": buddy and buddy["id"],
+            "loan_offers": loan_offers(d), "plans": PLANS, "locked": locked(d), "has_tank": has_tank(d), "companion": buddy and buddy["id"],
             "aqua_hungry": now - d["aqua_fed"] >= HUNGRY_AFTER,
             "aqua_meal": round(sum(CATALOG[a["type"]]["meal"] for a in d["aquatic"]), 2)}
 
@@ -295,27 +297,32 @@ def home_value(d):
 
 
 def loan_offers(d):
-    """Everything that can be mortgaged now: [{kind, ref, label, amount}]."""
+    """Everything that can be mortgaged now: [{kind, ref, label, value}]; the loan is a plan's share of the
+    value. The whole home is worth $20,000 plus everything in it that isn't mortgaged yet."""
     if locked(d):
         return []
     taken = {(loan["kind"], loan["ref"]) for loan in d["loans"]}
-    offers = [{"kind": "house", "ref": h, "label": HOUSES[h][0], "price": HOUSES[h][1]} for h in d["houses"] if HOUSES[h][1]]
-    offers += [{"kind": "build", "ref": b, "label": BUILD[b][0].split(" (")[0], "price": BUILD[b][1]} for b in BUILD if d[b]]
+    offers = [{"kind": "house", "ref": h, "label": HOUSES[h][0], "value": HOUSES[h][1]} for h in d["houses"] if HOUSES[h][1]]
+    offers += [{"kind": "build", "ref": b, "label": BUILD[b][0].split(" (")[0], "value": BUILD[b][1]} for b in BUILD if d[b]]
     offers += [{"kind": "furniture", "ref": f["id"], "label": f"{FURNITURE[f['item']][0]} ({HOUSES[h][0].lower()})",
-                "price": FURNITURE[f["item"]][1]} for h, f in _furniture(d)]
-    offers = [{**o, "amount": round(o.pop("price") * MORTGAGE, 2)} for o in offers if (o["kind"], o["ref"]) not in taken]
-    pledged = sum(loan["value"] for loan in d["loans"])
-    whole = round(HOME_LOAN_BASE + MORTGAGE * max(0, home_value(d) - pledged), 2)
-    return [{"kind": "all", "ref": "all", "label": "The whole home (garden, houses and everything in them)", "amount": whole}] + offers
+                "value": FURNITURE[f["item"]][1]} for h, f in _furniture(d)]
+    offers = [o for o in offers if (o["kind"], o["ref"]) not in taken]
+    pledged = sum(loan["value"] for loan in d["loans"] if loan["kind"] != "all")
+    whole = HOME_LOAN_BASE + max(0, home_value(d) - pledged)
+    return [{"kind": "all", "ref": "all", "label": "The whole home (garden, houses and everything in them)", "value": whole}] + offers
 
 
 def _mortgage(d, body):
     offer = next((o for o in loan_offers(d) if o["kind"] == body.get("kind") and o["ref"] == body.get("ref")), None)
     if offer is None:
         raise HomeError("That can't be mortgaged now.")
-    d["loans"].append({"id": uuid.uuid4().hex[:6], **offer, "value": round(offer["amount"] / MORTGAGE, 2), "t": time.time()})
-    _log(d, f"Mortgaged {offer['label'].split(' (')[0].lower()}: +${offer['amount']:,.0f} to trading", 0)
-    return offer["amount"]
+    if body.get("plan") not in PLANS:
+        raise HomeError("Pick a mortgage plan.")
+    share, rate = PLANS[body["plan"]]
+    amount = round(offer["value"] * share, 2)
+    d["loans"].append({"id": uuid.uuid4().hex[:6], **offer, "plan": body["plan"], "amount": amount, "rate": rate, "t": time.time()})
+    _log(d, f"Mortgaged {offer['label'].split(' (')[0].lower()} ({share:.0%} at {rate:.2%} a day): +${amount:,.0f} to trading", 0)
+    return amount
 
 
 def _redeem(d, body, cash):
@@ -337,7 +344,7 @@ def charge_interest(home, cash):
     for loan in list(d["loans"]):
         if loan not in d["loans"]:  # already gone with a foreclosed house or building
             continue
-        due = round(loan["amount"] * INTEREST, 2)
+        due = round(loan["amount"] * loan.get("rate", 0.005), 2)
         if cash - paid >= due:
             paid += due
         else:

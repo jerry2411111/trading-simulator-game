@@ -1,5 +1,5 @@
 // Garden art, drawn in code with whole-pixel rectangles: pets, flower piles, trees with beehives,
-// birds and bees, the pool, and the garden ground (wasteland, cleared soil, floors and rubble).
+// birds and bees, the pool, and the garden ground (neon tiles, floors, and the garbage on the wasteland).
 // Everything takes the time `t` so it can idle-animate.
 import { disc, ellipse, glow, hash, icon, outlined, rect, sprite } from './pixel.js';
 
@@ -356,14 +356,14 @@ export function drawPool(g, x, y, w, h, t) {
   disc(g, fx, fy, 3, '#ff4f9a'); disc(g, fx, fy, 1, '#1f8fd8'); rect(g, fx - 3, fy, 1, 1, '#ffffff'); rect(g, fx + 3, fy, 1, 1, '#ffffff');
 }
 
-// ---------------------------------------------------------------- garden ground: wasteland, cleared soil and floors
+// ---------------------------------------------------------------- garden ground: neon tiles, floors and garbage
 
 export const FLOOR_LOOK = {
   lawn: ['#2c7436', '#378442', '#246630', '#5ab85a'], clover: ['#245e30', '#2f7038', '#1c5028', '#7ed06a'],
   gravel: ['#8a8a98', '#a2a2b0', '#70707e', '#c8c8d4'], brick: ['#9a3a24', '#b04a30', '#80301c', '#4a3430'],
   stone: ['#7c7c8c', '#92929e', '#666676', '#30303c'], deck: ['#8e5e32', '#a06c3a', '#734a26', '#40260f'],
-  neon: ['#150b28', '#1c1034', '#0e0820', '#00e5ff'], soil: ['#4a3a2e', '#544234', '#3c2e24', '#6a5a4a'],
-  waste: ['#463a36', '#52443c', '#382c28', '#2a1e1c'],
+  neon: ['#150b28', '#1c1034', '#0e0820', '#00e5ff'],
+  base: ['#0b0614', '#0e091a', '#12606e', '#6e1c5c'],  // the bare ground: black tiles, neon blue and pink edges
 };
 
 function noise(g, x0, y0, w, h, pal, seed, step = 2) {
@@ -434,26 +434,16 @@ const PATTERNS = {
   neon(g, x0, y0, w, h, p) {
     for (let y = y0; y < y0 + h; y += 8) for (let x = x0; x < x0 + w; x += 8) rect(g, x, y, 8, 8, p[((x + y) / 8) % 2 ? 0 : 1]);
   },
-  soil(g, x0, y0, w, h, p, s) {
-    noise(g, x0, y0, w, h, p, s);
-    for (let y = y0 + 2; y < y0 + h; y += 5) rect(g, x0, y, w, 1, p[2]);
-    for (let i = 0; i < (w * h) / 60; i++) rect(g, x0 + Math.floor(hash(i + s) * w), y0 + Math.floor(hash(i * 5 + s) * h), 1, 1, p[3]);
-  },
-  waste(g, x0, y0, w, h, p, s) {
-    noise(g, x0, y0, w, h, p, s, 3);
-    for (let i = 0; i < (w * h) / 220; i++) {  // cracks
-      let x = x0 + Math.floor(hash(i + s) * w);
-      let y = y0 + Math.floor(hash(i * 7 + s) * h);
-      for (let k = 0; k < 7; k++) {
-        rect(g, x, y, 1, 1, p[3]);
-        x += hash(i * 11 + k) > 0.5 ? 1 : -1;
-        y += hash(i * 13 + k) > 0.4 ? 1 : 0;
+  base(g, x0, y0, w, h, p) {  // 8 px square tiles: blue top / left edge, pink bottom / right edge
+    for (let y = y0; y < y0 + h; y += 8) {
+      for (let x = x0; x < x0 + w; x += 8) {
+        const tw = Math.min(8, x0 + w - x);
+        const th = Math.min(8, y0 + h - y);
+        rect(g, x, y, tw, th, ((x + y) / 8) % 2 ? p[0] : p[1]);
+        rect(g, x, y, tw, 1, p[2]); rect(g, x, y, 1, th, p[2]);
+        if (th === 8) rect(g, x + 1, y + 7, tw - 1, 1, p[3]);
+        if (tw === 8) rect(g, x + 7, y + 1, 1, th - 1, p[3]);
       }
-    }
-    for (let i = 0; i < (w * h) / 90; i++) {  // dead grass
-      const x = x0 + Math.floor(hash(i * 3 + s + 1) * w);
-      const y = y0 + Math.floor(hash(i * 9 + s + 2) * h);
-      rect(g, x, y, 1, 2, '#8a7a4a'); rect(g, x + 1, y + 1, 1, 1, '#6a5a32');
     }
   },
 };
@@ -462,16 +452,54 @@ export function drawFloor(g, x0, y0, w, h, floor, seed) {
   PATTERNS[floor](g, x0, y0, w, h, FLOOR_LOOK[floor], seed);
 }
 
-// Rubble lying on the wasteland (x, y = ground point).
-const DEBRIS = {
-  rock(g, x, y) { ellipse(g, x, y - 2, 3, 2, '#1a1418'); ellipse(g, x, y - 2, 2, 1, '#6a6070'); rect(g, x - 1, y - 3, 2, 1, '#9a90a0'); },
-  tire(g, x, y) { ellipse(g, x, y - 2, 4, 2, '#0c0c10'); ellipse(g, x, y - 2, 2, 1, '#3a3040'); rect(g, x - 3, y - 4, 2, 1, '#3a3a44'); },
-  bag(g, x, y) { ellipse(g, x, y - 3, 3, 3, '#0e0a14'); ellipse(g, x - 1, y - 3, 2, 2, '#2a2236'); rect(g, x, y - 7, 1, 2, '#2a2236'); rect(g, x - 2, y - 5, 1, 1, '#5a5070'); },
-  crate(g, x, y) { rect(g, x - 4, y - 6, 8, 6, '#2a1a0e'); rect(g, x - 3, y - 5, 6, 4, '#7a5a30'); rect(g, x - 3, y - 3, 6, 1, '#4a3418'); rect(g, x + 1, y - 6, 2, 2, '#2a1a0e'); },
-  barrel(g, x, y) { rect(g, x - 3, y - 7, 6, 7, '#1a0e0a'); rect(g, x - 2, y - 6, 4, 6, '#8a3e1e'); rect(g, x - 2, y - 4, 4, 1, '#5a2a14'); rect(g, x - 2, y - 6, 1, 6, '#b0582e'); ellipse(g, x, y - 7, 2, 0, '#c87040'); },
-  bush(g, x, y) { [[-3, -4], [0, -6], [3, -4], [-1, -3], [2, -2]].forEach(([dx, dy]) => { rect(g, x, y, 1, 1, '#5a4228'); for (let k = 0; k < 4; k++) rect(g, x + Math.round((dx * k) / 4), y + Math.round((dy * k) / 4), 1, 1, '#6a4e2c'); }); },
-  can(g, x, y) { rect(g, x - 1, y - 2, 3, 2, '#a8a8b8'); rect(g, x - 1, y - 2, 1, 2, '#d03a3a'); },
-  puddle(g, x, y, t) { ellipse(g, x, y - 1, 6, 2, '#1e1438'); rect(g, x - 3, y - 2, 4, 1, '#3fd8ff'); rect(g, x + 1, y - 1, 2, 1, '#ff4fd8'); },
+// Garbage lying on the wasteland, big enough to tell what it is (x, y = where it touches the ground).
+const GARBAGE = {
+  bag(g, x, y) {  // a black trash bag tied at the top
+    ellipse(g, x, y - 5, 6, 5, '#1c1828'); ellipse(g, x - 1, y - 6, 4, 3, '#2c2640');
+    rect(g, x - 3, y - 8, 2, 2, '#4a4468'); rect(g, x - 1, y - 12, 3, 2, '#1c1828'); rect(g, x - 3, y - 13, 2, 2, '#2c2640'); rect(g, x + 2, y - 13, 2, 2, '#2c2640');
+    rect(g, x + 2, y - 4, 2, 1, '#0e0a16');
+  },
+  tire(g, x, y) {  // an old tire standing on its edge
+    disc(g, x, y - 6, 6, '#141418'); disc(g, x, y - 6, 2, '#0b0614');
+    for (let k = 0; k < 8; k++) rect(g, x + Math.round(Math.cos(k * 0.785) * 5), y - 6 + Math.round(Math.sin(k * 0.785) * 5), 1, 1, '#4a4a56');
+    disc(g, x, y - 6, 3, '#5a5a66'); disc(g, x, y - 6, 1, '#0b0614');
+  },
+  barrel(g, x, y) {  // a rusty oil drum
+    rect(g, x - 4, y - 12, 9, 12, '#9a4a22'); rect(g, x - 4, y - 12, 2, 12, '#c8703a'); rect(g, x + 3, y - 12, 2, 12, '#6a2e14');
+    [y - 12, y - 7, y - 2].forEach((ry) => rect(g, x - 4, ry, 9, 1, '#5a2410'));
+    ellipse(g, x, y - 12, 4, 1, '#7a3818'); rect(g, x - 1, y - 9, 3, 3, '#ffd21f'); rect(g, x, y - 8, 1, 1, '#1a1a1a');
+  },
+  box(g, x, y) {  // a soggy cardboard box with tape
+    rect(g, x - 6, y - 8, 12, 8, '#a87a44'); rect(g, x - 6, y - 10, 12, 3, '#c89a5e');
+    rect(g, x - 1, y - 10, 2, 10, '#e8d8a0'); rect(g, x - 8, y - 12, 3, 3, '#c89a5e'); rect(g, x + 4, y - 4, 2, 1, '#6a4a22');
+  },
+  tv: (g, x, y) => {  // a broken TV with a cracked screen
+    rect(g, x - 7, y - 11, 14, 11, '#5a5a66'); rect(g, x - 6, y - 10, 10, 8, '#16202e');
+    [[-4, -9], [-3, -8], [-2, -6], [-1, -5], [0, -4], [1, -6], [2, -7]].forEach(([dx, dy]) => rect(g, x + dx, y + dy, 1, 1, '#c8d8e8'));
+    rect(g, x + 5, y - 9, 1, 1, '#ff2a6d'); rect(g, x + 5, y - 6, 1, 1, '#8a8a96');
+    rect(g, x - 3, y - 14, 1, 3, '#8a8a96'); rect(g, x + 2, y - 15, 1, 4, '#8a8a96'); rect(g, x - 4, y - 15, 1, 1, '#8a8a96'); rect(g, x + 3, y - 16, 1, 1, '#8a8a96');
+  },
+  cans(g, x, y) {  // crushed cans and a bottle
+    rect(g, x - 6, y - 3, 4, 3, '#d82a2a'); rect(g, x - 6, y - 3, 4, 1, '#e8e8f0');
+    rect(g, x - 1, y - 2, 3, 2, '#c8c8d4'); rect(g, x - 1, y - 2, 1, 2, '#2a6ad8');
+    rect(g, x + 3, y - 3, 6, 2, '#2a8a4a'); rect(g, x + 9, y - 3, 2, 1, '#2a8a4a'); rect(g, x + 4, y - 3, 2, 1, '#7ad89a');
+  },
+  pipes(g, x, y) {  // a pile of scrap pipes
+    [[-7, -3], [-5, -6], [-3, -9]].forEach(([dx, dy], i) => {
+      rect(g, x + dx, y + dy, 13, 3, i % 2 ? '#7a7a86' : '#8a8a98'); rect(g, x + dx, y + dy, 13, 1, '#b8b8c8');
+      disc(g, x + dx + 12, y + dy + 1, 1, '#2a2a34'); rect(g, x + dx + 3, y + dy + 1, 2, 1, '#9a4a22');
+    });
+  },
+  chair(g, x, y) {  // a broken chair on its side
+    rect(g, x - 6, y - 4, 10, 3, '#7a4a22'); rect(g, x - 6, y - 4, 10, 1, '#a8703c');
+    rect(g, x + 3, y - 11, 3, 10, '#6a3e1c'); rect(g, x - 5, y - 1, 2, 1, '#4a2a10'); rect(g, x + 1, y - 1, 2, 1, '#4a2a10');
+    rect(g, x - 6, y - 7, 1, 3, '#6a3e1c'); rect(g, x - 2, y - 6, 1, 2, '#6a3e1c');
+  },
 };
-export const DEBRIS_KINDS = Object.keys(DEBRIS);
-export function drawDebris(g, kind, x, y) { DEBRIS[kind](g, Math.round(x), Math.round(y)); }
+export const GARBAGE_KINDS = Object.keys(GARBAGE);
+export function drawGarbage(g, kind, x, y) {
+  x = Math.round(x);
+  y = Math.round(y);
+  ellipse(g, x, y, 7, 2, 'rgba(0,0,0,0.45)');
+  outlined(g, x - 12, y - 18, 24, 19, '#05020a', (sg) => GARBAGE[kind](sg, 12, 18));
+}

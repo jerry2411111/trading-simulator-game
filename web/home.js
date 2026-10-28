@@ -2,7 +2,7 @@
 // pets, birds and bees, the house seen from outside), the house (rooms on a grid, furniture, your pets
 // living inside) and the aquarium (fish, sea life, the ice land). Animals run small state machines.
 import {
-  DEBRIS_KINDS, drawBee, drawBird, drawDebris, drawFloor, drawFlower, drawHive, drawPet, drawPool, drawTree, PET_SIZE,
+  drawBee, drawBird, drawFloor, drawGarbage, drawFlower, drawHive, drawPet, drawPool, drawTree, GARBAGE_KINDS, PET_SIZE,
 } from './art.js';
 import { drawFurniture, drawHouse, drawRoom, HOUSE_W, ROOM, roomSize, TILE, tileOrigin, wallPieces } from './build.js';
 import { AQ, drawAquarium, drawSea } from './sea.js';
@@ -291,25 +291,27 @@ export function initHome(ctx) {
       rect(q, i, 30 - h, 8, h, '#0c0820');
       for (let j = 2; j < h - 2; j += 3) if (hash(i + j) > 0.55) rect(q, i + 2 + (j % 2) * 3, 30 - h + j, 1, 1, j % 4 ? '#ffe58a' : '#ff4fd8');
     }
-    // the house lot: a dark lawn with hedges on both sides of the house
-    drawFloor(q, 0, 30, GW, 56, 'lawn', 3);
-    q.fillStyle = 'rgba(8,4,24,0.45)';
-    q.fillRect(0, 30, GW, 56);
-    for (let x = 0; x < GW; x += 7) { disc(q, x + 3, 33 + (x % 14 ? 1 : 0), 5, x % 14 ? '#163a26' : '#1f4a30'); rect(q, x + 1, 30, 2, 1, '#3a7a4a'); }
-    // zones: wasteland, cleared soil or a floor
+    // the ground everywhere is neon tiles (the house lot too); a floor replaces them where you lay one
+    drawFloor(q, 0, 30, GW, 56, 'base', 0);
     Object.entries(ZONES).forEach(([zone, rects], zi) => {
       const z = st().zones[zone];
+      rects.forEach((r, ri) => drawFloor(q, r.x, r.y, r.w, r.h, z?.floor ?? 'base', zi * 17 + ri));
+    });
+    // wasteland: the same ground with garbage lying around, a few big recognizable pieces
+    const junk = [];
+    Object.entries(ZONES).forEach(([zone, rects], zi) => {
+      if (st().zones[zone]) return;
       rects.forEach((r, ri) => {
-        drawFloor(q, r.x, r.y, r.w, r.h, z ? z.floor ?? 'soil' : 'waste', zi * 17 + ri);
-        if (!z) {
-          const n = Math.floor((r.w * r.h) / 260);
-          for (let i = 0; i < n; i++) {
-            const k = DEBRIS_KINDS[Math.floor(hash(zi * 31 + ri * 7 + i * 3.1) * DEBRIS_KINDS.length)];
-            drawDebris(q, k, r.x + 6 + hash(i * 1.7 + zi) * (r.w - 12), r.y + 8 + hash(i * 2.3 + zi * 5) * (r.h - 10));
+        for (let y = r.y + 16; y <= r.y + r.h - 2; y += 20) {
+          for (let x = r.x + 12; x <= r.x + r.w - 12; x += 28) {
+            const k = zi * 97 + ri * 31 + x * 0.13 + y * 0.71;
+            if (hash(k) < 0.5) continue;
+            junk.push({ x: x + Math.round((hash(k + 1) - 0.5) * 10), y: y - Math.round(hash(k + 2) * 5), kind: GARBAGE_KINDS[Math.floor(hash(k + 3) * GARBAGE_KINDS.length)] });
           }
         }
       });
     });
+    junk.sort((a, b) => a.y - b.y).forEach((j) => drawGarbage(q, j.kind, j.x, j.y));
     // the flower bed: a stone curb and leafy ground cover, no bare dirt
     if (clean('plaza')) {
       ellipse(q, BED.x, BED.y + 1, BED.rx + 3, BED.ry + 3, '#1a1a24');
@@ -329,13 +331,12 @@ export function initHome(ctx) {
       }
     }
     // the stone road from the gate to the door, and around the bed
-    const road = clean('path') ? [...STONES, ...(clean('plaza') ? RING : [])] : STONES.filter((_, k) => k % 3 === 0);
+    const road = clean('path') ? [...STONES, ...(clean('plaza') ? RING : [])] : [];
     road.forEach((s, k) => {
       ellipse(q, s.x, s.y + 1, 4, 2, '#20202a');
-      ellipse(q, s.x, s.y, 4, 2, clean('path') ? '#a8a8b8' : '#6a6070');
-      rect(q, s.x - 2, s.y - 1, 3, 1, clean('path') ? '#d8d8e4' : '#8a8090');
-      if (!clean('path')) rect(q, s.x - 1, s.y, 3, 1, '#2a2028');
-      else if (k % 4 === 1) rect(q, s.x + 3, s.y + 1, 1, 1, '#5aa850');
+      ellipse(q, s.x, s.y, 4, 2, '#a8a8b8');
+      rect(q, s.x - 2, s.y - 1, 3, 1, '#d8d8e4');
+      if (k % 4 === 1) rect(q, s.x + 3, s.y + 1, 1, 1, '#5aa850');
     });
     if (clean('southeast')) {   // the play corner: a dog house and a sandbox
       rect(q, 214, 180, 18, 14, '#7a3a2a'); rect(q, 212, 177, 22, 4, '#3a2a4a'); rect(q, 219, 185, 8, 9, '#140a10');
@@ -705,6 +706,7 @@ export function initHome(ctx) {
       });
     });
     stand.sort((a, b) => a.key - b.key).forEach((it) => it.draw());
+    drawExit(t);
     if (editing && holding && hoverTile) {
       const ok = fits(holding.item, hoverTile.x, hoverTile.y, holding.rot, holding.id);
       drawItem(holding.item, hoverTile.x, hoverTile.y, holding.rot, t, false, 0.7);
@@ -714,6 +716,24 @@ export function initHome(ctx) {
       g.fillRect(x, y, w * TILE, h * TILE);
     }
   }
+
+  // The front door at the bottom of the room: click it to go out to the garden.
+  function exitBox() {
+    const [w, h] = roomSize(...grid());
+    return { x: Math.round(w / 2) - TILE, y: h - ROOM.bottom - 6, w: TILE * 2, h: ROOM.bottom + 6 };
+  }
+  function drawExit(t) {
+    const b = exitBox();
+    const on = hoverExit || t % 1.2 < 0.8;
+    rect(g, b.x + 2, b.y + 6, b.w - 4, b.h - 6, hoverExit ? '#2a0a3a' : '#120618');
+    rect(g, b.x + 2, b.y + 6, 1, b.h - 6, '#00e5ff'); rect(g, b.x + b.w - 3, b.y + 6, 1, b.h - 6, '#00e5ff');
+    const ax = b.x + b.w / 2;  // an arrow pointing out
+    [[0, 0, 1], [-1, 1, 3], [-2, 2, 5]].forEach(([dx, dy, w]) => rect(g, ax + dx - 0.5, b.y + b.h - 6 + dy, w, 1, on ? '#ff4fd8' : '#7a2a6a'));
+    rect(g, ax - 1, b.y + b.h - 10, 2, 4, on ? '#ff4fd8' : '#7a2a6a');
+    if (on) glow(g, ax, b.y + b.h - 6, 8, '255,79,216', 0.35);
+  }
+  let hoverExit = false;
+  const atExit = (m) => { const b = exitBox(); return m.x >= b.x && m.x < b.x + b.w && m.y >= b.y && m.y < b.y + b.h + 2; };
 
   // ------------------------------------------------------------- aquarium
 
@@ -863,12 +883,14 @@ export function initHome(ctx) {
       canvas.style.cursor = hoverPet || hitGarden(m) ? 'pointer' : 'default';
     } else if (view === 'house') {
       hoverTile = tileAt(m);
-      const p = editing ? null : petInsideAt(m);
+      hoverExit = !holding && atExit(m);
+      const p = editing || hoverExit ? null : petInsideAt(m);
       inside.forEach((q) => { q.petted = q === p; });
       canvas.style.cursor = p ? 'grab' : 'pointer';
+      canvas.title = hoverExit ? 'Go out to the garden' : '';
     }
   };
-  canvas.onmouseleave = () => { hoverPet = null; inside.forEach((q) => { q.petted = false; }); hoverTile = null; };
+  canvas.onmouseleave = () => { hoverPet = null; hoverExit = false; inside.forEach((q) => { q.petted = false; }); hoverTile = null; };
 
   function hitGarden(m) {
     const w = HOUSE_W[st().house];
@@ -895,6 +917,7 @@ export function initHome(ctx) {
       return renderSide();
     }
     if (view === 'aquarium') return;
+    if (!holding && atExit(m)) return setView('garden');
     const tile = tileAt(m);
     if (editing) {
       if (holding) {
@@ -973,11 +996,11 @@ export function initHome(ctx) {
     const z = st().zones[zone];
     const c = cat(zone);
     if (!z) {
-      side.append(el(`<p><b>${c.name}</b> is wasteland: rubble, tires and trash.</p>`));
+      side.append(el(`<p><b>${c.name}</b> is wasteland: trash bags, tires, oil drums, boxes, broken TVs and scrap. Clean it up to use it.</p>`));
       side.append(button(`Clean it up (${c.price} coins)`, () => act('clean', { zone }), 'primary'));
       return;
     }
-    side.append(el(`<p><b>${c.name}</b> — ${z.floor ? cat(z.floor).name.toLowerCase() : 'cleared, bare ground'}. Lay a new floor:</p>`));
+    side.append(el(`<p><b>${c.name}</b> — ${z.floor ? cat(z.floor).name.toLowerCase() : 'clean, bare neon ground'}. Lay a new floor:</p>`));
     const grid2 = document.createElement('div');
     grid2.className = 'group wrap';
     Object.entries(data.catalog).filter(([, i]) => i.kind === 'floor').forEach(([id, i]) => {
@@ -1056,7 +1079,7 @@ export function initHome(ctx) {
     side.append(el('<p id="home-status" class="muted"></p>'));
     side.append(button(editing ? 'Done arranging' : 'Arrange furniture', () => { editing = !editing; holding = null; selected = null; renderSide(); }, editing ? 'active' : 'primary'));
     if (!editing) {
-      side.append(el('<p class="muted">Your pets live here and use the furniture. Hover a pet to pet it, click it for a trick, click the floor to call your companion.</p>'));
+      side.append(el('<p class="muted">Your pets live here and use the furniture. Hover a pet to pet it, click it for a trick, click the floor to call your companion. Click the front door (bottom) to go back out.</p>'));
       renderStatusLine();
       return;
     }

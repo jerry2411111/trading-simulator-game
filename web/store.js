@@ -131,38 +131,58 @@ export function initStore(ctx) {
 
   function mortgageTab() {
     const out = [];
+    const money = (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    const pct = (r) => `${+(r * 100).toFixed(2)}%`;
+    const plans = Object.entries(data.plans);  // [id, [share, rate]]
     const intro = document.createElement('div');
     intro.className = 'mortgage';
-    intro.innerHTML = '<p>Mortgage things for <b>dollars in your trading account</b>: one house, building or piece of furniture '
-      + 'for 70% of its price, or the whole home for $20,000 + 70% of everything in it (that locks the home until you pay it back). '
-      + 'This is the only way to add money to the account.</p><p><b>Interest: 0.5% of each loan every trading day</b>, taken from your '
-      + 'cash at the close (interest only: the loan itself stays until you pay it back, which takes the same dollars from your cash). '
-      + '<b class="down">If your cash can\'t cover the interest, the bank takes the mortgaged thing.</b> Selling things back pays half their price.</p>';
+    intro.innerHTML = '<p>Mortgage a house, a building, a piece of furniture or the whole home (worth $20,000 plus everything in it; '
+      + 'that locks the home until you pay it back) for <b>dollars in your trading account</b>. This is the only way to add money.</p>'
+      + `<p>Plans: ${plans.map(([, [share, rate]]) => `<b>${pct(share)}</b> of the value at <b>${pct(rate)}</b> a day`).join(' · ')}.</p>`
+      + '<p>Interest is taken from your cash at the close of every trading day; you only pay interest until you pay the loan back '
+      + '(that takes the same dollars from your cash). <b class="down">If your cash can\'t cover the interest, the bank takes the '
+      + 'mortgaged thing.</b> Selling things back pays half their price.</p>';
     out.push(intro);
-    const list = (title, rows) => {
-      const box = document.createElement('div');
-      box.className = 'mortgage';
-      box.innerHTML = `<div class="box-title">${title}</div>`;
+    const box = (title, items) => {
+      const b = document.createElement('div');
+      b.className = 'mortgage';
+      b.innerHTML = `<div class="box-title">${title}</div>`;
       const ul = document.createElement('ul');
       ul.className = 'list';
-      rows.forEach((r) => ul.append(r));
-      if (!rows.length) ul.innerHTML = '<li class="muted">Nothing here.</li>';
-      box.append(ul);
-      out.push(box);
+      items.forEach((li) => ul.append(li));
+      if (!items.length) ul.innerHTML = '<li class="muted">Nothing here.</li>';
+      b.append(ul);
+      out.push(b);
     };
-    const row = (text, amount, label, onclick, cls) => {
-      const li = document.createElement('li');
-      li.innerHTML = `<span>${text}</span><b class="num">$${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b>`;
+    const button = (label, onclick, cls = '') => {
       const b = document.createElement('button');
       b.textContent = label;
       b.className = cls;
       b.onclick = onclick;
-      li.append(b);
-      return li;
+      return b;
     };
-    const perDay = (amount) => `interest $${(amount * 0.005).toFixed(2)} a day`;
-    list('YOUR LOANS', data.state.loans.map((l) => row(`${l.label} · ${perDay(l.amount)}`, l.amount, 'Pay back', () => post('redeem', { id: l.id }), '')));
-    list('MORTGAGE', data.loan_offers.map((o) => row(`${o.label} · ${perDay(o.amount)}`, o.amount, 'Mortgage', () => post('mortgage', { kind: o.kind, ref: o.ref }), o.kind === 'all' ? 'primary' : '')));
+    box('YOUR LOANS', data.state.loans.map((l) => {
+      const li = document.createElement('li');
+      const rate = l.rate ?? 0.005;
+      li.innerHTML = `<span>${l.label} · ${pct(rate)} a day = <b class="down">${money(Math.round(l.amount * rate * 100) / 100)}</b> a day</span><b class="num">${money(l.amount)}</b>`;
+      li.append(button('Pay back', () => post('redeem', { id: l.id })));
+      return li;
+    }));
+    box('MORTGAGE', data.loan_offers.map((o) => {
+      const li = document.createElement('li');
+      li.className = 'loan-offer';
+      li.innerHTML = `<span>${o.label} · worth ${money(o.value)}</span>`;
+      const row = document.createElement('span');
+      row.className = 'group wrap';
+      plans.forEach(([plan, [share, rate]]) => {
+        const amount = Math.round(o.value * share * 100) / 100;
+        const b = button(`${pct(share)}: ${money(amount)} · ${pct(rate)}/day`, () => post('mortgage', { kind: o.kind, ref: o.ref, plan }));
+        b.title = `Borrow ${money(amount)}; interest ${money(Math.round(amount * rate * 100) / 100)} every trading day`;
+        row.append(b);
+      });
+      li.append(row);
+      return li;
+    }));
     return out;
   }
 

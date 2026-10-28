@@ -378,6 +378,8 @@ button.badge { background: transparent; }
 /* Store extras, the collection shelves */
 .mortgage { grid-column: 1 / -1; }
 .mortgage .list li { gap: 8px; }
+.mortgage .list li.loan-offer { flex-wrap: wrap; }
+.loan-offer .group { margin-left: auto; }
 .lock-note { grid-column: 1 / -1; color: var(--warn); }
 .showcase { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; min-height: 0; min-width: 0; }
 .piece-detail canvas { width: 240px; height: 192px; display: block; margin: 0 auto 6px; background: #0a0614; }
