@@ -1,0 +1,599 @@
+// Building art: house exteriors for the garden, interiors (walls, windows, floors, inner walls) and
+// furniture. Top-down 3/4 view: tops of things are lit, fronts are darker, everything has an outline.
+import { drawFish } from './sea.js';
+import { disc, ellipse, glow, hash, outlined, rect } from './pixel.js';
+
+const INK = '#120c1c';
+const W = ['#c8904c', '#a8703c', '#6a4020', '#40240e'];  // wood: light, mid, dark, deepest
+const lamp = (t, k = 0) => (Math.sin(t * 3 + k) > -0.9 ? '#ffe9a8' : '#c8a868');  // a warm light that flickers now and then
+
+function shingles(g, x, y, w, h, [base, dark, light], step = 3) {
+  rect(g, x, y, w, h, base);
+  for (let j = 0; j < h; j += step) {
+    rect(g, x, y + j + step - 1, w, 1, dark);
+    for (let i = (j / step) % 2 ? 0 : 2; i < w; i += 4) rect(g, x + i, y + j, 1, step - 1, dark);
+    rect(g, x, y + j, w, 1, light);
+  }
+}
+
+function windowLit(g, x, y, w, h, frame, t, k = 0, glass = '#ffd58a') {
+  rect(g, x - 1, y - 1, w + 2, h + 2, frame);
+  rect(g, x, y, w, h, Math.sin(t * 0.7 + k * 3) > -0.95 ? glass : '#c89a50');
+  rect(g, x, y, w, 1, '#fff4d0');
+  rect(g, x + Math.floor(w / 2), y, 1, h, frame);
+  if (h > 5) rect(g, x, y + Math.floor(h / 2), w, 1, frame);
+}
+
+// ---------------------------------------------------------------- exteriors (x, y = door step); return width
+
+// ---------------------------------------------------------------- exteriors (x, y = door step)
+// Better houses are wider: the European palace fills the whole garden.
+
+export const HOUSE_W = { shack: 64, modern: 112, euro: 112, tower: 176, palace_cn: 208, palace_eu: 240 };
+
+function plants(g, x, y) { rect(g, x, y - 5, 8, 5, '#3a3a44'); rect(g, x, y - 5, 8, 1, '#5a5a66'); disc(g, x + 4, y - 8, 4, '#2a7a3c'); disc(g, x + 3, y - 9, 2, '#45a34c'); rect(g, x + 2, y - 10, 1, 1, '#9be07a'); }
+function lantern(g, x, y, t, i) { rect(g, x - 1, y - 4, 3, 4, '#1a1a22'); rect(g, x, y - 3, 1, 2, lamp(t, i)); glow(g, x, y - 2, 9, '255,200,120', 0.4); }
+
+const HOUSES = {
+  shack(g, x, y, t) {
+    const L = x - 32;
+    const T = y - 36;
+    rect(g, L, T, 64, 36, '#76767e');                        // concrete block walls
+    for (let j = 0; j < 36; j += 5) {
+      rect(g, L, T + j, 64, 1, '#5a5a64');
+      for (let i = (j / 5) % 2 ? 0 : 6; i < 64; i += 12) rect(g, L + i, T + j, 1, 5, '#5a5a64');
+    }
+    [[6, 20, 7, 9], [44, 26, 9, 8], [22, 4, 6, 6]].forEach(([dx, dy, w, h]) => rect(g, L + dx, T + dy, w, h, '#64646e'));  // stains
+    [[12, 8], [50, 14], [30, 22]].forEach(([dx, dy]) => { for (let k = 0; k < 6; k++) rect(g, L + dx + (k % 2), T + dy + k, 1, 1, '#2a2a32'); });  // cracks
+    rect(g, L - 4, T - 6, 72, 6, '#7a4a2e');                 // rusty corrugated roof
+    for (let i = 0; i < 72; i += 2) rect(g, L - 4 + i, T - 6, 1, 6, '#a0603a');
+    rect(g, L - 4, T, 72, 1, '#2a1a12');
+    rect(g, L + 8, T - 8, 16, 3, '#2a5aa8'); rect(g, L + 8, T - 8, 16, 1, '#4a82d0');  // tarp patch
+    ellipse(g, L + 30, T - 6, 4, 2, '#18181e'); ellipse(g, L + 30, T - 6, 2, 1, '#3a3a44');  // tire holding the roof down
+    rect(g, L + 50, T - 14, 1, 8, '#9a9aa8'); ellipse(g, L + 52, T - 15, 4, 3, '#c8c8d4'); rect(g, L + 52, T - 15, 1, 1, '#ff2a6d');  // dish
+    rect(g, x - 6, y - 21, 12, 21, '#3a4448');                // dented metal door
+    rect(g, x - 5, y - 20, 10, 19, '#5a6a6e');
+    rect(g, x - 5, y - 14, 10, 1, '#4a585c'); rect(g, x - 2, y - 8, 4, 3, '#6e8084');
+    rect(g, x + 3, y - 11, 1, 2, '#c8c8d0');
+    rect(g, x - 8, y - 1, 16, 1, '#9a9aa4');
+    const on = lamp(t) === '#ffe9a8';
+    rect(g, x - 7, y - 25, 14, 2, on ? '#7ff8ff' : '#2a6a70');  // flickering tube light
+    if (on) glow(g, x, y - 20, 14, '0,229,255', 0.35);
+    windowLit(g, L + 7, T + 12, 10, 8, '#2a2a32', t, 1);      // barred window
+    for (let i = 0; i < 10; i += 3) rect(g, L + 7 + i, T + 12, 1, 8, '#2a2a32');
+    rect(g, L + 45, T + 11, 12, 10, '#1a1418');               // boarded window
+    rect(g, L + 44, T + 12, 14, 3, '#8a6a3a'); rect(g, L + 44, T + 17, 14, 3, '#7a5a30');
+    rect(g, L + 63, T - 1, 2, 37, '#5a5a62');                 // drain pipe, dripping
+    const drip = (t * 9) % 12;
+    if (drip < 8) rect(g, L + 63, y - 1 + Math.floor(drip / 4), 1, 1, '#7fd8ff');
+    rect(g, L + 26, T + 6, 9, 6, '#a8a8b0'); disc(g, L + 30, T + 9, 2, '#5a5a62');  // AC unit with a turning fan
+    rect(g, L + 30 + Math.round(Math.cos(t * 9) * 2), T + 9 + Math.round(Math.sin(t * 9) * 2), 1, 1, '#e8e8f0');
+    rect(g, L + 2, y - 5, 5, 5, '#5a6a8a'); rect(g, L + 3, y - 8, 3, 3, '#3a8a3a');  // bucket plant
+  },
+
+  modern(g, x, y, t) {
+    const w = HOUSE_W.modern;
+    const L = x - w / 2;
+    const T = y - 50;
+    rect(g, L, T + 12, 42, 38, '#e8e8ee');                    // white plaster volume
+    for (let j = 16; j < 50; j += 8) rect(g, L, T + j, 42, 1, '#d4d4dc');
+    rect(g, L + 42, T, w - 42, 50, '#8e5e34');                // wood-clad volume
+    for (let i = 0; i < w - 42; i += 3) rect(g, L + 42 + i, T, 1, 50, '#734a26');
+    rect(g, L - 2, T + 10, 46, 3, '#26262e'); rect(g, L + 40, T - 2, w - 38, 3, '#26262e');
+    const led = 0.6 + Math.sin(t * 2) * 0.2;
+    rect(g, L - 2, T + 13, 46, 1, `rgba(0,229,255,${led})`); rect(g, L + 40, T + 1, w - 38, 1, `rgba(0,229,255,${led})`);
+    const gx = L + 48;
+    const gw = w - 56;
+    rect(g, gx - 1, T + 7, gw + 2, 26, '#1c2c40');            // panorama glass with a warm room inside
+    rect(g, gx, T + 8, gw, 24, '#3a5674');
+    for (let i = 0; i < gw - 10; i += 18) { rect(g, gx + 3 + i, T + 18, 13, 14, i % 36 ? '#ffcb70' : '#ffd58a'); rect(g, gx + 5 + i, T + 24, 8, 3, '#c0603a'); }
+    for (let k = 0; k < 3; k++) { const s = Math.floor((t * 7 + k * 21) % (gw + 30)) - 15; for (let j = 0; j < 24; j++) if (s + j > 0 && s + j < gw) rect(g, gx + s + j, T + 8 + j, 1, 1, 'rgba(255,255,255,0.22)'); }
+    for (let i = 0; i < gw; i += 10) rect(g, gx + i, T + 8, 1, 24, '#1c2c40');
+    rect(g, gx, T + 38, gw, 2, '#c8d0dc'); for (let i = 0; i < gw; i += 4) rect(g, gx + i, T + 36, 1, 2, '#c8d0dc');  // glass railing
+    windowLit(g, L + 6, T + 20, 12, 12, '#26262e', t, 2);
+    windowLit(g, L + 24, T + 20, 12, 12, '#26262e', t, 4);
+    rect(g, x - 5, y - 22, 10, 22, '#1e1e26');                // tall door and glowing handle
+    rect(g, x - 4, y - 21, 8, 21, '#3a3a46'); rect(g, x + 2, y - 16, 1, 8, '#ff4fd8');
+    rect(g, x - 14, y - 1, 28, 1, '#b8b8c4');
+    plants(g, L + 2, y); plants(g, L + w - 10, y);
+    rect(g, L + 34, T + 26, 3, 4, '#c8c8d4'); rect(g, L + 35, T + 26, 1, 1, '#ffe14d');  // house number
+  },
+
+  euro(g, x, y, t) {
+    const w = HOUSE_W.euro;
+    const L = x - w / 2;
+    const T = y - 36;
+    rect(g, L, y - 6, w, 6, '#8a8494');                       // stone base
+    for (let i = 0; i < w; i += 6) rect(g, L + i, y - 6, 1, 6, '#5a5464');
+    rect(g, L, T, w, 30, '#efe0c0');                          // half-timbered walls
+    for (let i = 0; i <= w - 2; i += 28) rect(g, L + i, T, 2, 30, '#5a3420');
+    rect(g, L + w - 2, T, 2, 30, '#5a3420');
+    rect(g, L, T + 14, w, 2, '#5a3420');
+    for (let b = 0; b < w - 28; b += 56) for (let k = 0; k < 12; k++) { rect(g, L + b + 2 + k * 2, T + 14 - k, 2, 1, '#5a3420'); rect(g, L + b + 30 + k * 2, T + 2 + k, 2, 1, '#5a3420'); }
+    rect(g, L + w - 26, T - 34, 7, 14, '#8a3a22'); rect(g, L + w - 27, T - 35, 9, 2, '#5a2414');  // chimney and smoke
+    for (let i = 0; i < 4; i++) {
+      const k = (t * 0.5 + i / 4) % 1;
+      disc(g, L + w - 23 + Math.round(Math.sin(k * 5 + i) * 3), T - 37 - Math.round(k * 16), 1 + Math.round(k * 3), `rgba(200,196,220,${0.7 - k * 0.65})`);
+    }
+    for (let j = 0; j < 24; j++) {                             // steep tiled roof
+      const half = Math.round(w / 2 - 22 + j * 1.05);
+      shingles(g, x - half, T - 24 + j, half * 2, 1, ['#b8452a', '#7a2414', j % 3 === 0 ? '#e0703e' : '#b8452a'], 3);
+    }
+    rect(g, L - 3, T - 1, w + 6, 2, '#5a2414');
+    [-28, 0, 28].forEach((dx, i) => {                          // dormers
+      rect(g, x + dx - 6, T - 17, 12, 10, '#efe0c0'); rect(g, x + dx - 8, T - 19, 16, 2, '#7a2414');
+      windowLit(g, x + dx - 3, T - 14, 6, 6, '#5a3420', t, 3 + i);
+    });
+    for (let wx = L + 8; wx < L + w - 12; wx += 26) {
+      if (Math.abs(wx + 5 - x) < 12) continue;
+      windowLit(g, wx, T + 18, 10, 9, '#5a3420', t, wx);
+      rect(g, wx - 4, T + 17, 3, 11, '#2f6a44'); rect(g, wx + 11, T + 17, 3, 11, '#2f6a44');
+      rect(g, wx - 1, T + 28, 12, 2, '#6a3e22');
+      for (let k = 0; k < 6; k++) rect(g, wx + k * 2, T + 27 - (k % 2), 1, 1, ['#ff3b6b', '#ffd84a', '#ff8fc0'][k % 3]);
+      windowLit(g, wx + 1, T + 3, 8, 7, '#5a3420', t, wx + 1);
+    }
+    ellipse(g, x, y - 18, 5, 4, '#3a2010'); rect(g, x - 5, y - 18, 11, 18, '#3a2010');  // arched wooden door
+    ellipse(g, x, y - 18, 4, 3, '#7a4a28'); rect(g, x - 4, y - 18, 9, 17, '#7a4a28');
+    for (let i = -3; i <= 3; i += 3) rect(g, x + i, y - 20, 1, 19, '#5a3420');
+    rect(g, x + 2, y - 9, 1, 1, '#ffd84a');
+    lantern(g, x - 9, y - 14, t, 0); lantern(g, x + 9, y - 14, t, 1);
+  },
+
+  tower(g, x, y, t) {
+    const w = HOUSE_W.tower;
+    const L = x - w / 2;
+    const tw = 70;
+    const T = y - 82;
+    [[L + 4, 50], [L + w - 52, 48]].forEach(([wx, ww], s) => {   // side wings
+      rect(g, wx, y - 48, ww, 36, '#24324a'); rect(g, wx, y - 48, ww, 1, '#4a6a9a');
+      for (let r = 0; r < 6; r++) for (let c = 0; c < ww / 6 - 1; c++) {
+        const lit = hash(r * 9 + c + s * 50 + Math.floor(t / 5) * 0.21) > 0.5;
+        rect(g, wx + 3 + c * 6, y - 45 + r * 5, 4, 3, lit ? '#ffe58a' : '#3a5a8a');
+      }
+    });
+    rect(g, x - 1, T - 8, 2, 8, '#9a9aa8');
+    if (t % 1.4 < 0.7) { rect(g, x - 1, T - 10, 3, 2, '#ff2a2a'); glow(g, x, T - 9, 6, '255,42,42', 0.6); }
+    rect(g, x - tw / 2 + 8, T, tw - 16, 8, '#2a3a56');
+    rect(g, x - tw / 2, T + 8, tw, 74, '#1e2a40');
+    rect(g, x - tw / 2, T + 8, 2, 74, '#3a5070'); rect(g, x + tw / 2 - 2, T + 8, 2, 74, '#141c2c');
+    for (let row = 0; row < 13; row++) {
+      for (let col = 0; col < 9; col++) {
+        const lit = hash(row * 9 + col + Math.floor(t / 4) * 0.13) > 0.45;
+        rect(g, x - tw / 2 + 3 + col * 7, T + 10 + row * 5, 5, 3, lit ? '#ffe58a' : '#3a5a8a');
+        if (lit && hash(row + col * 3) > 0.8) rect(g, x - tw / 2 + 3 + col * 7, T + 10 + row * 5, 2, 3, '#ff9ad8');
+      }
+    }
+    for (let j = 0; j < 60; j += 2) rect(g, x + tw / 2 - 5, T + 12 + j, 2, 1, (Math.floor(t * 4) + j) % 12 < 6 ? '#ff2fd0' : '#7a1a68');  // vertical neon sign
+    rect(g, L, y - 12, w, 12, '#d8dee8');                     // glass podium lobby
+    rect(g, L + 2, y - 10, w - 4, 10, '#5fa8d8');
+    for (let i = 0; i < w - 4; i += 8) rect(g, L + 2 + i, y - 10, 1, 10, '#d8dee8');
+    rect(g, x - 7, y - 10, 14, 10, '#9fe0ff'); rect(g, x, y - 10, 1, 10, '#d8dee8');
+    rect(g, L, y - 13, w, 1, `rgba(0,229,255,${0.6 + Math.sin(t * 3) * 0.3})`);
+    plants(g, L + 8, y); plants(g, L + w - 16, y); plants(g, x - 22, y); plants(g, x + 14, y);
+  },
+
+  palace_cn(g, x, y, t) {
+    const w = HOUSE_W.palace_cn;
+    const L = x - w / 2;
+    const T = y - 56;
+    rect(g, L - 2, y - 6, w + 4, 6, '#d8d0c0'); rect(g, L - 2, y - 6, w + 4, 1, '#f4f0e8');  // terrace and stairs
+    for (let i = 0; i < w; i += 8) rect(g, L + i, y - 9, 2, 3, '#e8e0d0');
+    for (let j = 0; j < 6; j += 2) rect(g, x - 10, y - 6 + j, 20, 1, '#b8b0a0');
+    const roof = (cx, top, rows, w0, grow) => {
+      for (let i = 0; i < rows; i++) {
+        const rw = w0 + i * grow;
+        rect(g, cx - rw / 2, top + i, rw, 1, i % 2 ? '#1f6a4c' : '#2c8a62');
+        for (let k = -rw / 2; k < rw / 2; k += 3) rect(g, cx + k, top + i, 1, 1, '#145038');
+      }
+      const rw = w0 + rows * grow;
+      rect(g, cx - rw / 2 - 3, top + rows - 3, 3, 2, '#2c8a62'); rect(g, cx + rw / 2, top + rows - 3, 3, 2, '#2c8a62');  // upturned eaves
+      rect(g, cx - rw / 2 - 4, top + rows - 4, 1, 1, '#d8a520'); rect(g, cx + rw / 2 + 3, top + rows - 4, 1, 1, '#d8a520');
+      rect(g, cx - rw / 2, top + rows, rw, 1, '#d8a520');
+    };
+    const hall = (cx, hw, base, hh) => {
+      rect(g, cx - hw / 2, base - hh, hw, hh, '#b0201a');
+      for (let i = 0; i <= hw - 3; i += 10) { rect(g, cx - hw / 2 + i, base - hh, 3, hh, '#7a1410'); rect(g, cx - hw / 2 + i, base - hh, 1, hh, '#d8402a'); }
+      for (let i = 4; i < hw - 8; i += 10) for (let k = 0; k < hh - 6; k += 4) rect(g, cx - hw / 2 + i + 1, base - hh + 3 + k, 5, 1, '#d8a520');  // lattice
+    };
+    [L + 26, L + w - 26].forEach((cx) => { hall(cx, 44, y - 6, 18); roof(cx, y - 34, 8, 36, 2.5); });  // side galleries
+    hall(x, 104, y - 6, 24);
+    rect(g, x - 30, T + 8, 60, 12, '#b0201a');
+    roof(x, T, 8, 52, 3.5);
+    roof(x, T + 18, 8, 98, 2.5);
+    rect(g, x - 26, T - 1, 52, 1, '#d8a520'); rect(g, x - 28, T - 3, 3, 3, '#d8a520'); rect(g, x + 25, T - 3, 3, 3, '#d8a520');
+    rect(g, x - 8, T + 8, 16, 7, '#1a1a40'); rect(g, x - 7, T + 9, 14, 5, '#d8a520');  // plaque
+    rect(g, x - 8, y - 24, 16, 18, '#7a1010');
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) rect(g, x - 5 + i * 5, y - 22 + j * 5, 1, 1, '#ffd84a');
+    rect(g, x, y - 24, 1, 18, '#4a0808');
+    for (let lx = L + 12; lx < L + w; lx += 30) {
+      const i = lx / 30;
+      const sw = Math.round(Math.sin(t * 2 + i) * 1.5);
+      const ly = Math.abs(lx - x) < 50 ? y - 30 : y - 26;
+      rect(g, lx + sw, ly - 4, 1, 3, '#d8a520');
+      ellipse(g, lx + sw, ly + 1, 3, 4, '#e82828'); rect(g, lx + sw - 2, ly - 1, 5, 1, '#ffd84a'); rect(g, lx + sw, ly + 5, 1, 2, '#ffd84a');
+      glow(g, lx + sw, ly + 1, 10, '255,80,40', 0.45);
+    }
+    [x - 16, x + 16].forEach((sx) => { rect(g, sx - 3, y - 10, 6, 4, '#a8a8b0'); disc(g, sx, y - 12, 3, '#c8c8d0'); rect(g, sx - 1, y - 13, 1, 1, '#2a2a32'); });  // stone lions
+  },
+
+  palace_eu(g, x, y, t) {
+    const w = HOUSE_W.palace_eu;
+    const L = x - w / 2;
+    const T = y - 62;
+    const block = (bx, bw, top) => {
+      rect(g, bx, top, bw, y - top, '#efe8da');
+      rect(g, bx, top - 2, bw, 2, '#c8b890');
+      for (let i = 0; i < bw; i += 3) rect(g, bx + i, top - 5, 2, 3, '#efe8da');  // balustrade
+      rect(g, bx, top - 6, bw, 1, '#d8c8a0');
+      for (let wx = bx + 4; wx < bx + bw - 6; wx += 9) {
+        ellipse(g, wx + 2, top + 6, 2, 2, '#c8a020');
+        windowLit(g, wx, top + 6, 5, 9, '#c8a020', t, wx);
+        windowLit(g, wx, top + 21, 5, 7, '#c8a020', t, wx + 3);
+      }
+      rect(g, bx, top + 18, bw, 1, '#d8c8a0');
+    };
+    block(L + 14, 78, y - 40);
+    block(L + w - 92, 78, y - 40);
+    [L, L + w - 16].forEach((px, i) => {                       // corner pavilions with small domes
+      rect(g, px, y - 46, 16, 46, '#f4efe4'); rect(g, px, y - 46, 16, 1, '#c8a020');
+      ellipse(g, px + 8, y - 48, 7, 5, '#3a8a7a'); ellipse(g, px + 6, y - 50, 3, 2, '#5ab0a0'); rect(g, px + 8, y - 57, 1, 5, '#c8a020');
+      windowLit(g, px + 5, y - 38, 6, 10, '#c8a020', t, 30 + i); windowLit(g, px + 5, y - 22, 6, 9, '#c8a020', t, 32 + i);
+      rect(g, px + 8, y - 70, 1, 14, '#9a9aa8');
+      for (let k = 0; k < 7; k++) rect(g, px + 9 + k, y - 70 + Math.round(Math.sin(t * 5 + k * 0.8 + i)), 1, 4, k < 3 ? '#2a4aa8' : '#e8e8f0');
+    });
+    const cw = 64;
+    rect(g, x - cw / 2, T + 16, cw, 46, '#f4efe4');
+    rect(g, x - cw / 2 - 2, T + 14, cw + 4, 3, '#d8c8a0');
+    for (let i = 0; i < 8; i++) { const cx = x - cw / 2 + 3 + i * 8; rect(g, cx, T + 20, 3, 36, '#e0d8c8'); rect(g, cx, T + 20, 1, 36, '#ffffff'); rect(g, cx - 1, T + 19, 5, 2, '#c8a020'); }
+    for (let i = 0; i < 7; i++) { const wx = x - cw / 2 + 7 + i * 8; ellipse(g, wx + 2, T + 26, 2, 2, '#ffd58a'); windowLit(g, wx, T + 26, 4, 10, '#c8a020', t, i + 40); }
+    for (let j = 0; j < 9; j++) rect(g, x - 4 - j * 3, T + 5 + j, 8 + j * 6, 1, j === 8 ? '#c8a020' : '#efe8da');  // pediment
+    rect(g, x - 3, T + 9, 6, 3, '#c8a020');
+    ellipse(g, x, T + 3, 16, 13, '#3a8a7a'); ellipse(g, x - 4, T - 1, 7, 7, '#5ab0a0'); rect(g, x - 16, T + 3, 33, 2, '#c8a020');  // dome
+    for (let i = -12; i <= 12; i += 6) rect(g, x + i, T - 8 + Math.abs(i) / 2, 1, 11 - Math.abs(i) / 2, '#2a6a5a');
+    rect(g, x - 2, T - 17, 4, 6, '#c8a020'); disc(g, x, T - 18, 1, '#ffe14d'); glow(g, x, T - 18, 7, '255,225,77', 0.5);
+    ellipse(g, x, y - 18, 6, 5, '#4a2a14'); rect(g, x - 6, y - 18, 13, 18, '#4a2a14');
+    rect(g, x - 5, y - 17, 5, 16, '#6a3e20'); rect(g, x + 1, y - 17, 5, 16, '#6a3e20');
+    for (let j = 0; j < 4; j++) rect(g, x - 12 - j * 4, y - 4 + j, 24 + j * 8, 1, j % 2 ? '#d8d0c0' : '#f0eadc');
+    [x - 40, x + 40].forEach((fx, i) => {                      // fountains
+      ellipse(g, fx, y - 2, 6, 2, '#c8c8d0'); ellipse(g, fx, y - 2, 4, 1, '#4dc3ff');
+      for (let k = 0; k < 6; k++) { const p = (t * 1.5 + k / 6 + i * 0.3) % 1; rect(g, fx + Math.round((k - 2.5) * p * 2), y - 4 - Math.round(Math.sin(p * Math.PI) * 7), 1, 1, '#bff0ff'); }
+    });
+  },
+};
+
+export function drawHouse(g, id, x, y, t) {
+  HOUSES[id](g, Math.round(x), Math.round(y), t);
+  return HOUSE_W[id];
+}
+
+// ---------------------------------------------------------------- interiors
+
+export const TILE = 16;
+export const ROOM = { side: 10, wall: 44, bottom: 10, inner: 14 };  // wall thickness / heights in pixels
+export const roomSize = (gw, gh) => [gw * TILE + ROOM.side * 2, ROOM.wall + gh * TILE + ROOM.bottom];
+export const tileOrigin = (x, y) => [ROOM.side + x * TILE, ROOM.wall + y * TILE];
+
+const ROOMS = {
+  shack: { cap: '#3a3a44', face: '#6a6a74', floor: 'concrete' },
+  modern: { cap: '#3a3a48', face: '#e0e2e8', floor: 'oak' },
+  euro: { cap: '#4a2a18', face: '#e8d8b0', floor: 'herringbone' },
+  tower: { cap: '#0e1424', face: '#24304a', floor: 'polished' },
+  palace_cn: { cap: '#4a0a08', face: '#a8221a', floor: 'lacquer' },
+  palace_eu: { cap: '#a88a40', face: '#f0eadc', floor: 'marble' },
+};
+
+function nightWindow(g, x, y, w, h, frame, t, city = true) {
+  rect(g, x - 2, y - 2, w + 4, h + 4, frame);
+  rect(g, x, y, w, h, '#120a2e');
+  rect(g, x, y + Math.floor(h / 2), w, Math.ceil(h / 2), '#1e1446');
+  for (let i = 0; i < w; i += 5) if (hash(i + x) > 0.5) rect(g, x + i, y + 1 + Math.floor(hash(i * 3 + x) * (h / 2)), 1, 1, Math.sin(t * 2 + i) > 0 ? '#ffffff' : '#8a8ab0');
+  if (city) {
+    for (let i = 0; i < w; i += 4) {
+      const bh = 3 + Math.floor(hash(i + x * 2) * (h / 2));
+      rect(g, x + i, y + h - bh, 3, bh, '#0a0618');
+      if (hash(i + Math.floor(t / 2)) > 0.5) rect(g, x + i + 1, y + h - bh + 1, 1, 1, i % 8 ? '#ffe58a' : '#ff4fd8');
+    }
+  }
+  disc(g, x + w - 5, y + 4, 2, '#fff4c8');
+}
+
+const BACK = {
+  shack(g, Wd, t) {
+    rect(g, 0, 0, Wd, ROOM.wall, '#7a7a84');
+    for (let j = 4; j < ROOM.wall; j += 6) { rect(g, 0, j, Wd, 1, '#64646e'); for (let i = (j / 6) % 2 ? 0 : 7; i < Wd; i += 14) rect(g, i, j, 1, 6, '#64646e'); }
+    [[20, 6, 10, 18], [Wd - 40, 10, 14, 12]].forEach(([x, y, w, h]) => rect(g, x, y, w, h, '#6a6a74'));
+    nightWindow(g, Math.round(Wd / 2) - 16, 10, 22, 16, '#3a3a44', t);
+    rect(g, Math.round(Wd / 2) - 12, 14, 7, 1, '#d8e8ff'); rect(g, Math.round(Wd / 2) - 8, 15, 1, 5, '#d8e8ff');  // cracked glass
+    rect(g, 14, 12, 12, 16, '#d84a8a'); rect(g, 15, 13, 10, 7, '#ffd84a'); rect(g, 16, 22, 8, 1, '#1a1a22'); rect(g, 16, 24, 6, 1, '#1a1a22');  // taped poster
+    const sw = Math.round(Math.sin(t * 1.2) * 3);                  // bare bulb on a cord
+    for (let j = 0; j < 12; j++) rect(g, Wd - 50 + Math.round((sw * j) / 12), j, 1, 1, '#1a1a1a');
+    disc(g, Wd - 50 + sw, 13, 2, lamp(t)); glow(g, Wd - 50 + sw, 14, 16, '255,233,168', 0.35);
+  },
+  modern(g, Wd, t) {
+    rect(g, 0, 0, Wd, ROOM.wall, '#e6e8ee');
+    rect(g, 12, 4, 30, 36, '#a8703c'); for (let i = 0; i < 30; i += 3) rect(g, 12 + i, 4, 1, 36, '#8a5a30');
+    nightWindow(g, 52, 6, Wd - 70, 30, '#2a2a34', t);
+    rect(g, 0, 2, Wd, 1, `rgba(0,229,255,${0.5 + Math.sin(t * 2) * 0.2})`);
+    rect(g, 18, 12, 18, 12, '#ffffff'); rect(g, 19, 13, 16, 10, '#ff6fa8'); rect(g, 24, 15, 8, 6, '#4dc3ff');  // art
+  },
+  euro(g, Wd, t) {
+    rect(g, 0, 0, Wd, ROOM.wall, '#e8d8b0');
+    for (let i = 3; i < Wd; i += 8) for (let j = 6; j < 26; j += 8) { rect(g, i, j, 1, 3, '#d0b880'); rect(g, i - 1, j + 1, 3, 1, '#d0b880'); }
+    rect(g, 0, 28, Wd, 16, '#8a5a30'); for (let i = 4; i < Wd; i += 14) rect(g, i, 30, 10, 11, '#9a6a3a');
+    rect(g, 0, 0, Wd, 3, '#f4ecd8'); rect(g, 0, 3, Wd, 1, '#c8a870');
+    [24, Wd - 46].forEach((wx) => {
+      nightWindow(g, wx, 7, 20, 18, '#f4ecd8', t, false);
+      rect(g, wx - 5, 4, 5, 24, '#7a2a3a'); rect(g, wx + 20, 4, 5, 24, '#7a2a3a'); rect(g, wx - 6, 3, 32, 2, '#c8a020');
+    });
+    rect(g, Math.round(Wd / 2) - 9, 8, 18, 14, '#c8a020'); rect(g, Math.round(Wd / 2) - 7, 10, 14, 10, '#4a6a3a'); disc(g, Math.round(Wd / 2), 14, 3, '#e8c060');
+  },
+  tower(g, Wd, t) {
+    nightWindow(g, 2, 2, Wd - 4, ROOM.wall - 6, '#141c2c', t);
+    for (let i = 2; i < Wd - 2; i += 24) rect(g, i, 0, 2, ROOM.wall, '#141c2c');
+    for (let i = 0; i < Wd; i += 7) {
+      const bh = 8 + Math.floor(hash(i * 1.3) * 22);
+      rect(g, i + 2, ROOM.wall - 4 - bh, 6, bh, '#080414');
+      for (let j = 2; j < bh - 2; j += 3) if (hash(i + j + Math.floor(t / 3)) > 0.6) rect(g, i + 3 + (j % 2) * 3, ROOM.wall - 4 - bh + j, 1, 1, j % 5 ? '#ffe58a' : '#00e5ff');
+    }
+    rect(g, 0, ROOM.wall - 4, Wd, 4, '#0e1424');
+  },
+  palace_cn(g, Wd, t) {
+    rect(g, 0, 0, Wd, ROOM.wall, '#a8221a');
+    for (let i = 4; i < Wd; i += 12) { rect(g, i, 6, 6, 1, '#d8a520'); rect(g, i + 2, 4, 2, 5, '#d8a520'); }
+    rect(g, 0, 32, Wd, 12, '#5a0e0a'); for (let i = 0; i < Wd; i += 6) rect(g, i, 34, 3, 2, '#d8a520');
+    const cx = Math.round(Wd / 2);
+    disc(g, cx, 18, 12, '#d8a520'); disc(g, cx, 18, 10, '#120a2e'); disc(g, cx + 4, 13, 3, '#fff4c8');  // moon window
+    for (let i = -8; i <= 8; i += 4) rect(g, cx + i, 9, 1, 18, '#5a0e0a');
+    [20, Wd - 26].forEach((sx) => { rect(g, sx, 6, 8, 22, '#f4ecd8'); rect(g, sx - 1, 5, 10, 1, '#4a2a14'); for (let j = 9; j < 26; j += 4) rect(g, sx + 3, j, 2, 2, '#1a1a1a'); });
+    [44, Wd - 48].forEach((lx, i) => { const s = Math.round(Math.sin(t * 1.5 + i)); rect(g, lx + s, 0, 1, 6, '#d8a520'); ellipse(g, lx + s, 10, 4, 4, '#e82828'); rect(g, lx + s - 3, 7, 7, 1, '#ffd84a'); glow(g, lx + s, 10, 12, '255,80,40', 0.4); });
+  },
+  palace_eu(g, Wd, t) {
+    rect(g, 0, 0, Wd, ROOM.wall, '#f0eadc');
+    for (let i = 0; i < Wd; i += 30) { rect(g, i, 0, 4, ROOM.wall, '#e0d4b8'); rect(g, i + 1, 0, 1, ROOM.wall, '#c8a020'); }
+    rect(g, 0, 0, Wd, 4, '#d8c890'); rect(g, 0, 4, Wd, 1, '#c8a020');
+    for (let i = 12; i < Wd - 20; i += 60) { ellipse(g, i + 9, 10, 9, 5, '#c8a020'); nightWindow(g, i, 10, 18, 26, '#c8a020', t, false); }
+    for (let i = 42; i < Wd - 20; i += 60) { rect(g, i, 10, 14, 18, '#c8a020'); rect(g, i + 2, 12, 10, 14, '#6a4a3a'); disc(g, i + 7, 17, 3, '#f0c8a0'); rect(g, i + 4, 21, 6, 5, '#2a3a6a'); }
+    const cx = Math.round(Wd / 2);                                  // chandelier
+    rect(g, cx, 0, 1, 6, '#c8a020'); ellipse(g, cx, 8, 8, 2, '#c8a020');
+    for (let k = -6; k <= 6; k += 3) { rect(g, cx + k, 5, 1, 2, '#fff4c8'); if ((t * 4 + k) % 3 < 1) rect(g, cx + k, 11, 1, 1, '#ffffff'); }
+    glow(g, cx, 8, 20, '255,233,168', 0.35);
+  },
+};
+
+const FLOORS = {
+  concrete(g, x, y, gx, gy) {
+    rect(g, x, y, TILE, TILE, (gx + gy) % 3 ? '#6e6e78' : '#74747e');
+    rect(g, x, y, TILE, 1, '#5e5e68'); rect(g, x, y, 1, TILE, '#5e5e68');
+    if (hash(gx * 7 + gy) > 0.7) for (let k = 0; k < 7; k++) rect(g, x + 4 + k, y + 6 + (k % 3), 1, 1, '#4a4a54');
+    if (hash(gx + gy * 5) > 0.8) ellipse(g, x + 8, y + 9, 4, 2, '#64646c');
+  },
+  oak(g, x, y, gx, gy) {
+    for (let j = 0; j < TILE; j += 4) {
+      rect(g, x, y + j, TILE, 4, ['#d8b07a', '#cca06a', '#e0bc88'][(gy * 4 + j / 4 + gx) % 3]);
+      rect(g, x, y + j + 3, TILE, 1, '#a87a48');
+      rect(g, x + ((gx * 5 + j) % TILE), y + j, 1, 3, '#a87a48');
+    }
+  },
+  herringbone(g, x, y, gx, gy) {
+    rect(g, x, y, TILE, TILE, '#8a5a2e');
+    for (let k = 0; k < 4; k++) {
+      for (let i = 0; i < 8; i++) {
+        rect(g, x + k * 4 + (i % 4), y + i * 2, 1, 1, '#b07a42');
+        rect(g, x + k * 4 + 3 - (i % 4), y + i * 2 + 1, 1, 1, '#a06a38');
+      }
+    }
+    rect(g, x, y, TILE, 1, '#6a4020');
+  },
+  polished(g, x, y, gx, gy) {
+    rect(g, x, y, TILE, TILE, (gx + gy) % 2 ? '#262c3a' : '#2e3546');
+    rect(g, x, y, TILE, 1, '#3a4256'); rect(g, x, y, 1, TILE, '#3a4256');
+    rect(g, x + 3, y + 3, 4, 1, 'rgba(120,200,255,0.18)'); rect(g, x + 3, y + 4, 2, 1, 'rgba(120,200,255,0.12)');
+  },
+  lacquer(g, x, y, gx, gy) {
+    for (let j = 0; j < TILE; j += 4) { rect(g, x, y + j, TILE, 4, (gy + j / 4) % 2 ? '#4a1a10' : '#561e12'); rect(g, x, y + j + 3, TILE, 1, '#2e0e08'); }
+  },
+  marble(g, x, y, gx, gy) {
+    const light = (gx + gy) % 2 === 0;
+    rect(g, x, y, TILE, TILE, light ? '#ece8e0' : '#3a3a46');
+    for (let k = 0; k < 6; k++) rect(g, x + 2 + k * 2, y + 3 + Math.round(Math.sin(k + gx) * 2) + k, 1, 1, light ? '#c8c0b8' : '#5a5a6a');
+    rect(g, x, y, TILE, 1, light ? '#ffffff' : '#4a4a58');
+  },
+};
+
+export function drawRoom(g, id, gw, gh, t, grid) {
+  const r = ROOMS[id];
+  const [Wd, Hd] = roomSize(gw, gh);
+  rect(g, 0, 0, Wd, Hd, '#05020a');
+  BACK[id](g, Wd, t);
+  rect(g, 0, ROOM.wall - 3, Wd, 3, r.cap);                          // baseboard
+  for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+    const [x, y] = tileOrigin(gx, gy);
+    FLOORS[r.floor](g, x, y, gx, gy);
+  }
+  rect(g, ROOM.side, ROOM.wall, gw * TILE, 3, 'rgba(0,0,0,0.25)');  // shadow under the back wall
+  rect(g, 0, 0, ROOM.side, Hd, r.cap); rect(g, Wd - ROOM.side, 0, ROOM.side, Hd, r.cap);
+  rect(g, ROOM.side - 1, ROOM.wall, 1, gh * TILE, r.face); rect(g, Wd - ROOM.side, ROOM.wall, 1, gh * TILE, r.face);
+  rect(g, 0, Hd - ROOM.bottom, Wd, ROOM.bottom, r.cap);
+  const dx = Math.round(Wd / 2) - TILE;                             // front entrance and door mat
+  rect(g, dx, Hd - ROOM.bottom, TILE * 2, ROOM.bottom, '#05020a');
+  rect(g, dx + 6, Hd - ROOM.bottom - 1, TILE * 2 - 12, 4, '#7a3a5a'); rect(g, dx + 8, Hd - ROOM.bottom, TILE * 2 - 16, 2, '#a85a7a');
+  if (grid) {
+    for (let gx = 0; gx <= gw; gx++) rect(g, ROOM.side + gx * TILE, ROOM.wall, 1, gh * TILE, 'rgba(0,229,255,0.28)');
+    for (let gy = 0; gy <= gh; gy++) rect(g, ROOM.side, ROOM.wall + gy * TILE, gw * TILE, 1, 'rgba(0,229,255,0.28)');
+  }
+}
+
+// Inner walls as depth-sortable pieces: [{key, draw}] (key = the floor row line they stand on).
+export function wallPieces(g, id, walls) {
+  const r = ROOMS[id];
+  const H = ROOM.inner;
+  const out = [];
+  walls.forEach(([kind, at, a0, a1, doors]) => {
+    for (let a = a0; a < a1; a++) {
+      if (doors.includes(a)) continue;
+      if (kind === 'h') {
+        const [x, y] = tileOrigin(a, at);
+        out.push({
+          key: at + 0.05,
+          draw: () => {
+            rect(g, x, y - H, TILE, H, r.face); rect(g, x, y - H, TILE, 1, 'rgba(255,255,255,0.25)');
+            rect(g, x, y - H - 3, TILE, 3, r.cap); rect(g, x, y - 2, TILE, 2, 'rgba(0,0,0,0.25)');
+            if (doors.includes(a + 1)) rect(g, x + TILE - 1, y - H - 3, 1, H + 3, r.cap);
+            if (doors.includes(a - 1)) rect(g, x, y - H - 3, 1, H + 3, r.cap);
+          },
+        });
+      } else {
+        const [x, y] = tileOrigin(at, a);
+        const end = a + 1 === a1 || doors.includes(a + 1);
+        out.push({
+          key: a + 1 + 0.04,
+          draw: () => {
+            rect(g, x - 2, y - H, 4, TILE, r.cap);
+            if (end) { rect(g, x - 2, y + TILE - H, 4, H, r.face); rect(g, x - 2, y + TILE - 2, 4, 2, 'rgba(0,0,0,0.3)'); }
+          },
+        });
+      }
+    }
+  });
+  return out;
+}
+
+// ---------------------------------------------------------------- furniture (w x h pixel box, front at the bottom)
+
+const legs = (g, x, y, w, h, c = W[3]) => { rect(g, x, y, 2, h, c); rect(g, x + w - 2, y, 2, h, c); };
+const top3 = (g, x, y, w, h, [l, m, d]) => { rect(g, x, y, w, h, m); rect(g, x, y, w, 1, l); rect(g, x, y + h - 1, w, 1, d); };
+
+const FURN = {
+  chair(g) { rect(g, 3, 1, 10, 6, W[2]); for (let i = 4; i < 12; i += 3) rect(g, i, 2, 2, 4, W[1]); top3(g, 3, 7, 10, 5, W); legs(g, 3, 12, 10, 3); },
+  cat_bed(g) { ellipse(g, 8, 9, 7, 5, '#a83a6a'); ellipse(g, 8, 8, 7, 4, '#c94f7c'); ellipse(g, 8, 9, 5, 3, '#f1a7c3'); rect(g, 5, 7, 3, 1, '#ffd0e0'); rect(g, 2, 9, 1, 2, '#e070a0'); },
+  plant_pot(g, w, h, t) {
+    rect(g, 4, 10, 8, 5, '#b85030'); rect(g, 3, 9, 10, 2, '#d8704a'); rect(g, 4, 12, 8, 1, '#8a3820');
+    const s = Math.round(Math.sin(t * 1.5));
+    [[-3, -3], [3, -4], [0, -6], [-2, -8], [2, -8]].forEach(([dx, dy], i) => { ellipse(g, 8 + dx + (dy < -5 ? s : 0), 9 + dy, 2, 2, '#2a7a3c'); rect(g, 7 + dx, 8 + dy, 1, 1, i % 2 ? '#6fd06f' : '#45a34c'); });
+  },
+  floor_lamp(g, w, h, t) { ellipse(g, 8, 14, 3, 1, '#2a2a32'); rect(g, 8, 5, 1, 9, '#5a5a66'); rect(g, 4, 1, 9, 5, '#f0d090'); rect(g, 4, 1, 9, 1, '#fff4d0'); rect(g, 4, 5, 9, 1, '#c8a060'); glow(g, 8, 6, 12, '255,233,168', 0.35 + Math.sin(t * 3) * 0.05); },
+  big_plant(g, w, h, t) {
+    rect(g, 4, 11, 8, 5, '#3a3a48'); rect(g, 4, 11, 8, 1, '#5a5a6a');
+    const s = Math.round(Math.sin(t * 1.2));
+    [[-4, -2], [4, -3], [0, -6], [-3, -8], [3, -9], [0, -11]].forEach(([dx, dy]) => { ellipse(g, 8 + dx + (dy < -5 ? s : 0), 10 + dy, 2, 3, '#1f6a34'); rect(g, 8 + dx, 9 + dy, 1, 2, '#4fae5a'); });
+  },
+  bean_bag(g) { ellipse(g, 8, 10, 7, 5, '#5a34a8'); ellipse(g, 7, 8, 5, 4, '#7a4fd0'); ellipse(g, 6, 7, 3, 2, '#9a70f0'); rect(g, 5, 6, 2, 1, '#c8a8ff'); },
+  office_chair(g) { rect(g, 4, 1, 8, 6, '#2a2a34'); rect(g, 5, 2, 6, 4, '#3a3a48'); top3(g, 3, 7, 10, 5, ['#5a5a6a', '#44444f', '#2a2a34']); rect(g, 7, 12, 2, 2, '#666'); rect(g, 2, 14, 12, 1, '#222'); rect(g, 2, 14, 1, 1, '#777'); rect(g, 13, 14, 1, 1, '#777'); },
+  easel(g) {
+    rect(g, 3, 13, 1, 3, W[2]); rect(g, 12, 13, 1, 3, W[2]); rect(g, 7, 0, 2, 2, W[2]);
+    rect(g, 2, 2, 12, 10, '#f8f6ee'); rect(g, 2, 11, 12, 1, '#c8c4b8');
+    rect(g, 3, 7, 10, 4, '#4dc3ff'); disc(g, 10, 5, 2, '#ffd84a'); rect(g, 3, 8, 4, 3, '#45a34c'); rect(g, 6, 9, 5, 2, '#2a7a3c');
+    rect(g, 2, 12, 12, 1, W[1]);
+  },
+  vase(g) { ellipse(g, 8, 11, 4, 4, '#2f5fd0'); rect(g, 6, 5, 5, 4, '#2f5fd0'); rect(g, 6, 5, 1, 4, '#6f9fff'); rect(g, 5, 10, 6, 1, '#ffffff'); rect(g, 6, 1, 1, 4, '#ff3b6b'); rect(g, 9, 0, 1, 5, '#ffd84a'); rect(g, 8, 2, 1, 3, '#45a34c'); disc(g, 6, 1, 1, '#ff3b6b'); disc(g, 9, 0, 1, '#ffd84a'); },
+  coffee_table(g) { top3(g, 1, 3, 30, 8, W); rect(g, 1, 11, 30, 2, W[2]); legs(g, 2, 13, 28, 2); rect(g, 22, 5, 4, 3, '#ffffff'); rect(g, 23, 6, 2, 1, '#6b3e12'); rect(g, 6, 5, 7, 4, '#e84a6a'); rect(g, 6, 5, 7, 1, '#ff8aa0'); },
+  rug(g, w, h) {
+    rect(g, 0, 0, w, h, '#d8a83a'); rect(g, 2, 2, w - 4, h - 4, '#7a1e44'); rect(g, 4, 4, w - 8, h - 8, '#a83a5a');
+    for (let i = 6; i < w - 6; i += 6) for (let j = 6; j < h - 6; j += 6) { rect(g, i, j, 3, 3, '#d8a83a'); rect(g, i + 1, j + 1, 1, 1, '#7a1e44'); }
+    for (let i = 0; i < w; i += 2) { rect(g, i, 0, 1, 1, '#f0d890'); rect(g, i, h - 1, 1, 1, '#f0d890'); }
+  },
+  sink(g, w, h, t) { top3(g, 1, 3, 14, 8, ['#ffffff', '#e8eef2', '#b8c4cc']); ellipse(g, 8, 7, 4, 2, '#a8b8c4'); rect(g, 8, 1, 1, 4, '#9aa8b4'); rect(g, 7, 1, 3, 1, '#c8d4dc'); rect(g, 1, 11, 14, 4, '#d0d8de'); rect(g, 7, 12, 2, 1, '#9aa8b4'); if (t % 1.5 < 0.25) rect(g, 8, 6, 1, 1, '#4dc3ff'); },
+  armchair(g) { rect(g, 1, 1, 14, 6, '#24508a'); rect(g, 1, 1, 14, 1, '#4a7ac0'); rect(g, 1, 4, 3, 10, '#24508a'); rect(g, 12, 4, 3, 10, '#24508a'); top3(g, 4, 6, 8, 6, ['#6a9ae0', '#3f7fbf', '#2a5a90']); rect(g, 1, 12, 14, 3, '#1a3a68'); },
+  desk(g) { top3(g, 1, 3, 30, 7, W); rect(g, 1, 10, 30, 5, W[2]); rect(g, 3, 11, 9, 3, W[1]); rect(g, 7, 12, 2, 1, '#ffd84a'); rect(g, 4, 1, 7, 5, '#f8f8f0'); rect(g, 5, 2, 4, 1, '#9a9aa8'); rect(g, 22, 0, 5, 6, '#2a2a34'); rect(g, 21, 0, 7, 2, '#ffe9a8'); },
+  toilet(g) { rect(g, 4, 0, 8, 4, '#f4f4f8'); rect(g, 4, 0, 8, 1, '#ffffff'); ellipse(g, 8, 9, 4, 5, '#e8eef2'); ellipse(g, 8, 9, 3, 3, '#ffffff'); ellipse(g, 8, 9, 2, 2, '#bfe0f0'); rect(g, 7, 13, 2, 2, '#c8d0d8'); },
+  dresser(g) { top3(g, 1, 1, 30, 4, W); rect(g, 1, 5, 30, 10, W[2]); for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { rect(g, 2 + i * 10, 6 + j * 4, 9, 3, W[1]); rect(g, 6 + i * 10, 7 + j * 4, 2, 1, '#ffd84a'); } rect(g, 20, 0, 5, 2, '#ff8fc0'); rect(g, 6, 0, 3, 2, '#9fe8ff'); },
+  bookshelf(g) {
+    rect(g, 0, 0, 32, 16, W[3]); rect(g, 1, 1, 30, 14, W[2]);
+    for (let s = 0; s < 3; s++) {
+      for (let i = 2; i < 30; i += 2) { const bh = 3 + Math.floor(hash(i + s * 9) * 2); rect(g, i, 1 + s * 5 + (4 - bh), 2, bh, ['#d8283c', '#3f6fd8', '#5cc85c', '#ffd84a', '#a070e0', '#ff8a1e'][(i + s) % 6]); rect(g, i, 1 + s * 5 + (4 - bh), 1, 1, 'rgba(255,255,255,0.4)'); }
+      rect(g, 1, 5 + s * 5, 30, 1, W[1]);
+    }
+  },
+  dining_table(g, w, h, t) {
+    [[3, 0], [19, 0], [3, 27], [19, 27]].forEach(([x, y]) => { rect(g, x, y, 10, 5, W[2]); rect(g, x + 1, y + 1, 8, 3, W[1]); });
+    top3(g, 2, 5, 28, 20, W); rect(g, 2, 25, 28, 2, W[2]); rect(g, 4, 7, 24, 16, '#f4ecd8');
+    [[8, 10], [22, 10], [8, 19], [22, 19]].forEach(([x, y]) => { disc(g, x, y, 2, '#ffffff'); rect(g, x, y, 1, 1, '#e8a040'); });
+    rect(g, 15, 13, 2, 4, '#f4f0e8'); rect(g, 15, 11 + (t % 0.5 < 0.25 ? 0 : 1), 1, 2, '#ffb000'); glow(g, 15, 12, 8, '255,180,0', 0.4);
+  },
+  guitar(g, w, h, t, use) { ellipse(g, 8, 11, 4, 4, '#c8681c'); ellipse(g, 8, 11, 3, 3, '#e08a2c'); disc(g, 8, 10, 1, '#3a2010'); rect(g, 8, 1, 1, 7, '#5a3a1e'); rect(g, 7, 0, 3, 2, '#2a1408'); rect(g, 7, 13, 3, 1, '#2a1408'); if (use) rect(g, 7 + Math.floor((t * 8) % 3), 9, 1, 3, '#fff4d0'); },
+  counter(g) { top3(g, 0, 1, 32, 5, ['#f4f4f8', '#e0e0e8', '#b8b8c4']); rect(g, 0, 6, 32, 9, '#d0d0d8'); rect(g, 15, 7, 1, 7, '#a8a8b4'); rect(g, 8, 9, 3, 1, '#8a8a96'); rect(g, 20, 9, 3, 1, '#8a8a96'); rect(g, 3, 2, 8, 3, '#c08a5a'); rect(g, 22, 1, 3, 4, '#ff6a3a'); rect(g, 26, 2, 3, 3, '#ffd84a'); },
+  wardrobe(g) { rect(g, 0, 0, 32, 16, W[3]); rect(g, 1, 1, 30, 14, W[2]); rect(g, 2, 2, 13, 12, W[1]); rect(g, 17, 2, 13, 12, W[1]); rect(g, 4, 4, 9, 8, W[2]); rect(g, 19, 4, 9, 8, W[2]); rect(g, 14, 7, 1, 3, '#ffd84a'); rect(g, 17, 7, 1, 3, '#ffd84a'); rect(g, 0, 0, 32, 1, W[0]); },
+  record_player(g, w, h, t) { top3(g, 1, 2, 14, 11, ['#8a5a30', '#6a4020', '#40240e']); disc(g, 7, 7, 4, '#111'); disc(g, 7, 7, 1, '#d8283c'); const a = t * 6; rect(g, 7 + Math.round(Math.cos(a) * 3), 7 + Math.round(Math.sin(a) * 3), 1, 1, '#666'); rect(g, 12, 3, 1, 6, '#cfcfd8'); rect(g, 10, 8, 3, 1, '#cfcfd8'); rect(g, 1, 13, 14, 2, '#40240e'); },
+  bed(g) {
+    rect(g, 0, 0, 32, 6, W[2]); rect(g, 0, 0, 32, 1, W[0]); rect(g, 2, 6, 28, 38, '#f4f4f8');
+    rect(g, 5, 7, 22, 7, '#ffffff'); rect(g, 5, 13, 22, 1, '#d0d0dc');
+    rect(g, 2, 18, 28, 26, '#3f6fd0'); rect(g, 2, 18, 28, 3, '#7fa8ff'); for (let j = 24; j < 44; j += 5) rect(g, 2, j, 28, 1, '#2f5ab0');
+    rect(g, 0, 44, 32, 4, W[2]); legs(g, 0, 44, 32, 4, W[3]);
+  },
+  double_bed(g) {
+    rect(g, 0, 0, 48, 7, '#5a2a14'); rect(g, 0, 0, 48, 1, '#8a4a28'); rect(g, 2, 7, 44, 37, '#f4f4f8');
+    rect(g, 5, 8, 17, 7, '#ffffff'); rect(g, 26, 8, 17, 7, '#ffffff'); rect(g, 5, 14, 17, 1, '#d0d0dc'); rect(g, 26, 14, 17, 1, '#d0d0dc');
+    rect(g, 2, 19, 44, 25, '#d84a8a'); rect(g, 2, 19, 44, 3, '#ff8fc0'); for (let i = 6; i < 44; i += 8) for (let j = 25; j < 44; j += 8) rect(g, i, j, 2, 2, '#ffc0dc');
+    rect(g, 0, 44, 48, 4, '#5a2a14');
+  },
+  fish_tank(g, w, h, t, use, extra = {}) {
+    rect(g, 0, 11, 32, 5, W[2]); rect(g, 0, 11, 32, 1, W[1]);
+    rect(g, 1, 0, 30, 11, '#a8b8c8'); rect(g, 2, 1, 28, 9, '#1f8fd8'); rect(g, 2, 1, 28, 2, '#5fc8ff');
+    rect(g, 2, 8, 28, 2, '#e6d28a'); rect(g, 6, 7, 3, 2, '#9a9aa8'); rect(g, 22, 6, 4, 3, '#b08a6a'); rect(g, 23, 5, 1, 1, '#b08a6a');
+    [[4, 0], [27, 1], [14, 2]].forEach(([x, k]) => { const s = Math.round(Math.sin(t * 2 + k)); rect(g, x + s, 4, 1, 4, '#2f8a4a'); rect(g, x, 6, 1, 2, '#2f8a4a'); });
+    const fish = (extra.fish ?? []).slice(0, 7);
+    fish.forEach((type, i) => {
+      const p = (t * (2 + (i % 3)) + i * 9) % 48;
+      const fx = p < 24 ? 3 + p : 51 - p;
+      drawFish(g, type, fx, 3 + (i * 2) % 5, p < 24 ? 1 : -1, t, true);
+    });
+    rect(g, 9, 1 + Math.floor(8 - ((t * 5) % 8)), 1, 1, '#d8f4ff'); rect(g, 10, 1 + Math.floor(8 - ((t * 5 + 3) % 8)), 1, 1, '#d8f4ff');
+    rect(g, 1, 0, 30, 1, '#00e5ff');
+  },
+  telescope(g) { rect(g, 3, 14, 1, 2, '#555'); rect(g, 12, 14, 1, 2, '#555'); rect(g, 7, 9, 2, 6, '#555'); rect(g, 3, 14, 10, 1, '#555'); for (let i = 0; i < 8; i++) rect(g, 3 + i, 10 - i, 3, 3, i < 2 ? '#8a8aa0' : '#d8d8e8'); rect(g, 11, 1, 3, 3, '#4dc3ff'); rect(g, 4, 9, 1, 1, '#ffd84a'); },
+  sofa(g) {
+    rect(g, 0, 0, 48, 6, '#901e18'); rect(g, 0, 0, 48, 1, '#c8402a');
+    top3(g, 4, 6, 40, 7, ['#ff6a50', '#e04f3f', '#b03026']); rect(g, 17, 6, 1, 7, '#b03026'); rect(g, 31, 6, 1, 7, '#b03026');
+    rect(g, 0, 3, 5, 12, '#901e18'); rect(g, 43, 3, 5, 12, '#901e18'); rect(g, 0, 3, 5, 1, '#c8402a'); rect(g, 43, 3, 5, 1, '#c8402a');
+    rect(g, 4, 13, 40, 2, '#701410'); rect(g, 8, 3, 6, 4, '#ffd84a'); rect(g, 34, 3, 6, 4, '#4dc3ff');
+  },
+  console(g, w, h, t) { rect(g, 1, 6, 14, 6, '#1a1a22'); rect(g, 1, 6, 14, 1, '#3a3a48'); rect(g, 3, 8, 2, 1, t % 1 < 0.5 ? '#39ff14' : '#0a3a0a'); rect(g, 8, 8, 5, 2, '#2a2a34'); rect(g, 1, 13, 5, 3, '#4a4a58'); rect(g, 10, 13, 5, 3, '#4a4a58'); rect(g, 2, 14, 1, 1, '#ff3b6b'); rect(g, 13, 14, 1, 1, '#4dc3ff'); rect(g, 5, 12, 1, 1, '#2a2a34'); },
+  stove(g, w, h, t, use) { top3(g, 0, 0, 16, 9, ['#5a5a66', '#44444e', '#2a2a32']); rect(g, 0, 9, 16, 7, '#d8d8e0'); rect(g, 3, 10, 10, 4, '#2a2a32'); rect(g, 4, 11, 8, 2, use ? '#ff6a1c' : '#3a3a44'); [[4, 3], [11, 3], [4, 7], [11, 7]].forEach(([x, y], i) => { disc(g, x, y, 2, '#1a1a1a'); if (i === 0 && (use || t % 0.6 < 0.3)) disc(g, x, y, 1, '#ff4a1c'); }); },
+  tv(g, w, h, t) {
+    rect(g, 2, 10, 28, 6, W[2]); rect(g, 2, 10, 28, 1, W[1]); rect(g, 4, 0, 24, 11, '#0a0a10'); rect(g, 5, 1, 22, 8, '#1a1a40');
+    for (let i = 0; i < 22; i++) rect(g, 5 + i, 1 + ((i + Math.floor(t * 8)) % 8), 1, 1, ['#ff4fd8', '#4dc3ff', '#ffd84a'][i % 3]);
+    rect(g, 5, 1, 22, 1, 'rgba(255,255,255,0.2)'); glow(g, 16, 5, 14, '77,195,255', 0.25);
+  },
+  clock(g, w, h, t) {
+    rect(g, 3, 0, 10, 16, '#5a2a14'); rect(g, 3, 0, 10, 1, '#8a4a28'); disc(g, 8, 4, 3, '#f4ecd8');
+    const now = new Date();
+    const a = (now.getSeconds() / 60) * 6.28;
+    rect(g, 8 + Math.round(Math.sin(a) * 2), 4 - Math.round(Math.cos(a) * 2), 1, 1, '#1a1a1a'); rect(g, 8, 4, 1, 1, '#1a1a1a');
+    rect(g, 5, 8, 6, 7, '#2a1408'); rect(g, 8 + Math.round(Math.sin(t * 3) * 2), 9, 1, 4, '#d8a520'); disc(g, 8 + Math.round(Math.sin(t * 3) * 2), 13, 1, '#ffd84a');
+  },
+  bathtub(g, w, h, t, use) {
+    rect(g, 0, 0, 32, 13, '#ffffff'); rect(g, 0, 12, 32, 4, '#d8dee4'); rect(g, 2, 2, 28, 9, '#8fd8ff'); rect(g, 2, 2, 28, 1, '#c8f0ff');
+    for (let i = 0; i < (use ? 9 : 4); i++) disc(g, 5 + i * 3, 4 + Math.round(Math.sin(t * 2 + i)), 1 + (i % 2), '#f0fbff');
+    rect(g, 28, 0, 2, 3, '#c0c8d0'); legs(g, 1, 14, 30, 2, '#c8a020');
+  },
+  fridge(g) { rect(g, 1, 0, 14, 16, '#c8d4dc'); rect(g, 2, 1, 12, 14, '#e8eef4'); rect(g, 2, 6, 12, 1, '#b8c4cc'); rect(g, 12, 2, 1, 3, '#8a96a0'); rect(g, 12, 8, 1, 4, '#8a96a0'); rect(g, 4, 8, 3, 3, '#ff6fa8'); rect(g, 8, 9, 2, 2, '#ffd84a'); rect(g, 4, 2, 2, 2, '#4dc3ff'); },
+  fireplace(g, w, h, t) {
+    rect(g, 0, 0, 32, 16, '#7a7a86'); for (let j = 0; j < 16; j += 4) for (let i = (j / 4) % 2 ? 0 : 3; i < 32; i += 6) rect(g, i, j, 1, 4, '#5a5a66');
+    rect(g, 0, 0, 32, 2, '#9a9aa6'); rect(g, 8, 5, 16, 11, '#1a1010'); ellipse(g, 16, 5, 8, 2, '#1a1010');
+    for (let i = 0; i < 7; i++) { const fh = 3 + Math.floor(hash(i + Math.floor(t * 10)) * 6); rect(g, 9 + i * 2, 16 - fh, 2, fh, i % 2 ? '#ffb000' : '#ff4a1c'); rect(g, 9 + i * 2, 16 - fh, 1, 1, '#ffe14d'); }
+    rect(g, 10, 14, 12, 2, '#5a3420'); glow(g, 16, 12, 16, '255,140,40', 0.45);
+  },
+  computer(g, w, h, t) {
+    top3(g, 0, 4, 32, 7, W); rect(g, 0, 11, 32, 4, W[2]); legs(g, 1, 14, 30, 2);
+    rect(g, 8, 0, 16, 9, '#1a1a22'); rect(g, 9, 1, 14, 6, '#08140a');
+    for (let i = 0; i < 4; i++) rect(g, 10, 2 + i, 2 + Math.floor(hash(i + Math.floor(t * 2)) * 10), 1, i === 3 ? '#00e5ff' : '#39ff14');
+    rect(g, 15, 9, 2, 1, '#2a2a34'); rect(g, 9, 9, 12, 2, '#d8d8e0'); rect(g, 24, 9, 3, 2, '#d8d8e0'); glow(g, 16, 4, 12, '57,255,20', 0.2);
+  },
+  arcade(g, w, h, t) {
+    rect(g, 1, 0, 14, 16, '#24145a'); rect(g, 1, 0, 14, 2, '#ff00d4'); rect(g, 3, 3, 10, 6, '#0a0a10');
+    rect(g, 4 + Math.floor(t * 4) % 7, 6, 2, 2, '#ffd84a'); rect(g, 4, 4, 8, 1, '#00e5ff');
+    rect(g, 2, 10, 12, 3, '#3a2a7a'); rect(g, 4, 10, 1, 2, '#ff3b6b'); rect(g, 8, 11, 2, 1, '#4dc3ff'); rect(g, 11, 11, 2, 1, '#ffd84a');
+    rect(g, 1, 0, 1, 16, '#ff00d4'); rect(g, 14, 0, 1, 16, '#00e5ff'); glow(g, 8, 6, 12, '255,0,212', 0.25);
+  },
+  piano(g, w, h, t, use) {
+    rect(g, 0, 0, 32, 10, '#0e0e12'); rect(g, 0, 0, 32, 1, '#3a3a48'); rect(g, 4, 2, 24, 4, '#1a1a22'); rect(g, 6, 3, 6, 2, '#f4ecd8');
+    rect(g, 0, 10, 32, 5, '#ffffff'); for (let i = 1; i < 32; i += 3) rect(g, i, 10, 1, 3, '#0e0e12');
+    if (use) rect(g, 2 + Math.floor(hash(Math.floor(t * 6)) * 27), 13, 2, 2, '#ffd84a');
+    legs(g, 1, 15, 30, 1, '#0e0e12');
+  },
+};
+
+// One furniture item into a w x h pixel box (unrotated), outlined; `use` is true while a pet uses it.
+export function drawFurniture(g, id, w, h, t, use = false, extra = {}) {
+  outlined(g, 0, 0, w, h, INK, (sg) => FURN[id](sg, w, h, t, use, extra));
+}

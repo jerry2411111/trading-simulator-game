@@ -144,14 +144,13 @@ async def update_ai(body: dict):
 
 @app.get("/api/home")
 async def home_view():
-    game.autosave()  # bring this game's profit into the coin count
-    return home.view()
+    return game.home_view()
 
 
 @app.post("/api/home/{action}")
 async def home_action(action: str, body: dict):
     try:
-        return home.act(action, body)
+        return await game.home_act(action, body)
     except home.HomeError as e:
         return JSONResponse({"ok": False, "message": str(e)}, 400)
 

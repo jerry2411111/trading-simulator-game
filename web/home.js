@@ -1,25 +1,41 @@
-// Home: the garden (plants, pets, pool, the house seen from outside) and the house (furniture on a
-// grid, the chibi girl who lives there). Pets and the girl run small behavior state machines.
+// Home: the garden (a wasteland you clean up and floor, the flower bed, trees with beehives, the pool,
+// pets, birds and bees, the house seen from outside), the house (rooms on a grid, furniture, your pets
+// living inside) and the aquarium (fish, sea life, the ice land). Animals run small state machines.
 import {
-  drawFlower, drawFurniture, drawHouse, drawPet, drawPool, drawRoom, drawTree, PET_SIZE, roomSize, TILE,
+  DEBRIS_KINDS, drawBee, drawBird, drawDebris, drawFloor, drawFlower, drawHive, drawPet, drawPool, drawTree, PET_SIZE,
 } from './art.js';
-import { drawChibi, LOOKS } from './girl.js';
-import { disc, ellipse, fitCanvas, hash, icon, mouse, now, rect } from './pixel.js';
+import { drawFurniture, drawHouse, drawRoom, HOUSE_W, ROOM, roomSize, TILE, tileOrigin, wallPieces } from './build.js';
+import { AQ, drawAquarium, drawSea } from './sea.js';
+import { disc, ellipse, fitCanvas, glow, hash, icon, mouse, now, rect } from './pixel.js';
 
 const $ = (id) => document.getElementById(id);
 const GW = 256;
-const GH = 176;
-const DOOR = { x: 128, y: 66 };
-const PLOTS = Array.from({ length: 6 }, (_, i) => ({ x: 20 + (i % 3) * 21, y: 82 + Math.floor(i / 3) * 20, w: 14, h: 10 }));
-const SPOTS = [{ x: 176, y: 108 }, { x: 222, y: 108 }, { x: 176, y: 154 }, { x: 222, y: 154 }];
-const POOL = { x: 20, y: 128, w: 58, h: 28 };
-const LAWN = { x0: 12, x1: 244, y0: 74, y1: 168 };
-const STONES = Array.from({ length: 15 }, (_, k) => ({ x: DOOR.x + (k % 2 ? 3 : -3), y: DOOR.y + 4 + k * 7 }));
-const TUFTS = Array.from({ length: 160 }, (_, i) => ({ x: Math.floor(hash(i) * GW), y: 10 + Math.floor(hash(i + 500) * (GH - 12)) }));
-const OUTFITS = [null, '#d8283c', '#3f6fd8', '#f4f4f4', '#2a2a2a', '#ff6fa8', '#5cc85c'];
+const GH = 208;
+const DOOR = { x: 128, y: 86 };
+const ZONES = {  // the garden's parts; the house lot above them is always the house's
+  path: [{ x: 6, y: 86, w: 244, h: 14 }, { x: 116, y: 160, w: 24, h: 44 }],
+  west: [{ x: 6, y: 100, w: 86, h: 60 }],
+  plaza: [{ x: 92, y: 100, w: 72, h: 60 }],
+  east: [{ x: 164, y: 100, w: 86, h: 60 }],
+  southwest: [{ x: 6, y: 160, w: 110, h: 44 }],
+  southeast: [{ x: 140, y: 160, w: 110, h: 44 }],
+};
+const BED = { x: 128, y: 131, rx: 31, ry: 17 };
+const FLOWERS = [[110, 127], [128, 124], [146, 127], [112, 142], [128, 145], [144, 142]].map(([x, y]) => ({ x, y }));
+const SPOTS = [{ x: 26, y: 146 }, { x: 68, y: 156 }, { x: 188, y: 156 }, { x: 230, y: 146 }];
+const POOL = { x: 24, y: 170, w: 64, h: 24 };
+const LAWN = { x0: 10, x1: 246, y0: 92, y1: 200 };
+const STONES = [
+  ...Array.from({ length: 4 }, (_, k) => ({ x: 128 + (k % 2 ? 3 : -3), y: 92 + k * 6 })),
+  ...Array.from({ length: 8 }, (_, k) => ({ x: 128 + (k % 2 ? 3 : -3), y: 156 + k * 6 })),
+];
+const RING = Array.from({ length: 22 }, (_, k) => ({ x: BED.x + Math.round(Math.cos((k / 22) * 6.28) * (BED.rx + 6)), y: BED.y + Math.round(Math.sin((k / 22) * 6.28) * (BED.ry + 5)) }));
+const LAMPS = [{ x: 98, y: 98 }, { x: 158, y: 98 }, { x: 110, y: 200 }, { x: 146, y: 200 }];
+const NAMES = { dog: 'dog', cat: 'cat', parrot: 'parrot', turtle: 'turtle', lizard: 'lizard', lion: 'lion' };
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const inRects = (p, rects) => rects.some((r) => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
 
 async function api(path, body) {
   const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
@@ -35,19 +51,25 @@ export function initHome(ctx) {
   let data = null;
   let clockSkew = 0;
   let view = 'garden';
-  let selected = null;     // garden: {kind: 'plot'|'tree'|'pet', i|id}; house: furniture id
+  let selected = null;     // garden: {kind: 'flower'|'tree'|'pet'|'zone', ...}; house: furniture id
   let editing = false;
   let holding = null;      // furniture being placed: {item, rot, id?}
   let hoverTile = null;
   let hoverPet = null;
   let shake = 0;
   let running = false;
-  const pets = new Map();
-  const girl = { x: 1, y: 1, path: [], until: 0, pose: 'stand', dir: 'down', emote: null, act: null, on: null, label: 'is looking around', outfit: null, petted: false };
+  let ground = null;       // pre-rendered garden ground, rebuilt when zones or floors change
+  let groundKey = '';
+  const pets = new Map();  // garden pets by id
+  const inside = new Map(); // the same pets inside the house
+  const swimmers = new Map();
+  let pellets = [];
+  const birds = { flock: [], next: 0, perch: null };
 
   const t0 = () => now() + clockSkew;  // server time in seconds
   const cat = (id) => data.catalog[id];
   const st = () => data.state;
+  const clean = (zone) => Boolean(st().zones[zone]);
 
   // ------------------------------------------------------------- data
 
@@ -57,8 +79,11 @@ export function initHome(ctx) {
     data = d;
     clockSkew = d.now - now();
     $('home-coins').textContent = `🪙 ${Math.floor(d.coins).toLocaleString()}`;
+    $('aquarium-tab').hidden = !st().aquarium;
     ctx.coins(d.coins);
+    ctx.onHome?.(d);
     syncPets();
+    syncSwimmers();
     renderSide();
   }
 
@@ -69,33 +94,33 @@ export function initHome(ctx) {
     return true;
   }
 
-  // ------------------------------------------------------------- growth and pets
+  // ------------------------------------------------------------- growth
 
   function stage(plant) {
     const f = (t0() - plant.planted) / (cat(plant.type).hours * 3600);
     return f >= 1 ? 3 : f >= 0.5 ? 2 : f >= 0.15 ? 1 : 0;
   }
-
+  const grownAt = (plant) => plant.planted + cat(plant.type).hours * 3600;
   function treeReady(plant) {
     const c = cat(plant.type);
-    const grownAt = plant.planted + c.hours * 3600;
-    return t0() >= grownAt && t0() - Math.max(plant.harvested ?? 0, grownAt) >= c.every * 3600;
+    return t0() >= grownAt(plant) && t0() - Math.max(plant.harvested ?? 0, grownAt(plant)) >= c.every * 3600;
   }
+
+  // ------------------------------------------------------------- garden pets
 
   function syncPets() {
     const ids = new Set(st().pets.map((p) => p.id));
-    for (const id of pets.keys()) if (!ids.has(id)) pets.delete(id);
+    [pets, inside].forEach((m) => { for (const id of m.keys()) if (!ids.has(id)) m.delete(id); });
     st().pets.forEach((p, i) => {
-      if (!pets.has(p.id)) {
-        pets.set(p.id, { id: p.id, type: p.type, x: 128 + (i % 3) * 6, y: 166, dir: 1, pose: 'idle', moving: false, until: 0, emote: null, phase: i });
-      }
-      Object.assign(pets.get(p.id), { status: p.status, fed: p.fed });
+      if (!pets.has(p.id)) pets.set(p.id, { id: p.id, type: p.type, x: 128 + (i % 3) * 8, y: 196, dir: 1, pose: 'idle', moving: false, until: 0, emote: null, phase: i });
+      if (!inside.has(p.id)) inside.set(p.id, { id: p.id, type: p.type, x: 0, y: 0, path: [], until: 0, pose: 'idle', dir: 1, emote: null, act: null, on: null, label: 'is looking around', phase: i });
+      [pets.get(p.id), inside.get(p.id)].forEach((b) => Object.assign(b, { status: p.status, fed: p.fed }));
     });
   }
 
   const lawnPoint = () => ({ x: rand(LAWN.x0, LAWN.x1), y: rand(LAWN.y0, LAWN.y1) });
   const near = (p, r) => ({ x: Math.min(LAWN.x1, Math.max(LAWN.x0, p.x + rand(-r, r))), y: Math.min(LAWN.y1, Math.max(LAWN.y0, p.y + rand(-r / 2, r / 2))) });
-  const bloomed = () => st().flowers.map((f, i) => f && stage(f) === 3 && { x: PLOTS[i].x + 7, y: PLOTS[i].y + 9 }).filter(Boolean);
+  const bloomed = () => st().flowers.map((f, i) => f && stage(f) === 3 && FLOWERS[i]).filter(Boolean);
   const grownTrees = () => st().trees.map((f, i) => f && stage(f) >= 2 && SPOTS[i]).filter(Boolean);
   const alive = () => [...pets.values()].filter((p) => p.status !== 'dead');
   const inPool = (p) => st().pool && p.x > POOL.x + 4 && p.x < POOL.x + POOL.w - 4 && p.y > POOL.y + 4 && p.y < POOL.y + POOL.h;
@@ -112,30 +137,32 @@ export function initHome(ctx) {
     dog(p, t) {
       const r = Math.random();
       const others = alive().filter((o) => o !== p);
-      if (r < 0.22) go(p, lawnPoint(), 38, ['sit', 2, 'heart']);
-      else if (r < 0.36 && bloomed().length) go(p, pick(bloomed()), 26, ['sniff', 2.5]);
-      else if (r < 0.46) go(p, lawnPoint(), 26, ['dig', 2.5]);
-      else if (r < 0.6 && others.length) {
+      if (r < 0.2) go(p, lawnPoint(), 38, ['sit', 2, 'heart']);
+      else if (r < 0.34 && bloomed().length) go(p, pick(bloomed()), 26, ['sniff', 2.5]);
+      else if (r < 0.44) go(p, lawnPoint(), 26, ['dig', 2.5]);
+      else if (r < 0.58 && others.length) {
         const o = pick(others);
         go(p, { x: o.x, y: o.y }, 40, ['bark', 1.2, 'bang']);
         if (o.type === 'cat' || o.type === 'lizard') flee(o, p, t);
-      } else if (r < 0.7 && st().pool) go(p, { x: POOL.x + POOL.w + 3, y: POOL.y + 10 }, 26, ['drink', 2.5]);
-      else if (r < 0.85) hold(p, t, 'sit', rand(2, 4));
+      } else if (r < 0.68 && st().pool) go(p, { x: POOL.x + POOL.w + 3, y: POOL.y + 10 }, 26, ['drink', 2.5]);
+      else if (r < 0.76 && clean('southeast')) go(p, { x: 222, y: 194 }, 30, ['sleep', rand(5, 8), 'z']);  // the dog house
+      else if (r < 0.88) hold(p, t, 'sit', rand(2, 4));
       else hold(p, t, 'sleep', rand(5, 9), 'z');
     },
     cat(p, t) {
       const r = Math.random();
-      if (r < 0.25) go(p, lawnPoint(), 12, ['sit', 3]);
-      else if (r < 0.4) hold(p, t, 'groom', 3);
-      else if (r < 0.58) go(p, near(pick([...grownTrees(), DOOR, ...bloomed()].filter(Boolean)) ?? lawnPoint(), 8), 12, ['sleep', rand(6, 12), 'z']);
-      else if (r < 0.75) go(p, butterflyAt(t, 0), 7, ['sit', 1, 'star'], 'stalk');
-      else if (r < 0.87) go(p, { x: DOOR.x + 8, y: DOOR.y + 4 }, 12, ['sit', 4]);
+      if (r < 0.22) go(p, lawnPoint(), 12, ['sit', 3]);
+      else if (r < 0.36) hold(p, t, 'groom', 3);
+      else if (r < 0.54) go(p, near(pick([...grownTrees(), DOOR, ...bloomed()].filter(Boolean)) ?? lawnPoint(), 8), 12, ['sleep', rand(6, 12), 'z']);
+      else if (r < 0.72) go(p, butterflyAt(t, 0), 7, ['sit', 1, 'star'], 'stalk');
+      else if (r < 0.82 && birds.perch) go(p, near(birds.perch.spot, 6), 9, ['sit', 3, 'bang'], 'stalk');
+      else if (r < 0.9) go(p, { x: DOOR.x + 10, y: DOOR.y + 6 }, 12, ['sit', 4]);
       else hold(p, t, 'sit', 2, 'heart');
     },
     parrot(p, t) {
       const r = Math.random();
-      const perches = [...grownTrees().map((s) => ({ x: s.x, y: s.y - 18 })), { x: DOOR.x - 14, y: DOOR.y - 30 },
-        { x: 6, y: 40 }, { x: 250, y: 60 }, { x: 116, y: 170 }, { x: 140, y: 170 }];
+      const perches = [...grownTrees().map((s) => ({ x: s.x, y: s.y - 40 })), { x: DOOR.x - 20, y: DOOR.y - 40 },
+        { x: 6, y: 92 }, { x: 250, y: 92 }, ...LAMPS.map((l) => ({ x: l.x, y: l.y - 12 }))];
       if (r < 0.55) go(p, pick(perches), 30, ['perch', rand(3, 7)], 'fly');
       else if (r < 0.72) hold(p, t, 'sing', 3, 'note');
       else if (r < 0.86) hold(p, t, 'preen', 3);
@@ -153,12 +180,12 @@ export function initHome(ctx) {
       const r = Math.random();
       if (r < 0.4) go(p, near(p, 45), 50, ['idle', rand(1, 4)]);
       else if (r < 0.6) hold(p, t, 'pushup', 2);
-      else if (r < 0.85) go(p, pick(STONES), 50, ['bask', rand(4, 8)]);
-      else go(p, pick(PLOTS), 50, ['idle', 3]);
+      else if (r < 0.85) go(p, pick([...STONES, ...RING]), 50, ['bask', rand(4, 8)]);
+      else go(p, pick(FLOWERS), 50, ['idle', 3]);
     },
     lion(p, t) {
       const r = Math.random();
-      if (r < 0.4) go(p, pick([{ x: 30, y: 80 }, { x: 230, y: 80 }, { x: 230, y: 160 }, { x: 100, y: 160 }, { x: 160, y: 120 }]), 9, ['idle', 2]);
+      if (r < 0.4) go(p, pick([{ x: 30, y: 110 }, { x: 226, y: 110 }, { x: 226, y: 196 }, { x: 100, y: 196 }, { x: 176, y: 130 }]), 9, ['idle', 2]);
       else if (r < 0.6) hold(p, t, 'lie', rand(6, 10));
       else if (r < 0.72) hold(p, t, 'sleep', rand(8, 12), 'z');
       else if (r < 0.86) { hold(p, t, 'roar', 1.6, 'bang'); roar(p, t); }
@@ -170,7 +197,7 @@ export function initHome(ctx) {
   function flee(p, from, t) {
     if (p.status === 'dead' || p.type === 'lion') return;
     if (p.type === 'turtle') return hold(p, t, 'hide', 4);
-    if (p.type === 'parrot') return go(p, { x: rand(20, 236), y: rand(20, 60) }, 34, ['perch', 3], 'fly');
+    if (p.type === 'parrot') return go(p, { x: rand(20, 236), y: rand(40, 80) }, 34, ['perch', 3], 'fly');
     const away = { x: p.x + Math.sign(p.x - from.x || 1) * 40, y: p.y + Math.sign(p.y - from.y || 1) * 20 };
     go(p, near(away, 4), p.type === 'lizard' ? 55 : 36, ['sit', 2, 'bang']);
   }
@@ -178,13 +205,14 @@ export function initHome(ctx) {
   function roar(p, t) {
     shake = t + 0.6;
     alive().filter((o) => o !== p && dist(o, p) < 90).forEach((o) => (o.type === 'dog' ? hold(o, t, 'sit', 2, 'bang') : flee(o, p, t)));
+    if (birds.perch) birds.perch.leave = 0;
   }
 
   function butterflyAt(t, i) {
     const f = bloomed();
-    if (!f.length) return { x: 50 + Math.sin(t * 0.4 + i) * 30, y: 95 + Math.sin(t * 0.9 + i) * 10 };
+    if (!f.length) return { x: 128 + Math.sin(t * 0.4 + i) * 60, y: 130 + Math.sin(t * 0.9 + i) * 20 };
     const c = f[i % f.length];
-    return { x: c.x + Math.sin(t * 0.7 + i * 2) * 14, y: c.y - 10 + Math.sin(t * 1.3 + i) * 6 };
+    return { x: c.x + Math.sin(t * 0.7 + i * 2) * 14, y: c.y - 12 + Math.sin(t * 1.3 + i) * 6 };
   }
 
   function thinkPet(p, t, dt) {
@@ -221,90 +249,236 @@ export function initHome(ctx) {
     if (t > p.until) BRAINS[p.type](p, t);
   }
 
+  // ------------------------------------------------------------- birds flying by, one landing in a tree
+
+  function thinkBirds(t, dt) {
+    if (t > birds.next) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const y = rand(8, 70);
+      const n = 3 + Math.floor(Math.random() * 3);
+      birds.flock = Array.from({ length: n }, (_, i) => ({ x: dir > 0 ? -10 - i * 7 : GW + 10 + i * 7, y: y + Math.abs(i - n / 2) * 4, dir, i }));
+      birds.next = t + rand(14, 26);
+      const trees = grownTrees();
+      if (!birds.perch && trees.length && Math.random() < 0.6) {
+        const spot = pick(trees);
+        birds.perch = { spot, x: dir > 0 ? -8 : GW + 8, y: 20, sit: { x: spot.x + 4, y: spot.y - 42 }, landed: false, leave: t + rand(10, 18), dir };
+      }
+    }
+    birds.flock.forEach((b) => { b.x += b.dir * 34 * dt; b.y += Math.sin(t * 2 + b.i) * 0.08; });
+    birds.flock = birds.flock.filter((b) => b.x > -40 && b.x < GW + 40);
+    const p = birds.perch;
+    if (p) {
+      const goal = t < p.leave ? p.sit : { x: p.dir > 0 ? GW + 20 : -20, y: 10 };
+      const dx = goal.x - p.x;
+      const dy = goal.y - p.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 1) { p.x += (dx / d) * 40 * dt; p.y += (dy / d) * 40 * dt; p.dir = Math.sign(dx) || p.dir; p.landed = false; } else p.landed = t < p.leave;
+      if (t >= p.leave && (p.x < -15 || p.x > GW + 15)) birds.perch = null;
+    }
+  }
+
   // ------------------------------------------------------------- garden drawing
 
-  function drawGarden(t) {
-    rect(g, 0, 0, GW, GH, '#4f9f45');
-    TUFTS.forEach((q, i) => {
-      const s = i % 5 === 0 ? Math.round(Math.sin(t * 1.5 + i)) : 0;
-      rect(g, q.x + s, q.y, 1, 2, i % 2 ? '#62b555' : '#3e8a38');
-    });
-    for (let i = 0; i < 2; i++) {               // drifting cloud shadows
-      g.fillStyle = 'rgba(0,0,0,0.07)';
-      const cx = ((t * 3 + i * 140) % (GW + 80)) - 40;
-      ellipse(g, cx, 60 + i * 60, 30, 9, 'rgba(0,0,0,0.07)');
+  function buildGround() {
+    const c = document.createElement('canvas');
+    c.width = GW;
+    c.height = GH;
+    const q = c.getContext('2d');
+    // night sky and the city behind the garden
+    for (let j = 0; j < 30; j += 2) rect(q, 0, j, GW, 2, `rgb(${10 + j},${6 + j / 2},${30 + j * 1.5})`);
+    for (let i = 0; i < GW; i += 9) {
+      const h = 8 + Math.floor(hash(i * 0.7) * 16);
+      rect(q, i, 30 - h, 8, h, '#0c0820');
+      for (let j = 2; j < h - 2; j += 3) if (hash(i + j) > 0.55) rect(q, i + 2 + (j % 2) * 3, 30 - h + j, 1, 1, j % 4 ? '#ffe58a' : '#ff4fd8');
     }
-    for (let x = 0; x < GW; x += 6) disc(g, x + 3, 4 + (x % 12 ? 1 : 0), 5, x % 12 ? '#2e7d32' : '#3a9a3e'); // hedge
-    for (let y = 12; y < 172; y += 8) { rect(g, 3, y, 2, 6, '#8a6a3a'); rect(g, 251, y, 2, 6, '#8a6a3a'); }
-    rect(g, 3, 12, 1, 160, '#c8a26a'); rect(g, 252, 12, 1, 160, '#c8a26a');
-    for (let x = 4; x < 252; x += 8) if (x < 112 || x > 142) rect(g, x, 170, 2, 6, '#8a6a3a');
-    rect(g, 4, 172, 108, 1, '#c8a26a'); rect(g, 144, 172, 108, 1, '#c8a26a');
-    [112, 142].forEach((x) => { rect(g, x, 164, 3, 12, '#6b4a2a'); rect(g, x, 161, 3, 3, t % 2 < 1.6 ? '#ffd84a' : '#ffb000'); });
-    STONES.forEach((s, k) => { ellipse(g, s.x, s.y, 4, 2, '#b8b8c0'); rect(g, s.x - 3, s.y + 2, 7, 1, '#8a8a96'); if (k % 4 === 1) rect(g, s.x + 2, s.y - 1, 1, 1, '#6fa060'); });
-    drawHouse(g, st().house, DOOR.x, DOOR.y, t);
-    rect(g, 16, 78, 64, 37, '#8a5a3a');
-    PLOTS.forEach((pl, i) => {
-      rect(g, pl.x, pl.y, pl.w, pl.h, '#6b4220');
-      for (let j = 2; j < pl.h; j += 3) rect(g, pl.x + 1, pl.y + j, pl.w - 2, 1, '#5a3418');
-      if (selected?.kind === 'plot' && selected.i === i) strokeBox(pl.x - 1, pl.y - 1, pl.w + 2, pl.h + 2, '#00e5ff');
+    // the house lot: a dark lawn with hedges on both sides of the house
+    drawFloor(q, 0, 30, GW, 56, 'lawn', 3);
+    q.fillStyle = 'rgba(8,4,24,0.45)';
+    q.fillRect(0, 30, GW, 56);
+    for (let x = 0; x < GW; x += 7) { disc(q, x + 3, 33 + (x % 14 ? 1 : 0), 5, x % 14 ? '#163a26' : '#1f4a30'); rect(q, x + 1, 30, 2, 1, '#3a7a4a'); }
+    // zones: wasteland, cleared soil or a floor
+    Object.entries(ZONES).forEach(([zone, rects], zi) => {
+      const z = st().zones[zone];
+      rects.forEach((r, ri) => {
+        drawFloor(q, r.x, r.y, r.w, r.h, z ? z.floor ?? 'soil' : 'waste', zi * 17 + ri);
+        if (!z) {
+          const n = Math.floor((r.w * r.h) / 260);
+          for (let i = 0; i < n; i++) {
+            const k = DEBRIS_KINDS[Math.floor(hash(zi * 31 + ri * 7 + i * 3.1) * DEBRIS_KINDS.length)];
+            drawDebris(q, k, r.x + 6 + hash(i * 1.7 + zi) * (r.w - 12), r.y + 8 + hash(i * 2.3 + zi * 5) * (r.h - 10));
+          }
+        }
+      });
+    });
+    // the flower bed: a stone curb and leafy ground cover, no bare dirt
+    if (clean('plaza')) {
+      ellipse(q, BED.x, BED.y + 1, BED.rx + 3, BED.ry + 3, '#1a1a24');
+      ellipse(q, BED.x, BED.y, BED.rx + 2, BED.ry + 2, '#9a9aa8');
+      for (let k = 0; k < 40; k++) {
+        const a = (k / 40) * 6.28;
+        rect(q, BED.x + Math.round(Math.cos(a) * (BED.rx + 2)), BED.y + Math.round(Math.sin(a) * (BED.ry + 2)), 2, 1, k % 2 ? '#c8c8d4' : '#6a6a78');
+      }
+      ellipse(q, BED.x, BED.y, BED.rx, BED.ry, '#173f24');
+      for (let i = 0; i < 260; i++) {
+        const a = hash(i) * 6.28;
+        const rr = Math.sqrt(hash(i + 70));
+        const x = BED.x + Math.round(Math.cos(a) * rr * (BED.rx - 2));
+        const y = BED.y + Math.round(Math.sin(a) * rr * (BED.ry - 2));
+        rect(q, x, y, 2, 1, i % 3 ? '#2a6a38' : '#3f8a48');
+        if (i % 7 === 0) rect(q, x, y - 1, 1, 1, '#7fd86a');
+      }
+    }
+    // the stone road from the gate to the door, and around the bed
+    const road = clean('path') ? [...STONES, ...(clean('plaza') ? RING : [])] : STONES.filter((_, k) => k % 3 === 0);
+    road.forEach((s, k) => {
+      ellipse(q, s.x, s.y + 1, 4, 2, '#20202a');
+      ellipse(q, s.x, s.y, 4, 2, clean('path') ? '#a8a8b8' : '#6a6070');
+      rect(q, s.x - 2, s.y - 1, 3, 1, clean('path') ? '#d8d8e4' : '#8a8090');
+      if (!clean('path')) rect(q, s.x - 1, s.y, 3, 1, '#2a2028');
+      else if (k % 4 === 1) rect(q, s.x + 3, s.y + 1, 1, 1, '#5aa850');
+    });
+    if (clean('southeast')) {   // the play corner: a dog house and a sandbox
+      rect(q, 214, 180, 18, 14, '#7a3a2a'); rect(q, 212, 177, 22, 4, '#3a2a4a'); rect(q, 219, 185, 8, 9, '#140a10');
+      rect(q, 212, 177, 22, 1, '#ff4fd8');
+      rect(q, 158, 182, 26, 14, '#5a4030'); rect(q, 160, 184, 22, 10, '#e8d4a0'); rect(q, 168, 186, 4, 3, '#ff3b6b');
+    }
+    // the fence, lit with neon caps, and the gate
+    for (let y = 30; y < GH; y += 8) [2, 251].forEach((x) => { rect(q, x, y, 3, 6, '#3a2a4a'); rect(q, x, y, 3, 1, '#00e5ff'); });
+    rect(q, 3, 30, 1, GH - 30, '#5a4a6a'); rect(q, 252, 30, 1, GH - 30, '#5a4a6a');
+    for (let x = 4; x < 252; x += 8) if (x < 112 || x > 142) { rect(q, x, 200, 3, 8, '#3a2a4a'); rect(q, x, 200, 3, 1, '#ff4fd8'); }
+    rect(q, 4, 203, 108, 1, '#5a4a6a'); rect(q, 144, 203, 108, 1, '#5a4a6a');
+    ground = c;
+  }
+
+  function drawGarden(t) {
+    const key = JSON.stringify([st().zones, st().house]);
+    if (key !== groundKey || !ground) { groundKey = key; buildGround(); }
+    g.drawImage(ground, 0, 0);
+    for (let i = 0; i < 24; i++) if ((t * 0.7 + hash(i) * 5) % 5 < 2.5) rect(g, Math.floor(hash(i + 3) * GW), Math.floor(hash(i + 8) * 18), 1, 1, '#ffffff');  // stars
+    disc(g, 230, 10, 5, '#fff4c8'); disc(g, 232, 9, 4, '#1a0f3a');  // moon
+    Object.entries(st().zones).forEach(([zone, z]) => {  // neon tiles pulse
+      if (z.floor !== 'neon') return;
+      const a = 0.35 + Math.sin(t * 2 + zone.length) * 0.25;
+      ZONES[zone].forEach((r) => {
+        for (let x = r.x; x < r.x + r.w; x += 8) rect(g, x, r.y, 1, r.h, `rgba(0,229,255,${a})`);
+        for (let y = r.y; y < r.y + r.h; y += 8) rect(g, r.x, y, r.w, 1, `rgba(255,79,216,${a * 0.8})`);
+      });
     });
     if (st().pool) drawPool(g, POOL.x, POOL.y, POOL.w, POOL.h, t);
+    if (selected?.kind === 'zone') ZONES[selected.id].forEach((r) => strokeBox(r.x, r.y, r.w, r.h, t % 1 < 0.6 ? '#00e5ff' : '#ff4fd8'));
 
-    // everything standing on the ground, back to front
     const items = [];
-    st().flowers.forEach((f, i) => f && items.push({ y: PLOTS[i].y + 9, draw: () => drawFlower(g, f.type, PLOTS[i].x + 7, PLOTS[i].y + 9, stage(f), t, i) }));
+    items.push({ y: DOOR.y, draw: () => drawHouse(g, st().house, DOOR.x, DOOR.y, t) });
+    st().trees.forEach((tr, i) => { if (tr && tr.type === 'sakura' && stage(tr) === 3) for (let k = 0; k < 26; k++) rect(g, SPOTS[i].x - 14 + hash(k) * 28, SPOTS[i].y - 4 + hash(k + 40) * 9, 1, 1, k % 3 ? '#ffb4d4' : '#ffe4ef'); });
+    st().flowers.forEach((f, i) => {
+      const s = FLOWERS[i];
+      if (f) items.push({ y: s.y, draw: () => drawFlower(g, f.type, s.x, s.y, stage(f), t, i) });
+      else if (clean('plaza') && t % 1.6 < 0.8) { rect(g, s.x - 1, s.y - 3, 3, 1, '#00e5ff'); rect(g, s.x, s.y - 4, 1, 3, '#00e5ff'); }
+      if (selected?.kind === 'flower' && selected.i === i) strokeBox(s.x - 10, s.y - 16, 20, 18, '#00e5ff');
+    });
     SPOTS.forEach((s, i) => {
       const tr = st().trees[i];
+      const zone = i < 2 ? 'west' : 'east';
       items.push({
         y: s.y,
         draw: () => {
-          if (tr) drawTree(g, tr.type, s.x, s.y, stage(tr), t, i, stage(tr) === 3 && treeReady(tr));
-          else { ellipse(g, s.x, s.y - 1, 5, 2, '#6b4220'); if (t % 1.6 < 0.8) { rect(g, s.x - 1, s.y - 2, 3, 1, '#00e5ff'); rect(g, s.x, s.y - 3, 1, 3, '#00e5ff'); } }
-          if (selected?.kind === 'tree' && selected.i === i) strokeBox(s.x - 8, s.y - 30, 16, 32, '#00e5ff');
+          if (clean(zone)) { ellipse(g, s.x, s.y, 7, 3, '#20202a'); ellipse(g, s.x, s.y - 1, 6, 2, '#5a4030'); }
+          if (tr) {
+            const sg = stage(tr);
+            drawTree(g, tr.type, s.x, s.y, sg, t, i, sg === 3 && treeReady(tr));
+            if (sg === 3 && tr.type !== 'sakura') {  // bees build a hive over the first day after it is grown
+              const level = Math.min(1, (t0() - grownAt(tr)) / 86400);
+              drawHive(g, s.x - 8, s.y - 20, level);
+            }
+          } else if (clean(zone) && t % 1.6 < 0.8) { rect(g, s.x - 1, s.y - 3, 3, 1, '#00e5ff'); rect(g, s.x, s.y - 4, 1, 3, '#00e5ff'); }
+          if (selected?.kind === 'tree' && selected.i === i) strokeBox(s.x - 16, s.y - 46, 32, 48, '#00e5ff');
         },
       });
     });
     pets.forEach((p) => items.push({
       y: p.y,
       draw: () => {
-        const flying = p.type === 'parrot' && (p.pose === 'fly' || p.y < LAWN.y0 || p.pose === 'perch');
-        if (!flying && p.pose !== 'swim') ellipse(g, p.x, p.y, Math.ceil(PET_SIZE[p.type][0] / 3), 1, 'rgba(0,0,0,0.2)');
+        const flying = p.type === 'parrot' && (p.pose === 'fly' || p.pose === 'perch');
+        if (!flying && p.pose !== 'swim') ellipse(g, p.x, p.y, Math.ceil(PET_SIZE[p.type][0] / 3), 1, 'rgba(0,0,0,0.3)');
         drawPet(g, p.type, p.x, p.y, { dir: p.dir, pose: p.pose, moving: p.moving, dead: p.status === 'dead', emote: p.emote }, t + p.phase);
         if (selected?.kind === 'pet' && selected.id === p.id) icon(g, 'star', p.x - 2, p.y + 2);
       },
     }));
+    LAMPS.forEach((l, i) => items.push({
+      y: l.y,
+      draw: () => {
+        if (!clean('path')) return;
+        rect(g, l.x, l.y - 12, 1, 12, '#2a2a3a'); rect(g, l.x - 1, l.y - 1, 3, 1, '#1a1a24');
+        rect(g, l.x - 1, l.y - 15, 3, 3, i % 2 ? '#ff4fd8' : '#00e5ff');
+        glow(g, l.x, l.y - 13, 14, i % 2 ? '255,79,216' : '0,229,255', 0.3 + Math.sin(t * 3 + i) * 0.05);
+      },
+    }));
     items.sort((a, b) => a.y - b.y).forEach((it) => it.draw());
 
-    for (let i = 0; i < 3; i++) {               // butterflies
+    // little life on top: falling sakura petals and maple leaves, bees, butterflies, fireflies, birds
+    st().trees.forEach((tr, i) => {
+      if (!tr || stage(tr) < 3) return;
+      const s = SPOTS[i];
+      if (tr.type === 'sakura') {
+        for (let k = 0; k < 14; k++) {
+          const p = (t * 0.12 + hash(k + i * 9)) % 1;
+          rect(g, s.x - 14 + hash(k) * 26 + p * 14 + Math.sin(t * 2 + k) * 2, s.y - 34 + p * 36, k % 4 ? 1 : 2, 1, k % 3 ? '#ffb4d4' : '#fff0f6');
+        }
+      } else if (tr.type === 'maple') {
+        for (let k = 0; k < 3; k++) { const p = (t * 0.08 + hash(k + 5)) % 1; rect(g, s.x - 10 + hash(k) * 20 + Math.sin(t + k) * 3, s.y - 30 + p * 32, 2, 1, '#ec7228'); }
+      }
+      if (tr.type !== 'sakura') {
+        const level = Math.min(1, (t0() - grownAt(tr)) / 86400);
+        const hive = { x: s.x - 8, y: s.y - 14 };
+        const flowers = bloomed();
+        for (let k = 0; k < 2 + Math.round(level * 4); k++) {
+          let b;
+          if (flowers.length && k % 2 && level > 0.3) {
+            const f = flowers[(k + i) % flowers.length];
+            const p = (t * 0.08 + k * 0.29) % 1;
+            const leg = p < 0.4 ? p / 0.4 : p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4;
+            b = { x: hive.x + (f.x - hive.x) * leg + Math.sin(t * 9 + k) * 2, y: hive.y + (f.y - 10 - hive.y) * leg + Math.cos(t * 7 + k) * 2 };
+          } else b = { x: hive.x + Math.cos(t * 3 + k * 1.7) * (5 + k), y: hive.y + Math.sin(t * 4 + k) * 4 };
+          drawBee(g, b.x, b.y, t, k);
+        }
+      }
+    });
+    for (let i = 0; i < 3; i++) {
       const b = butterflyAt(t, i);
       const c = ['#ffd84a', '#ff9fd8', '#9fe8ff'][i];
       const f = Math.floor(t * 10 + i) % 2;
       rect(g, b.x - (f ? 2 : 1), b.y, f ? 2 : 1, 2, c); rect(g, b.x + 1, b.y, f ? 2 : 1, 2, c); rect(g, b.x, b.y, 1, 2, '#333');
     }
-    st().trees.forEach((tr, i) => {             // sakura petals
-      if (!tr || tr.type !== 'sakura' || stage(tr) < 3) return;
-      for (let k = 0; k < 10; k++) {
-        const px = SPOTS[i].x - 14 + ((t * 6 + k * 13) % 40) + Math.sin(t * 2 + k) * 2;
-        const py = SPOTS[i].y - 30 + ((t * 9 + k * 17) % 36);
-        rect(g, px, py, 1, 1, k % 2 ? '#ffb7d5' : '#ffe4ef');
-      }
-    });
+    for (let i = 0; i < 8; i++) {
+      const fx = 20 + hash(i) * 216 + Math.sin(t * 0.5 + i) * 10;
+      const fy = 100 + hash(i + 4) * 96 + Math.cos(t * 0.7 + i) * 6;
+      if ((t + i) % 3 < 2) { rect(g, fx, fy, 1, 1, '#d8ff6a'); glow(g, fx, fy, 3, '216,255,106', 0.5); }
+    }
+    birds.flock.forEach((b) => drawBird(g, b.x, b.y, t, b.i));
+    if (birds.perch) drawBird(g, birds.perch.x, birds.perch.y, t, 9, birds.perch.landed);
   }
 
   function strokeBox(x, y, w, h, c) {
     rect(g, x, y, w, 1, c); rect(g, x, y + h - 1, w, 1, c); rect(g, x, y, 1, h, c); rect(g, x + w - 1, y, 1, h, c);
   }
 
-  // ------------------------------------------------------------- house: grid, furniture, girl
+  // ------------------------------------------------------------- house: grid, walls, furniture, pets inside
 
   const grid = () => cat(st().house).grid;
+  const walls = () => cat(st().house).walls;
   const layout = () => st().layouts[st().house] ?? [];
   const size = (item, rot) => { const [w, h] = cat(item).size; return rot % 2 ? [h, w] : [w, h]; };
+
+  function crossesWall(x, y, w, h) {
+    return walls().some(([kind, at, a0, a1]) => (kind === 'v'
+      ? x < at && at < x + w && y < a1 && a0 < y + h
+      : y < at && at < y + h && x < a1 && a0 < x + w));
+  }
 
   function fits(item, x, y, rot, skip) {
     const [gw, gh] = grid();
     const [w, h] = size(item, rot);
-    if (x < 0 || y < 0 || x + w > gw || y + h > gh) return false;
+    if (x < 0 || y < 0 || x + w > gw || y + h > gh || crossesWall(x, y, w, h)) return false;
     return layout().every((f) => {
       if (f.id === skip || (f.item === 'rug') !== (item === 'rug')) return true;
       const [fw, fh] = size(f.item, f.rot);
@@ -323,7 +497,16 @@ export function initHome(ctx) {
     return b;
   }
 
-  // Shortest walk on free tiles to any of `goals` (BFS); [] if unreachable.
+  // A wall between two neighbouring tiles?
+  function wallBetween(a, b) {
+    return walls().some(([kind, at, a0, a1, doors]) => {
+      if (kind === 'v' && a.y === b.y && Math.max(a.x, b.x) === at && Math.min(a.x, b.x) === at - 1) return a.y >= a0 && a.y < a1 && !doors.includes(a.y);
+      if (kind === 'h' && a.x === b.x && Math.max(a.y, b.y) === at && Math.min(a.y, b.y) === at - 1) return a.x >= a0 && a.x < a1 && !doors.includes(a.x);
+      return false;
+    });
+  }
+
+  // Shortest walk on free tiles to any of `goals` (BFS, through doorways); [] if unreachable.
   function path(from, goals) {
     const [gw, gh] = grid();
     const b = blocked();
@@ -340,7 +523,7 @@ export function initHome(ctx) {
       }
       [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
         const n = { x: c.x + dx, y: c.y + dy };
-        if (n.x >= 0 && n.y >= 0 && n.x < gw && n.y < gh && !b[n.x][n.y] && !prev.has(key(n))) { prev.set(key(n), key(c)); queue.push(n); }
+        if (n.x >= 0 && n.y >= 0 && n.x < gw && n.y < gh && !b[n.x][n.y] && !prev.has(key(n)) && !wallBetween(c, n)) { prev.set(key(n), key(c)); queue.push(n); }
       });
     }
     return [];
@@ -359,145 +542,262 @@ export function initHome(ctx) {
     return out.filter((p) => p.x >= 0 && p.y >= 0 && p.x < gw && p.y < gh && !b[p.x][p.y]).sort((a, c) => c.y - a.y);
   }
 
-  // What she does with each piece of furniture.
+  // What pets do with furniture: [kind of action, gets on top, what the status line says]
   const ACTS = {
-    bed: ['sleep', 'is sleeping', 'z', 9, 15, true], double_bed: ['sleep', 'is sleeping', 'z', 9, 15, true],
-    sofa: ['sit', 'is relaxing on the sofa', 'note', 5, 9, true], armchair: ['sit', 'is sitting in the armchair', 'heart', 5, 8, true],
-    chair: ['sit', 'is sitting down', null, 4, 6, true], office_chair: ['sit', 'is spinning in the chair', 'star', 4, 6, true],
-    bean_bag: ['sit', 'sank into the bean bag', 'heart', 5, 9, true], bookshelf: ['read', 'is reading a book', 'star', 6, 10],
-    desk: ['read', 'is studying', 'bang', 5, 8], fish_tank: ['stand', 'is watching the fish', 'heart', 5, 8],
-    piano: ['sit', 'is playing the piano', 'note', 6, 10], guitar: ['stand', 'is strumming the guitar', 'note', 5, 8],
-    record_player: ['dance', 'is dancing to a record', 'note', 6, 10], tv: ['sit', 'is watching TV', 'star', 6, 11],
-    console: ['play', 'is playing video games', 'star', 6, 11], arcade: ['play', 'is playing the arcade', 'star', 5, 9],
-    computer: ['play', 'is chatting online', 'heart', 5, 9], stove: ['cook', 'is cooking', 'steam', 5, 8],
-    counter: ['cook', 'is making a snack', 'steam', 4, 7], fridge: ['stand', 'is looking for snacks', 'heart', 3, 5],
-    sink: ['cook', 'is washing dishes', 'drop', 4, 6], bathtub: ['sit', 'is taking a bubble bath', 'drop', 7, 11, true],
-    plant_pot: ['water', 'is watering the plant', 'drop', 3, 5], big_plant: ['water', 'is watering the plant', 'drop', 3, 5],
-    vase: ['water', 'is arranging flowers', 'heart', 3, 5], telescope: ['stand', 'is stargazing', 'star', 5, 8],
-    easel: ['stand', 'is painting', 'star', 6, 10], fireplace: ['sit', 'is warming up by the fire', 'heart', 5, 9],
-    dresser: ['stand', 'is trying on outfits', 'star', 3, 4], wardrobe: ['stand', 'is changing clothes', 'star', 3, 4],
-    clock: ['stand', 'is checking the time', 'bang', 2, 3], cat_bed: ['stand', 'is fluffing the cat bed', 'heart', 3, 4],
-    dining_table: ['sit', 'is having a meal', 'heart', 5, 8],
+    bed: ['rest', true, 'is napping on the bed'], double_bed: ['rest', true, 'is sprawled across the big bed'],
+    sofa: ['rest', true, 'is curled up on the sofa'], armchair: ['rest', true, 'has taken the armchair'],
+    bean_bag: ['rest', true, 'sank into the bean bag'], cat_bed: ['rest', true, 'is asleep in the pet bed'],
+    chair: ['watch', true, 'is sitting on a chair'], office_chair: ['play', true, 'is spinning on the office chair'],
+    rug: ['rest', true, 'is rolling on the rug'], fireplace: ['rest', false, 'is warming up by the fire'],
+    tv: ['watch', false, 'is watching TV'], fish_tank: ['watch', false, 'is staring at the fish'],
+    console: ['watch', false, 'is watching the game console'], arcade: ['watch', false, 'is watching the arcade lights'],
+    telescope: ['watch', false, 'is looking at the stars'], clock: ['watch', false, 'is watching the pendulum'],
+    computer: ['play', true, 'is sitting on the keyboard'], piano: ['play', true, 'is walking on the piano keys'],
+    guitar: ['play', false, 'is plucking the guitar'], record_player: ['play', false, 'is dancing to a record'],
+    easel: ['play', false, 'is painting with its paws'],
+    fridge: ['beg', false, 'is begging at the fridge'], stove: ['beg', false, 'smells something cooking'],
+    counter: ['beg', false, 'is looking for snacks'], dining_table: ['beg', false, 'is begging at the table'],
+    sink: ['drink', false, 'is drinking from the sink'], toilet: ['drink', false, 'is drinking from the toilet (ew)'],
+    bathtub: ['drink', true, 'is splashing in the bathtub'],
+    plant_pot: ['sniff', false, 'is sniffing the plant'], big_plant: ['sniff', false, 'is hiding behind the big plant'],
+    vase: ['sniff', false, 'is about to knock over the vase'],
+    wardrobe: ['hide', false, 'is hiding in the wardrobe'], dresser: ['hide', true, 'is sitting on the dresser'],
+    bookshelf: ['hide', false, 'is napping by the books'], desk: ['hide', true, 'is lying on the desk'],
+    coffee_table: ['watch', true, 'is sitting on the coffee table'], floor_lamp: ['watch', false, 'is chasing the lamp light'],
   };
-  const tileXY = (x, y) => ({ px: 8 + x * TILE + TILE / 2, py: 22 + y * TILE + TILE - 2 });
+  const POSES = {  // action -> pose per species
+    rest: { dog: 'sleep', cat: 'sleep', parrot: 'perch', turtle: 'hide', lizard: 'bask', lion: 'sleep' },
+    watch: { dog: 'sit', cat: 'sit', parrot: 'perch', turtle: 'idle', lizard: 'idle', lion: 'lie' },
+    play: { dog: 'bark', cat: 'groom', parrot: 'sing', turtle: 'idle', lizard: 'pushup', lion: 'roar' },
+    beg: { dog: 'sit', cat: 'sit', parrot: 'sing', turtle: 'eat', lizard: 'idle', lion: 'idle' },
+    drink: { dog: 'drink', cat: 'sit', parrot: 'preen', turtle: 'swim', lizard: 'idle', lion: 'lie' },
+    sniff: { dog: 'sniff', cat: 'stalk', parrot: 'perch', turtle: 'eat', lizard: 'idle', lion: 'idle' },
+    hide: { dog: 'sit', cat: 'sleep', parrot: 'perch', turtle: 'hide', lizard: 'bask', lion: 'lie' },
+  };
+  const EMOTES = { rest: 'z', watch: 'star', play: 'note', beg: 'food', drink: 'drop', sniff: 'heart', hide: 'bang' };
 
-  function girlNext(t) {
-    girl.on = null;
-    girl.act = null;
+  function petNext(p, t) {
+    p.on = null;
+    p.act = null;
     const usable = layout().filter((f) => ACTS[f.item]);
-    if (usable.length && Math.random() < 0.72) {
+    const here = { x: Math.round(p.x), y: Math.round(p.y) };
+    if (usable.length && Math.random() < 0.7) {
       const f = pick(usable);
-      const steps = path({ x: Math.round(girl.x), y: Math.round(girl.y) }, besideTiles(f));
-      if (steps.length || besideTiles(f).some((p) => p.x === Math.round(girl.x) && p.y === Math.round(girl.y))) {
-        girl.path = steps;
-        girl.act = f;
-        girl.label = 'is walking over';
+      const goals = besideTiles(f);
+      const steps = path(here, goals);
+      if (steps.length || goals.some((q) => q.x === here.x && q.y === here.y)) {
+        Object.assign(p, { path: steps, act: f, label: 'is walking over' });
         return;
       }
     }
-    const r = Math.random();
     const [gw, gh] = grid();
-    if (r < 0.5) {
-      girl.path = path({ x: Math.round(girl.x), y: Math.round(girl.y) }, [{ x: Math.floor(rand(0, gw)), y: Math.floor(rand(0, gh)) }]);
-      girl.label = 'is wandering around';
+    if (Math.random() < 0.55) {
+      p.path = path(here, [{ x: Math.floor(rand(0, gw)), y: Math.floor(rand(0, gh)) }]);
+      p.label = 'is exploring the house';
     } else {
-      const [pose, label, emote] = pick([['yawn', 'yawns', 'z'], ['dance', 'is dancing', 'note'], ['cheer', 'stretches', 'star'], ['stand', 'is daydreaming', 'heart']]);
-      Object.assign(girl, { pose, label, emote, until: t + rand(2, 4) });
+      const [pose, label, emote] = pick([['sit', 'is resting', null], ['idle', 'is looking around', null], [POSES.play[p.type], 'is playing', 'note'], [POSES.rest[p.type], 'is dozing', 'z']]);
+      Object.assign(p, { pose, label, emote, until: t + rand(2, 4) });
     }
   }
 
-  function girlArrive(t) {
-    const f = girl.act;
-    const [pose, label, emote, lo, hi, on] = ACTS[f.item];
-    Object.assign(girl, { pose, label, emote, until: t + rand(lo, hi), dir: on ? 'down' : f.y + size(f.item, f.rot)[1] <= girl.y ? 'up' : 'down' });
-    if (on) girl.on = f;
-    if (f.item === 'dresser' || f.item === 'wardrobe') girl.outfit = pick(OUTFITS.filter((o) => o !== girl.outfit));
+  function petArrive(p, t) {
+    const f = p.act;
+    const [kind, on, label] = ACTS[f.item];
+    Object.assign(p, { pose: POSES[kind][p.type], label, emote: EMOTES[kind], until: t + rand(5, 11) });
+    if (on) p.on = f;
+    const [w] = size(f.item, f.rot);
+    p.dir = f.x + w / 2 > p.x ? 1 : -1;
+    if (kind === 'play' && p.type === 'lion') shake = t + 0.4;
   }
 
-  function thinkGirl(t, dt) {
-    if (girl.petted) { girl.pose = 'pat'; girl.emote = 'heart'; girl.label = 'is being patted'; return; }
-    if (girl.path.length) {
-      const n = girl.path[0];
-      const dx = n.x - girl.x;
-      const dy = n.y - girl.y;
+  function thinkInside(p, t, dt) {
+    if (p.status === 'dead') return;
+    if (p.petted) { Object.assign(p, { pose: POSES.watch[p.type], emote: 'heart', label: 'is being petted' }); return; }
+    if (p.path.length) {
+      const n = p.path[0];
+      const dx = n.x - p.x;
+      const dy = n.y - p.y;
       const d = Math.hypot(dx, dy);
-      const step = 3 * dt;
-      girl.pose = 'walk';
-      girl.emote = null;
-      girl.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-      if (d <= step) { girl.x = n.x; girl.y = n.y; girl.path.shift(); } else { girl.x += (dx / d) * step; girl.y += (dy / d) * step; }
-      if (!girl.path.length) {
-        if (girl.act) girlArrive(t);
-        else if (girl.called) { Object.assign(girl, { pose: 'wave', emote: 'heart', label: 'came when you called', until: t + 2, called: false }); }
-        else Object.assign(girl, { pose: 'stand', until: t + rand(1, 3) });
+      const step = (p.status === 'hungry' ? 1.5 : 3) * dt;
+      Object.assign(p, { pose: p.type === 'parrot' ? 'fly' : 'walk', moving: true, emote: null });
+      if (Math.abs(dx) > 0.01) p.dir = Math.sign(dx);
+      if (d <= step) { p.x = n.x; p.y = n.y; p.path.shift(); } else { p.x += (dx / d) * step; p.y += (dy / d) * step; }
+      if (!p.path.length) {
+        p.moving = false;
+        if (p.act) petArrive(p, t);
+        else if (p.called) Object.assign(p, { pose: POSES.watch[p.type], emote: 'heart', label: 'came when you called', until: t + 2.5, called: false });
+        else Object.assign(p, { pose: 'idle', until: t + rand(1, 3) });
       }
       return;
     }
-    if (girl.act && t >= girl.until) girl.act = null;
-    if (t >= girl.until) girlNext(t);
+    p.moving = false;
+    if (p.status === 'hungry' && Math.floor(t) % 7 === 0) p.emote = 'food';
+    if (t >= p.until) petNext(p, t);
   }
 
-  function girlPixel() {
-    if (girl.on) {
-      const [w, h] = size(girl.on.item, girl.on.rot);
-      const px = 8 + girl.on.x * TILE + (w * TILE) / 2;
-      const top = 22 + girl.on.y * TILE;
-      return { px, py: girl.on.item.includes('bed') ? top + 16 : top + h * TILE - 2 };
+  function petPixel(p) {
+    if (p.on) {
+      const [w, h] = size(p.on.item, p.on.rot);
+      const [x, y] = tileOrigin(p.on.x, p.on.y);
+      return { px: x + (w * TILE) / 2, py: p.on.item.includes('bed') ? y + 26 : y + h * TILE - 4 };
     }
-    return tileXY(girl.x, girl.y);
+    const [x, y] = tileOrigin(p.x, p.y);
+    return { px: x + TILE / 2, py: Math.min(y + TILE - 3, ROOM.wall + grid()[1] * TILE - 3) };
+  }
+
+  function placePets() {
+    const [gw, gh] = grid();
+    const b = blocked();
+    const free = [];
+    for (let y = gh - 1; y >= 0; y--) for (let x = 0; x < gw; x++) if (!b[x][y]) free.push({ x, y });
+    [...inside.values()].forEach((p, i) => {
+      const spot = free[Math.min(free.length - 1, Math.floor(free.length / 2) + i * 2)] ?? { x: 0, y: 0 };
+      Object.assign(p, { x: spot.x, y: spot.y, path: [], act: null, on: null, until: 0 });
+    });
   }
 
   function drawItem(item, gx, gy, rot, t, use, alpha = 1) {
     const [w, h] = cat(item).size;
     const scratch = drawItem.c ?? (drawItem.c = document.createElement('canvas'));
-    scratch.width = w * TILE;
-    scratch.height = h * TILE;
+    scratch.width = w * TILE + 2;
+    scratch.height = h * TILE + 2;
     const sg = scratch.getContext('2d');
-    drawFurniture(sg, item, w * TILE, h * TILE, t, use);
+    sg.translate(1, 1);
+    drawFurniture(sg, item, w * TILE, h * TILE, t, use, item === 'fish_tank' ? { fish: tankFish() } : {});
     const [fw, fh] = size(item, rot);
+    const [ox, oy] = tileOrigin(gx, gy);
     g.save();
     g.globalAlpha = alpha;
-    g.translate(8 + gx * TILE + (fw * TILE) / 2, 22 + gy * TILE + (fh * TILE) / 2);
+    g.translate(ox + (fw * TILE) / 2, oy + (fh * TILE) / 2);
     g.rotate((rot * Math.PI) / 2);
-    g.drawImage(scratch, (-w * TILE) / 2, (-h * TILE) / 2);
+    g.drawImage(scratch, (-w * TILE) / 2 - 1, (-h * TILE) / 2 - 1);
     g.restore();
   }
+  const tankFish = () => st().aquatic.filter((a) => cat(a.type).kind === 'fish').map((a) => a.type);
 
   function drawHouseView(t) {
     const [gw, gh] = grid();
     drawRoom(g, st().house, gw, gh, t, editing);
-    const look = LOOKS[ctx.theme()] ?? LOOKS.neon;
-    const items = layout().filter((f) => f.item === 'rug');
-    items.forEach((f) => drawItem(f.item, f.x, f.y, f.rot, t, false));
+    layout().filter((f) => f.item === 'rug').forEach((f) => drawItem(f.item, f.x, f.y, f.rot, t, false));
+    const using = new Set([...inside.values()].filter((p) => p.act && !p.path.length).map((p) => p.act.id));
     const stand = layout().filter((f) => f.item !== 'rug').map((f) => ({
-      y: f.y + size(f.item, f.rot)[1],
+      key: f.y + size(f.item, f.rot)[1],
       draw: () => {
-        drawItem(f.item, f.x, f.y, f.rot, t, girl.act === f && !girl.path.length, holding?.id === f.id ? 0.35 : 1);
+        drawItem(f.item, f.x, f.y, f.rot, t, using.has(f.id), holding?.id === f.id ? 0.35 : 1);
         if (editing && selected === f.id) {
           const [w, h] = size(f.item, f.rot);
-          strokeBox(8 + f.x * TILE, 22 + f.y * TILE, w * TILE, h * TILE, '#00e5ff');
+          const [x, y] = tileOrigin(f.x, f.y);
+          strokeBox(x, y, w * TILE, h * TILE, '#00e5ff');
         }
       },
     }));
-    const { px, py } = girlPixel();
-    stand.push({
-      y: girl.on ? girl.on.y + size(girl.on.item, girl.on.rot)[1] + 0.1 : girl.y + 1,
-      draw: () => {
-        const sleeping = girl.pose === 'sleep';
-        drawChibi(g, look, px, py, girl.pose, girl.dir, t, girl.outfit);
-        if (sleeping) rect(g, px - 7, py - 8, 15, 8, '#4f7fd8');
-        if (girl.on?.item === 'bathtub') rect(g, px - 7, py - 7, 15, 6, '#8fd8ff');
-        if (girl.emote && t % 2 < 1.4) icon(g, girl.emote, px - 2, py - 30 - (sleeping ? -8 : 0) - Math.round((t * 3) % 3));
-      },
+    stand.push(...wallPieces(g, st().house, walls()));
+    inside.forEach((p) => {
+      const { px, py } = petPixel(p);
+      stand.push({
+        key: (p.on ? p.on.y + size(p.on.item, p.on.rot)[1] : p.y + 1) + 0.1,
+        draw: () => {
+          if (p.status === 'dead') return;
+          if (!p.on) ellipse(g, px, py, Math.ceil(PET_SIZE[p.type][0] / 3), 1, 'rgba(0,0,0,0.3)');
+          drawPet(g, p.type, px, py, { dir: p.dir, pose: p.pose, moving: p.moving, emote: t % 2 < 1.4 ? p.emote : null }, t + p.phase);
+          if (p.on?.item === 'bathtub') rect(g, px - 8, py - 5, 16, 4, '#8fd8ff');
+        },
+      });
     });
-    stand.sort((a, b) => a.y - b.y).forEach((it) => it.draw());
+    stand.sort((a, b) => a.key - b.key).forEach((it) => it.draw());
     if (editing && holding && hoverTile) {
       const ok = fits(holding.item, hoverTile.x, hoverTile.y, holding.rot, holding.id);
       drawItem(holding.item, hoverTile.x, hoverTile.y, holding.rot, t, false, 0.7);
       const [w, h] = size(holding.item, holding.rot);
+      const [x, y] = tileOrigin(hoverTile.x, hoverTile.y);
       g.fillStyle = ok ? 'rgba(0,255,159,0.25)' : 'rgba(255,42,109,0.35)';
-      g.fillRect(8 + hoverTile.x * TILE, 22 + hoverTile.y * TILE, w * TILE, h * TILE);
+      g.fillRect(x, y, w * TILE, h * TILE);
     }
+  }
+
+  // ------------------------------------------------------------- aquarium
+
+  const REGION = {  // where each kind swims: [x0, x1, y0, y1], speed
+    starfish: [[8, 248, AQ.sand - 3, AQ.sand + 2], 2], seahorse: [[30, 50, 90, 140], 3], eel: [[200, 230, AQ.sand - 8, AQ.sand - 4], 4],
+    octopus: [[150, 200, AQ.sand - 10, AQ.sand - 6], 4], jellyfish: [[20, 236, 40, 120], 4], whale: [[50, 200, 60, 110], 9],
+    shark: [[30, 226, 40, 120], 16], manta: [[30, 226, 50, 120], 10], sea_turtle: [[20, 236, 40, 130], 8],
+    lionfish: [[60, 200, 110, 140], 6],
+  };
+  function syncSwimmers() {
+    const ids = new Set(st().aquatic.map((a) => a.id));
+    for (const id of swimmers.keys()) if (!ids.has(id)) swimmers.delete(id);
+    st().aquatic.forEach((a, i) => {
+      if (swimmers.has(a.id)) return;
+      const ice = cat(a.type).kind === 'ice';
+      swimmers.set(a.id, {
+        id: a.id, type: a.type, kind: cat(a.type).kind, dir: i % 2 ? 1 : -1, until: 0, pose: ice ? 'stand' : 'swim',
+        x: ice ? rand(AQ.ice.x0 + 8, 246) : rand(30, 220), y: ice ? AQ.ice.top : rand(50, 130), target: null, onIce: ice,
+      });
+    });
+  }
+
+  function thinkSwimmer(s, t, dt) {
+    const hungry = data.aqua_hungry ? 0.4 : 1;
+    if (pellets.length && s.kind === 'fish') {
+      const p = pellets.reduce((a, b) => (dist(a, s) < dist(b, s) ? a : b));
+      s.target = { x: p.x, y: p.y };
+      s.speed = 24;
+      if (dist(p, s) < 3) { pellets = pellets.filter((q) => q !== p); s.emote = 'heart'; s.emoteUntil = t + 1.5; }
+    } else if (!s.target || t > s.until) {
+      if (s.kind === 'ice') return thinkIce(s, t);
+      const [[x0, x1, y0, y1], speed] = REGION[s.type] ?? [[10, 246, AQ.surface + 10, AQ.sand - 8], 12];
+      s.target = { x: rand(x0, x1), y: rand(y0, y1) };
+      s.speed = speed;
+      s.until = t + rand(4, 9);
+    }
+    const dx = s.target.x - s.x;
+    const dy = s.target.y - s.y;
+    const d = Math.hypot(dx, dy);
+    const step = s.speed * hungry * dt;
+    if (Math.abs(dx) > 1) s.dir = Math.sign(dx);
+    if (d > step) { s.x += (dx / d) * step; s.y += (dy / d) * step; } else if (s.kind !== 'ice') s.until = Math.min(s.until, t + rand(0.5, 2));
+    if (s.kind === 'ice' && d <= step) arriveIce(s, t);
+  }
+
+  // Penguins and seals: on the ice they waddle, flap, bark and clap; now and then they dive in for a
+  // swim and later climb back out at the edge of the ice.
+  function thinkIce(s, t) {
+    const ice = AQ.ice;
+    s.until = t + rand(3, 7);
+    s.emote = null;
+    if (!s.onIce) {
+      Object.assign(s, { target: { x: ice.x0 - 3, y: ice.base + 4 }, speed: 18, climb: true, until: t + 30 });
+      return;
+    }
+    const r = Math.random();
+    const stay = { x: s.x, y: s.y };
+    if (r < 0.3) Object.assign(s, { target: { x: rand(ice.x0 + 6, 248), y: ice.top }, speed: s.type === 'penguin' ? 8 : 4, pose: s.type === 'penguin' ? 'walk' : 'flop' });
+    else if (r < 0.5) Object.assign(s, { target: stay, pose: { penguin: 'flap', seal: 'stand', sea_dog: 'bark' }[s.type], emote: s.type === 'sea_dog' ? 'note' : null, emoteUntil: t + 2 });
+    else if (r < 0.62 && s.type === 'sea_dog') Object.assign(s, { target: stay, pose: 'clap', emote: 'star', emoteUntil: t + 2 });
+    else if (r < 0.82) Object.assign(s, { target: { x: ice.x0 + 2, y: ice.top }, speed: 10, pose: s.type === 'penguin' ? 'slide' : 'flop', dive: true, until: t + 30 });
+    else Object.assign(s, { target: stay, pose: 'stand' });
+  }
+
+  function arriveIce(s, t) {
+    if (s.dive) {         // splash in
+      Object.assign(s, { dive: false, onIce: false, pose: 'swim', target: { x: rand(30, 200), y: rand(60, 130) }, speed: s.type === 'penguin' ? 26 : 16, until: t + rand(6, 10) });
+    } else if (s.climb) { // hop out
+      Object.assign(s, { climb: false, onIce: true, pose: 'stand', x: AQ.ice.x0 + 4, y: AQ.ice.top, target: null, until: t + 1 });
+    } else if (!s.onIce) s.until = Math.min(s.until, t + rand(1, 3));
+  }
+
+  function drawAquariumView(t) {
+    const dt = drawAquariumView.dt ?? 0;
+    pellets.forEach((p) => { p.y = Math.min(AQ.sand - 2, p.y + 6 * dt); });
+    swimmers.forEach((s) => thinkSwimmer(s, t, dt));
+    drawAquarium(g, t, st().iceland);
+    pellets.forEach((p) => rect(g, p.x, p.y, 1, 1, '#c87a2a'));
+    [...swimmers.values()].sort((a, b) => (a.type === 'whale' ? -1 : b.type === 'whale' ? 1 : 0)).forEach((s) => {
+      const pose = s.onIce ? s.pose : 'swim';
+      drawSea(g, s.type, s.x, s.y, s.dir, t + (s.id.charCodeAt(0) % 7), pose);
+      if (s.emote && t < (s.emoteUntil ?? 0)) icon(g, s.emote, s.x - 2, s.y - 14);
+      else if (data.aqua_hungry && (t + s.x) % 5 < 1) icon(g, 'food', s.x - 2, s.y - 14);
+    });
   }
 
   // ------------------------------------------------------------- loop and input
@@ -509,24 +809,28 @@ export function initHome(ctx) {
     const dt = Math.min(0.1, now() - last);
     last = now();
     if (data) {
+      g.save();
+      if (t < shake) g.translate(Math.round(Math.sin(t * 60) * 2), 0);
       if (view === 'garden') {
         pets.forEach((p) => thinkPet(p, t, dt));
-        g.save();
-        if (t < shake) g.translate(Math.round(Math.sin(t * 60) * 2), 0);
+        thinkBirds(t, dt);
         drawGarden(t);
-        g.restore();
-      } else {
-        thinkGirl(t, dt);
+      } else if (view === 'house') {
+        inside.forEach((p) => thinkInside(p, t, dt));
         drawHouseView(t);
+      } else {
+        drawAquariumView.dt = dt;
+        drawAquariumView(t);
       }
-      if (Math.floor(t) !== frame.sec) { frame.sec = Math.floor(t); if (frame.sec % 5 === 0) renderStatusLine(); }
+      g.restore();
+      if (Math.floor(t) !== frame.sec) { frame.sec = Math.floor(t); if (frame.sec % 3 === 0) renderStatusLine(); }
     }
     requestAnimationFrame(frame);
   }
 
   function fit() {
     if (!data) return;
-    const [w, h] = view === 'garden' ? [GW, GH] : roomSize(...grid());
+    const [w, h] = view === 'garden' ? [GW, GH] : view === 'house' ? roomSize(...grid()) : [AQ.w, AQ.h];
     fitCanvas(canvas, w, h);
   }
   new ResizeObserver(fit).observe(canvas.parentElement);
@@ -537,7 +841,15 @@ export function initHome(ctx) {
       return Math.abs(m.x - p.x) <= w / 2 && m.y <= p.y + 2 && m.y >= p.y - h;
     });
   }
-  const tileAt = (m) => ({ x: Math.floor((m.x - 8) / TILE), y: Math.floor((m.y - 22) / TILE) });
+  function petInsideAt(m) {
+    return [...inside.values()].reverse().find((p) => {
+      if (p.status === 'dead') return false;
+      const { px, py } = petPixel(p);
+      const [w, h] = PET_SIZE[p.type];
+      return Math.abs(m.x - px) <= w / 2 && m.y <= py + 2 && m.y >= py - h;
+    });
+  }
+  const tileAt = (m) => ({ x: Math.floor((m.x - ROOM.side) / TILE), y: Math.floor((m.y - ROOM.wall) / TILE) });
   const furnitureAt = (tile) => [...layout()].reverse().find((f) => {
     const [w, h] = size(f.item, f.rot);
     return tile.x >= f.x && tile.x < f.x + w && tile.y >= f.y && tile.y < f.y + h;
@@ -549,22 +861,27 @@ export function initHome(ctx) {
     if (view === 'garden') {
       hoverPet = petAt(m) ?? null;
       canvas.style.cursor = hoverPet || hitGarden(m) ? 'pointer' : 'default';
-    } else {
+    } else if (view === 'house') {
       hoverTile = tileAt(m);
-      const { px, py } = girlPixel();
-      girl.petted = !editing && Math.abs(m.x - px) < 7 && m.y > py - 24 && m.y < py + 1;
-      canvas.style.cursor = girl.petted ? 'grab' : 'pointer';
+      const p = editing ? null : petInsideAt(m);
+      inside.forEach((q) => { q.petted = q === p; });
+      canvas.style.cursor = p ? 'grab' : 'pointer';
     }
   };
-  canvas.onmouseleave = () => { hoverPet = null; girl.petted = false; hoverTile = null; };
+  canvas.onmouseleave = () => { hoverPet = null; inside.forEach((q) => { q.petted = false; }); hoverTile = null; };
 
   function hitGarden(m) {
-    if (Math.abs(m.x - DOOR.x) < 9 && m.y > DOOR.y - 18 && m.y < DOOR.y + 2) return { kind: 'door' };
-    const plot = PLOTS.findIndex((p) => m.x >= p.x - 1 && m.x <= p.x + p.w && m.y >= p.y - 12 && m.y <= p.y + p.h);
-    if (plot >= 0) return { kind: 'plot', i: plot };
-    const spot = SPOTS.findIndex((s) => Math.abs(m.x - s.x) < 9 && m.y > s.y - 30 && m.y < s.y + 3);
+    const w = HOUSE_W[st().house];
+    if (Math.abs(m.x - DOOR.x) < 9 && m.y > DOOR.y - 22 && m.y < DOOR.y + 2) return { kind: 'door' };
+    if (Math.abs(m.x - DOOR.x) < w / 2 && m.y > 20 && m.y < DOOR.y) return { kind: 'door' };
+    if (clean('plaza')) {
+      const fl = FLOWERS.findIndex((s) => Math.abs(m.x - s.x) <= 9 && m.y >= s.y - 15 && m.y <= s.y + 2);
+      if (fl >= 0) return { kind: 'flower', i: fl };
+    }
+    const spot = SPOTS.findIndex((s, i) => clean(i < 2 ? 'west' : 'east') && Math.abs(m.x - s.x) < 12 && m.y > s.y - 44 && m.y < s.y + 3);
     if (spot >= 0) return { kind: 'tree', i: spot };
-    return null;
+    const zone = Object.keys(ZONES).find((z) => inRects(m, ZONES[z]));
+    return zone ? { kind: 'zone', id: zone } : null;
   }
 
   canvas.onclick = async (e) => {
@@ -577,6 +894,7 @@ export function initHome(ctx) {
       selected = hit;
       return renderSide();
     }
+    if (view === 'aquarium') return;
     const tile = tileAt(m);
     if (editing) {
       if (holding) {
@@ -590,13 +908,18 @@ export function initHome(ctx) {
       selected = furnitureAt(tile)?.id ?? null;
       return renderSide();
     }
-    const { px, py } = girlPixel();
-    if (Math.abs(m.x - px) < 7 && m.y > py - 24 && m.y < py + 1) {
-      Object.assign(girl, { pose: 'jump', emote: 'heart', label: 'is happy to see you', until: t0() + 1.2, path: [], act: null, on: null });
+    const t = t0();
+    const p = petInsideAt(m);
+    if (p) {  // a trick
+      const trick = { dog: ['bark', 'heart'], cat: ['groom', 'heart'], parrot: ['sing', 'note'], turtle: ['hide', 'bang'], lizard: ['pushup', 'star'], lion: ['roar', 'bang'] }[p.type];
+      Object.assign(p, { pose: trick[0], emote: trick[1], label: 'shows off a trick', until: t + 1.6, path: [], act: null, on: null });
+      if (p.type === 'lion') shake = t + 0.5;
       return;
     }
-    const steps = path({ x: Math.round(girl.x), y: Math.round(girl.y) }, [tile]);
-    if (steps.length) Object.assign(girl, { path: steps, act: null, on: null, called: true, label: 'is coming over' });
+    const buddy = inside.get(data.companion) ?? [...inside.values()].find((q) => q.status !== 'dead');
+    if (!buddy) return;
+    const steps = path({ x: Math.round(buddy.x), y: Math.round(buddy.y) }, [tile]);
+    if (steps.length) Object.assign(buddy, { path: steps, act: null, on: null, called: true, label: 'is coming over' });
   };
 
   document.addEventListener('keydown', (e) => {
@@ -620,10 +943,13 @@ export function initHome(ctx) {
     return b;
   }
   const until = (secs) => (secs <= 0 ? 'now' : `in ${ago(secs)}`);
+  const petName = (type) => cat(type).name;
 
   function renderStatusLine() {
     const s = $('home-status');
-    if (s) s.textContent = view === 'house' ? `She ${girl.label}.` : '';
+    if (!s || view !== 'house') return;
+    s.innerHTML = [...inside.values()].filter((p) => p.status !== 'dead').map((p) => `The ${NAMES[p.type]} ${p.label}.`).join('<br>')
+      || 'Nobody lives here yet: pets you adopt move in.';
   }
 
   function renderSide() {
@@ -631,38 +957,62 @@ export function initHome(ctx) {
     side.replaceChildren();
     const s = st();
     side.append(el(`<div class="box-title">WALLET</div><div class="kv"><span>Coins</span><b class="num">🪙 ${Math.floor(data.coins).toLocaleString()}</b></div>`));
+    if (data.locked) side.append(el('<p class="down">The whole home is mortgaged: pay it back in the Store (Mortgage) to change things.</p>'));
     if (view === 'garden') renderGardenSide(s);
-    else renderHouseSide(s);
+    else if (view === 'house') renderHouseSide(s);
+    else renderAquariumSide(s);
     side.append(el('<div class="box-title">RECENT</div>'));
     const log = document.createElement('ul');
     log.className = 'list';
-    log.innerHTML = s.log.slice(-5).reverse().map((l) => `<li><span>${l.text}</span><b class="${l.amount >= 0 ? 'up' : 'down'}">${l.amount >= 0 ? '+' : ''}${l.amount}</b></li>`).join('')
+    log.innerHTML = s.log.slice(-5).reverse().map((l) => `<li><span>${l.text}</span><b class="${l.amount >= 0 ? 'up' : 'down'}">${l.amount ? `${l.amount > 0 ? '+' : ''}${l.amount}` : ''}</b></li>`).join('')
       || '<li class="muted">Nothing yet. Profit from trading becomes coins.</li>';
     side.append(log);
   }
 
+  function renderZone(zone) {
+    const z = st().zones[zone];
+    const c = cat(zone);
+    if (!z) {
+      side.append(el(`<p><b>${c.name}</b> is wasteland: rubble, tires and trash.</p>`));
+      side.append(button(`Clean it up (${c.price} coins)`, () => act('clean', { zone }), 'primary'));
+      return;
+    }
+    side.append(el(`<p><b>${c.name}</b> — ${z.floor ? cat(z.floor).name.toLowerCase() : 'cleared, bare ground'}. Lay a new floor:</p>`));
+    const grid2 = document.createElement('div');
+    grid2.className = 'group wrap';
+    Object.entries(data.catalog).filter(([, i]) => i.kind === 'floor').forEach(([id, i]) => {
+      grid2.append(button(`${i.name} ${i.price}`, () => act('floor', { zone, item: id }), z.floor === id ? 'active' : ''));
+    });
+    side.append(grid2);
+  }
+
   function renderGardenSide(s) {
     side.append(el('<div class="box-title">GARDEN</div>'));
-    if (!selected) side.append(el('<p class="muted">Click a flower plot, a tree spot or a pet. Hover a pet to pet it. Click the front door to go inside.</p>'));
-    if (selected?.kind === 'plot' || selected?.kind === 'tree') {
-      const where = selected.kind === 'plot' ? 'flowers' : 'trees';
+    if (!selected) {
+      const dirty = Object.keys(ZONES).filter((z) => !s.zones[z]).length;
+      side.append(el(`<p class="muted">${dirty ? `${dirty} of 6 parts are still wasteland: click one to clean it up. ` : ''}Click the flower bed, a tree spot, a pet or any part of the garden. Hover a pet to pet it. Click the house to go inside.</p>`));
+    }
+    if (selected?.kind === 'zone') renderZone(selected.id);
+    if (selected?.kind === 'flower' || selected?.kind === 'tree') {
+      const where = selected.kind === 'flower' ? 'flowers' : 'trees';
       const plant = s[where][selected.i];
       if (!plant) {
-        const kind = where === 'flowers' ? 'flower' : 'tree';
+        const kind = selected.kind;
         const seeds = Object.entries(s.inventory).filter(([k, n]) => n > 0 && cat(k).kind === kind);
-        side.append(el(`<p>${where === 'flowers' ? `Flower plot ${selected.i + 1}` : `Tree spot ${selected.i + 1}`} is empty.</p>`));
+        side.append(el(`<p>${where === 'flowers' ? `Flower spot ${selected.i + 1}` : `Tree spot ${selected.i + 1}`} is empty.</p>`));
         seeds.forEach(([k, n]) => side.append(button(`Plant ${cat(k).name} (${n})`, () => act('plant', { where, slot: selected.i, item: k }))));
         if (!seeds.length) side.append(button(`Buy ${kind === 'flower' ? 'seeds' : 'saplings'} in the store`, () => ctx.openStore(kind === 'flower' ? 'Flowers' : 'Trees')));
       } else {
         const c = cat(plant.type);
-        const left = plant.planted + c.hours * 3600 - t0();
+        const left = grownAt(plant) - t0();
         if (left > 0) side.append(el(`<p><b>${c.name}</b> is growing: ${where === 'flowers' ? 'blooms' : 'grows up'} ${until(left)}.</p>`));
         else if (where === 'flowers') {
           side.append(el(`<p><b>${c.name}</b> is in full bloom.</p>`));
           side.append(button(`Pick and sell (+${c.sells} coins)`, () => act('harvest', { where, slot: selected.i }), 'primary'));
         } else {
-          const next = Math.max(plant.harvested ?? 0, plant.planted + c.hours * 3600) + c.every * 3600 - t0();
-          side.append(el(`<p><b>${c.name}</b> is grown. Harvest of ${c.yield} coins every ${c.every} h; next ${until(next)}.</p>`));
+          const next = Math.max(plant.harvested ?? 0, grownAt(plant)) + c.every * 3600 - t0();
+          const hive = plant.type === 'sakura' ? '' : ` Bees are ${t0() - grownAt(plant) < 86400 ? 'building a hive in it' : 'living in their hive'}.`;
+          side.append(el(`<p><b>${c.name}</b> is grown. Harvest of ${c.yield} coins every ${c.every} h; next ${until(next)}.${hive}</p>`));
           if (next <= 0) side.append(button(`Harvest (+${c.yield} coins)`, () => act('harvest', { where, slot: selected.i }), 'primary'));
         }
         side.append(button('Dig up', () => act('dig', { where, slot: selected.i })));
@@ -670,13 +1020,15 @@ export function initHome(ctx) {
     }
     if (selected?.kind === 'pet') {
       const pet = s.pets.find((p) => p.id === selected.id);
-      const b = pets.get(selected.id);
-      if (pet && b) {
+      if (pet) {
         const c = cat(pet.type);
         const mood = { ok: 'happy and fed', hungry: 'HUNGRY', dead: 'has died' }[pet.status];
         side.append(el(`<p><b>${c.name}</b> — ${mood}. Last meal ${ago(t0() - pet.fed)} ago.<br><span class="muted">Hungry after 2 days, dies after 7 days without food.</span></p>`));
         if (pet.status === 'dead') side.append(button('Bury', () => act('bury', { id: pet.id })));
-        else side.append(button(`Feed (${c.meal} coins)`, () => act('feed', { id: pet.id }), 'primary'));
+        else {
+          side.append(button(`Feed (${c.meal} coins)`, () => act('feed', { id: pet.id }), 'primary'));
+          side.append(button(data.companion === pet.id ? 'Your companion next to the chart ✓' : 'Make it my companion next to the chart', () => act('companion', { id: pet.id }), data.companion === pet.id ? 'active' : ''));
+        }
       }
     }
     if (s.pets.length) {
@@ -685,7 +1037,7 @@ export function initHome(ctx) {
       ul.className = 'list';
       s.pets.forEach((p) => {
         const li = document.createElement('li');
-        li.innerHTML = `<span>${cat(p.type).name} <i class="${p.status === 'ok' ? 'up' : 'down'}">${p.status === 'ok' ? 'fed' : p.status}</i></span>`;
+        li.innerHTML = `<span>${petName(p.type)}${p.id === data.companion ? ' ★' : ''} <i class="${p.status === 'ok' ? 'up' : 'down'}">${p.status === 'ok' ? 'fed' : p.status}</i></span>`;
         if (p.status !== 'dead') li.append(button(`Feed ${cat(p.type).meal}`, () => act('feed', { id: p.id })));
         ul.append(li);
       });
@@ -698,17 +1050,17 @@ export function initHome(ctx) {
     if (s.houses.length > 1) {
       const row = document.createElement('div');
       row.className = 'group wrap';
-      s.houses.forEach((h) => row.append(button(cat(h).name, () => act('house', { item: h }).then(() => { fit(); placeGirl(); }), h === s.house ? 'active' : '')));
+      s.houses.forEach((h) => row.append(button(cat(h).name, () => act('house', { item: h }).then(() => { fit(); placePets(); }), h === s.house ? 'active' : '')));
       side.append(row);
     }
     side.append(el('<p id="home-status" class="muted"></p>'));
     side.append(button(editing ? 'Done arranging' : 'Arrange furniture', () => { editing = !editing; holding = null; selected = null; renderSide(); }, editing ? 'active' : 'primary'));
     if (!editing) {
-      side.append(el('<p class="muted">Hover her to pat her, click her to say hi, click the floor to call her over.</p>'));
+      side.append(el('<p class="muted">Your pets live here and use the furniture. Hover a pet to pet it, click it for a trick, click the floor to call your companion.</p>'));
       renderStatusLine();
       return;
     }
-    side.append(el(`<p class="muted">${holding ? `Placing ${cat(holding.item).name}: click a spot, R rotates, Esc cancels.` : 'Pick an item below, or click furniture in the room.'}</p>`));
+    side.append(el(`<p class="muted">${holding ? `Placing ${cat(holding.item).name}: click a spot, R rotates, Esc cancels. Furniture can't cross walls.` : 'Pick an item below, or click furniture in the room.'}</p>`));
     if (holding) side.append(button('Rotate (R)', () => { holding.rot = (holding.rot + 1) % 4; }));
     const sel = layout().find((f) => f.id === selected);
     if (sel && !holding) {
@@ -736,10 +1088,19 @@ export function initHome(ctx) {
     side.append(ul);
   }
 
-  function placeGirl() {
-    const [gw, gh] = grid();
-    const b = blocked();
-    for (let y = gh - 1; y >= 0; y--) for (let x = Math.floor(gw / 2); x < gw; x++) if (!b[x][y]) { Object.assign(girl, { x, y, path: [], act: null, on: null, until: 0 }); return; }
+  function renderAquariumSide(s) {
+    side.append(el(`<div class="box-title">AQUARIUM${s.iceland ? ' + ICE LAND' : ''}</div>`));
+    const counts = {};
+    s.aquatic.forEach((a) => { counts[a.type] = (counts[a.type] ?? 0) + 1; });
+    side.append(el(`<p>${data.aqua_hungry ? '<b class="down">Everyone is hungry.</b>' : 'Everyone is fed.'} Water animals get hungry after 2 days but never die.</p>`));
+    side.append(button(`Feed everyone (${data.aqua_meal} coins)`, async () => {
+      if (await act('feed_aquatic')) pellets = Array.from({ length: 24 }, () => ({ x: rand(20, 236), y: AQ.surface + 2 }));
+    }, 'primary'));
+    const ul = document.createElement('ul');
+    ul.className = 'list';
+    ul.innerHTML = Object.entries(counts).map(([k, n]) => `<li><span>${cat(k).name}</span><b>×${n}</b></li>`).join('') || '<li class="muted">Empty: buy sea life in the store.</li>';
+    side.append(ul);
+    side.append(button('Buy sea life', () => ctx.openStore('Sea life')));
   }
 
   function setView(v) {
@@ -748,7 +1109,7 @@ export function initHome(ctx) {
     editing = false;
     holding = null;
     document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
-    if (v === 'house') placeGirl();
+    if (v === 'house') placePets();
     fit();
     renderSide();
   }
@@ -758,7 +1119,8 @@ export function initHome(ctx) {
     async open(v = 'garden') {
       $('home').hidden = false;
       await refresh();
-      setView(v);
+      if (!data) return;
+      setView(v === 'aquarium' && !st().aquarium ? 'garden' : v);
       if (!running) { running = true; last = now(); requestAnimationFrame(frame); }
     },
     close() { running = false; $('home').hidden = true; },

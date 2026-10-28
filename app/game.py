@@ -4,6 +4,7 @@ import asyncio
 import logging
 import random
 import string
+import time
 import uuid
 from dataclasses import asdict
 
@@ -11,8 +12,8 @@ import httpx
 import numpy as np
 import pandas as pd
 
-from . import agent, home, indicators, orders, saves, stats, universe
-from .account import MAX_CAPITAL, MAX_LEVERAGE, Account, OrderError
+from . import agent, bonus, collection, home, indicators, orders, saves, stats, universe
+from .account import MAX_LEVERAGE, MIN_FEE_PER_SHARE, MIN_FEE_PER_TRADE, Account, OrderError
 from .data import COLS, ET, AuthError, Cache, Day, Prefetcher, Stock
 
 log = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ MAX_STOCKS = 5
 SESSION_DAYS = 7
 PICK_TRIES = 5       # random start days to try before giving up on an empty stock pool
 AI_LOG = 30          # AI decisions kept for the log panel
+REVEAL_SECONDS = 2 * 3600  # the 2-hour range reveal
 
 
 def alias(n):
@@ -123,6 +125,10 @@ class Game:
         self.ai_log = []
         self.ai_mark = 1          # bar of the last AI decision
         self.thinking = False     # an AI decision is in flight: the clock waits
+        self.home = home.new()    # this game's garden, house, coins and collection
+        self.boost = bonus.new_boost()
+        self.trade_count = 0      # trades so far: every bonus.EVERY of them spins the slot machine
+        self.reveals = []         # slot machine reveals shown on the chart (2-hour range, next-day direction)
 
     # ----- state sent to the frontend
 
@@ -199,7 +205,7 @@ class Game:
         s = self.s
         msg = {**self.status(), "type": "snapshot", "feed": self.client and self.client.feed, "speeds": SPEEDS,
                "session": None, "account": self.account_view(), "trades": self.trades_today(),
-               "ai": {**self.agent.public(), "log": self.ai_log}}
+               "ai": {**self.agent.public(), "log": self.ai_log}, "bonus": self.bonus_view()}
         if s:
             msg["session"] = {"day": s.day_no, "last_day": s.day_idx == len(s.days) - 1,
                               "stocks": [st.alias for st in s.stocks.values()], "view": s.stocks[self.view].alias,
@@ -210,6 +216,9 @@ class Game:
             if msg["phase"] == "day_end" and self.days:
                 msg["summary"] = self.days[-1]
         return msg
+
+    def bonus_view(self):
+        return {"boost": self.boost, "next_spin": bonus.EVERY - self.trade_count % bonus.EVERY, "reveals": self.reveals}
 
     def others(self, a, b):
         """Split view: bars a..b-1 of every stock except the viewed one, by alias."""
@@ -230,7 +239,7 @@ class Game:
 
     async def push_account(self, fills=()):
         await self.broadcast({"type": "account", "account": self.account_view(), "trades": self.trades_today(),
-                              "fills": [public(f) for f in fills]})
+                              "fills": [public(f) for f in fills], "bonus": self.bonus_view()})
 
     async def error(self, text):
         await self.broadcast({"type": "error", "text": text})
@@ -298,7 +307,9 @@ class Game:
                               "ind": self.ind(old, self.pos), "others": self.others(old, self.pos),
                               "account": self.account_view()})
         if fills or rejected:
+            self.settle(fills)
             await self.push_account(fills)
+            await self.count_trades(fills)
             for text in rejected:
                 await self.error(text)
         if self.equity() <= 0:
@@ -325,7 +336,7 @@ class Game:
         return fills, rejected
 
     def close_all(self):
-        return [self.execute(t, "close", 0) for t in list(self.account.shares)]
+        return [self.execute(t, "close", 0, by="auto") for t in list(self.account.shares)]
 
     async def end_day(self):
         self.pending.clear()  # day orders expire
@@ -355,8 +366,13 @@ class Game:
         prices = self.prices(at)
         if price is not None:
             prices[ticker] = price
-        return self.account.order(ticker, side, dollars, prices, market, day=s.day_no, t=self.time_at(at),
-                                  stock=s.stocks[ticker].alias, ticker=ticker, by=by)
+        free = self.boost["free"] > 0 and by in ("you", "AI")
+        trade = self.account.order(ticker, side, dollars, prices, market, free, day=s.day_no, t=self.time_at(at),
+                                   stock=s.stocks[ticker].alias, ticker=ticker, by=by)
+        if free:
+            self.boost["free"] -= 1
+            trade["free"] = True
+        return trade
 
     def place(self, ticker, side, kind, price, dollars, by):
         """Market and close orders (and limit/conditional orders already reached) fill now; others wait.
@@ -384,10 +400,78 @@ class Game:
         await self.after_trade([trade] if trade else [])
 
     async def after_trade(self, trades):
+        self.settle(trades)
         self.autosave()
         await self.push_account(trades)
+        await self.count_trades(trades)
         if self.equity() <= 0:
             await self.game_over()
+
+    def settle(self, trades):
+        """Pay slot machine bonuses (2x, 5x, shield) on closing trades; the bonus is trading profit."""
+        for tr in trades:
+            if extra := bonus.settle(self.boost, tr):
+                self.account.cash += extra
+                tr["bonus"] = extra
+
+    async def count_trades(self, trades):
+        before = self.trade_count
+        self.trade_count += len(trades)
+        for _ in range(self.trade_count // bonus.EVERY - before // bonus.EVERY):
+            await self.spin()
+
+    async def spin(self):
+        """One slot machine spin. The clock pauses while the reels turn; the player starts it again."""
+        outcome, detail = bonus.spin(self.rng), None
+        if outcome == "gift":
+            detail = collection.gift({c["id"] for c in self.home["collection"]}, self.rng)
+            if detail:
+                self.home["collection"].append({"id": detail["id"], "t": time.time(), "day": self.s.day_no})
+        elif outcome == "range2h":
+            detail = self.range_reveal()
+        elif outcome == "next_day":
+            detail = await self.next_day_reveal()
+        if outcome in ("gift", "range2h") and detail is None:  # collection complete / day over: a 2x instead
+            outcome = "double"
+        bonus.grant(self.boost, outcome)
+        if outcome in ("range2h", "next_day"):
+            self.reveals = [r for r in self.reveals if r["kind"] != outcome] + [detail]
+        self.speed = 0
+        self.autosave()
+        await self.push_status()
+        _, title, text = bonus.OUTCOMES[outcome]
+        await self.broadcast({"type": "slot", "outcome": outcome, "title": title, "text": text, "detail": detail,
+                              "bonus": self.bonus_view()})
+
+    def range_reveal(self):
+        """Highest and lowest price of the viewed stock over the next 2 hours (until the close)."""
+        s = self.s
+        bars = s.bars(self.view)
+        w = bars.iloc[self.pos: self.pos + REVEAL_SECONDS]
+        if w.empty:
+            return None
+        hi, lo = int(np.argmax(w["h"].to_numpy())), int(np.argmin(w["l"].to_numpy()))
+        times = chart_times(w.index[[hi, lo, len(w) - 1]], s.day_no)
+        return {"kind": "range2h", "stock": s.stocks[self.view].alias, "high": round(float(w["h"].iloc[hi]), 4),
+                "low": round(float(w["l"].iloc[lo]), 4), "t_high": int(times[0]), "t_low": int(times[1]),
+                "until": int(times[2]), "day": s.day_no}
+
+    async def next_day_reveal(self):
+        """Whether the viewed stock closes the next trading day above (up) or below (down) today's close."""
+        s = self.s
+        out = {"kind": "next_day", "stock": s.stocks[self.view].alias, "day": s.day_no, "direction": "unknown"}
+        if s.day_idx + 1 >= len(s.days):
+            return out
+        try:
+            # daily bars are stamped at midnight ET, so start at the beginning of today (UTC)
+            daily = (await self.client.bars([self.view], "1Day", s.day.open.floor("D"), s.days[s.day_idx + 1].close)).get(self.view)
+        except (httpx.HTTPError, AuthError):
+            log.warning("next-day reveal failed", exc_info=True)
+            return out
+        if daily is not None and len(daily) >= 2:
+            today, nxt = float(daily["c"].iloc[-2]), float(daily["c"].iloc[-1])
+            out["direction"] = "up" if nxt > today else "down" if nxt < today else "flat"
+        return out
 
     # ----- AI trader
 
@@ -471,8 +555,6 @@ class Game:
             await self.clear_pnl()
         elif cmd == "configure":
             await self.configure(msg)
-        elif cmd == "deposit":
-            await self.deposit(msg.get("amount"))
         elif cmd == "split":
             self.split = bool(msg.get("on"))
             await self.push_snapshot()
@@ -505,28 +587,55 @@ class Game:
             spread, per_share, min_fee = (float(msg[k]) for k in ("spread", "fee_per_share", "min_fee"))
         except (KeyError, TypeError, ValueError):
             return await self.error("Settings must be numbers.")
-        if min(spread, per_share, min_fee) < 0:
-            return await self.error("Spread and fees can't be negative.")
+        if spread < 0:
+            return await self.error("The spread can't be negative.")
+        if per_share < MIN_FEE_PER_SHARE or min_fee < MIN_FEE_PER_TRADE:
+            return await self.error(f"Fees can't go below ${MIN_FEE_PER_SHARE} a share and ${MIN_FEE_PER_TRADE:.0f} a trade.")
         a = self.account
         a.spread, a.fee_per_share, a.min_fee = spread, per_share, min_fee
         self.autosave()
         await self.push_account()
 
-    async def deposit(self, amount):
-        """Add (or, if negative, withdraw) money. The PnL baselines and the equity curve move with it,
-        so a deposit never shows up as profit."""
-        if not isinstance(amount, (int, float)) or not amount or abs(amount) > MAX_CAPITAL * 100:
-            return await self.error("Enter an amount to add, or a negative amount to withdraw.")
-        try:
-            self.account.deposit(float(amount), self.prices())
-        except OrderError as e:
-            return await self.error(str(e))
+    def move_money(self, amount):
+        """Mortgage money in (+) or a loan paid back (-). The PnL baselines and the equity curve move with
+        it, so it never shows up as profit. Raises OrderError."""
+        self.account.deposit(float(amount), self.prices())
         self.day_start += amount
         for p in self.curve + self.today:
             p[1] = round(p[1] + amount, 2)
+
+    # ----- home (per game)
+
+    def profit(self):
+        """This game's trading profit: what the home's coins are made of."""
+        try:
+            return self.equity() - self.account.start if self.s else 0.0
+        except (KeyError, IndexError):
+            return self.account.cash - self.account.start
+
+    def home_view(self):
+        v = home.view(self.home, self.profit())
+        v["collection"] = {"items": collection.ITEMS, "categories": collection.CATEGORIES}
+        v["has_game"] = self.s is not None
+        return v
+
+    async def home_act(self, action, body):
+        """One Home / Store action. Raises home.HomeError."""
+        if self.s is None:
+            raise home.HomeError("Start a game first: every game has its own home.")
+        new, dollars = home.act(self.home, action, body, self.profit(), self.account.cash)
+        if dollars:
+            try:
+                self.move_money(dollars)
+            except OrderError as e:
+                raise home.HomeError(str(e)) from None
+        self.home = new
         self.autosave()
-        await self.push_account()
-        await self.broadcast({"type": "notice", "text": f"{'Added' if amount > 0 else 'Withdrew'} ${abs(amount):,.2f}."})
+        if dollars:
+            await self.push_account()
+            await self.broadcast({"type": "notice", "text": f"{'+' if dollars > 0 else '-'}${abs(dollars):,.2f} "
+                                                            f"{'to' if dollars > 0 else 'from'} your trading account."})
+        return self.home_view()
 
     async def new_game(self):
         if self.client is None or self.picking:
@@ -551,6 +660,7 @@ class Game:
         ticker = universe.pick(pool, (), self.rng)
         self.s.stocks[ticker] = self.s.new_stock(ticker)
         self.view, self.pos, self.ai_mark = ticker, 1, 1
+        self.home, self.boost, self.trade_count, self.reveals = home.new(), bonus.new_boost(), 0, []
         self.reset_account()
         self.start_worker()
         self.autosave()
@@ -576,7 +686,7 @@ class Game:
         if new is None:
             return await self.error("No more stocks left in this game's pool.")
         if old in self.account.shares:
-            self.execute(old, "close", 0)
+            self.execute(old, "close", 0, by="auto")
         self.pending = [o for o in self.pending if o["ticker"] != old]
         self.stop_worker()  # it may be downloading the old ticker
         s.stocks = {(new if t == old else t): (s.new_stock(new) if t == old else st) for t, st in s.stocks.items()}
@@ -606,6 +716,7 @@ class Game:
         return {"session": s.to_dict() if s else None, "view": self.view, "pos": self.pos,
                 "account": asdict(self.account), "day_start": self.day_start, "over": self.over,
                 "days": self.days, "curve": self.curve, "today": self.today, "pending": self.pending,
+                "home": self.home, "boost": self.boost, "trade_count": self.trade_count, "reveals": self.reveals,
                 "summary": {"day": s.day_no if s else None, "equity": round(equity, 2)}}
 
     def restore(self, d):
@@ -615,9 +726,11 @@ class Game:
         self.account = Account(**d["account"])
         self.day_start, self.over = d["day_start"], d["over"]
         self.days, self.curve, self.today, self.pending = d["days"], d["curve"], d["today"], d.get("pending", [])
+        self.home = home.normalize(d.get("home"))
+        self.boost = {**bonus.new_boost(), **d.get("boost", {})}
+        self.trade_count = d.get("trade_count", len(self.account.trades))
+        self.reveals = d.get("reveals", [])
         self.start_worker()
 
     def autosave(self):
         saves.autosave(self.to_dict())
-        if self.s:  # this game's profit counts toward home coins
-            home.record(self.s.id, self.equity() - self.account.start)

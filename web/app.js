@@ -3,10 +3,12 @@ import {
   INDICATOR_NAMES, PERIODIC, PriceChart, SINGLES, css, look, store, stored,
 } from './chart.js';
 import { fillTable, money, signed, summaryRows } from './format.js';
-import { Girl } from './girl.js';
+import { Buddy } from './buddy.js';
+import { initCollection } from './collect.js';
 import { initHome } from './home.js';
 import { applyStoredTheme, initMenus } from './menu.js';
 import { showSetup } from './setup.js';
+import { initSlot } from './slot.js';
 import { initStore } from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -28,41 +30,79 @@ const view = () => state.session?.view;
 const allCharts = () => [chart, ...[...minis.values()].map((m) => m.chart)];
 
 applyStoredTheme();
-const girl = new Girl($('girl-box'));
+const pet = new Buddy($('pet-box'));
 const theme = () => document.documentElement.dataset.theme;
-const showGirl = (on) => { $('girl-box').hidden = !on; store('tt.girl', on ? '1' : '0'); };
-girl.setTheme(theme());
-showGirl(stored('tt.girl') !== '0');
+const showPet = (on) => { $('pet-box').hidden = !on; store('tt.pet', on ? '1' : '0'); };
+pet.setAccent(css('--accent'));
+showPet(stored('tt.pet') !== '0');
 const menus = initMenus({
   send, state: () => state, charts: allCharts, lastSpeed: () => lastSpeed, openSetup, toast,
-  onTheme: () => girl.setTheme(theme()), showGirl, girlShown: () => !$('girl-box').hidden,
+  onTheme: () => pet.setAccent(css('--accent')), showPet, petShown: () => !$('pet-box').hidden,
 });
 
-// ----- Home and Store: full-window screens; the game pauses while they are open
+// ----- Home, Store and Collection: full-window screens; the game pauses while they are open
 const setCoins = (c) => { $('coins-btn').textContent = `🪙 ${Math.floor(c).toLocaleString()}`; };
+function onHome(d) {  // coins and the companion pet next to the chart
+  setCoins(d.coins);
+  const p = d.state.pets.find((x) => x.id === d.companion);
+  pet.setPet(p ? { type: p.type, name: d.catalog[p.type].name, hungry: p.status === 'hungry' } : null);
+}
 let screenOpen = false;
 function openScreen(which, arg) {
   if (!screenOpen && state.speed) send('speed', { value: 0 });
   screenOpen = true;
   document.body.classList.add('in-home');
-  if (which === 'home') { shop.close(); home.open(arg); } else { home.close(); shop.open(arg); }
+  Object.entries(screens).forEach(([name, sc]) => { if (name !== which) sc.close(); });
+  screens[which].open(arg);
 }
 function closeScreens() {
-  home.close();
-  shop.close();
+  Object.values(screens).forEach((sc) => sc.close());
   document.body.classList.remove('in-home');
   if (screenOpen) send('speed', { value: lastSpeed });
   screenOpen = false;
+  refreshCoins();
 }
-const home = initHome({ toast, theme, coins: setCoins, openStore: (tab) => openScreen('store', tab) });
-const shop = initStore({ toast, coins: setCoins });
+const screens = {
+  home: initHome({ toast, theme, coins: setCoins, onHome, openStore: (tab) => openScreen('store', tab) }),
+  store: initStore({ toast, coins: setCoins, onHome }),
+  collection: initCollection({ toast }),
+};
 $('home-btn').onclick = () => openScreen('home');
 $('store-btn').onclick = () => openScreen('store');
+$('collection-btn').onclick = () => openScreen('collection');
 $('coins-btn').onclick = () => openScreen('store');
 $('home-store').onclick = () => openScreen('store');
 $('store-home').onclick = () => openScreen('home');
 document.querySelectorAll('[data-back]').forEach((b) => { b.onclick = closeScreens; });
-const refreshCoins = async () => { try { setCoins((await (await fetch('/api/home')).json()).coins); } catch { /* offline */ } };
+const refreshCoins = async () => { try { onHome(await (await fetch('/api/home')).json()); } catch { /* offline */ } };
+
+// ----- the slot machine (every 5 trades) and what it gives
+const slot = initSlot({ onBonus: (b) => { state.bonus = b; renderBonus(); showReveals(); }, resume: () => send('speed', { value: lastSpeed }) });
+
+function activeReveals() {
+  const day = state.session?.day;
+  const now = chart?.rows.at(-1)?.[0] ?? 0;
+  return (state.bonus?.reveals ?? []).filter((r) => r.kind === 'range2h' && r.day === day && r.stock === view() && now <= r.until);
+}
+function showReveals() {
+  const list = activeReveals();
+  const key = JSON.stringify(list);
+  if (key !== showReveals.key) { showReveals.key = key; chart?.setReveals(list); }
+}
+function renderBonus() {
+  const b = state.bonus;
+  if (!b) return;
+  const parts = [`🎰 spin in ${b.next_spin} trade${b.next_spin === 1 ? '' : 's'}`];
+  if (b.boost.mult > 1) parts.push(`<b class="up">${b.boost.mult}x</b> next close`);
+  if (b.boost.shield) parts.push('<b class="up">shield</b> next close');
+  if (b.boost.free) parts.push(`<b class="up">${b.boost.free}</b> free trades`);
+  const day = state.session?.day;
+  (b.reveals ?? []).filter((r) => r.kind === 'next_day' && r.direction !== 'unknown' && (r.day === day || r.day === day - 1)).forEach((r) => {
+    const arrow = r.direction === 'up' ? '<b class="up">▲ UP</b>' : r.direction === 'down' ? '<b class="down">▼ DOWN</b>' : '■ FLAT';
+    parts.push(`oracle: ${r.stock} closes ${r.day === day ? 'tomorrow' : 'today'} ${arrow}`);
+  });
+  $('bonus-line').innerHTML = parts.join(' · ');
+}
 
 function openSetup(reason = '', cancellable = false) {
   $('game').hidden = true;
@@ -101,6 +141,8 @@ function handle(m) {
       chart.setTrades(viewTrades());
       renderMinis(m.others || {});
       render();
+      renderBonus();
+      showReveals();
       break;
     case 'tick':
       Object.assign(state, { clock: m.clock, prices: m.prices, account: m.account });
@@ -110,6 +152,7 @@ function handle(m) {
       renderTabs();
       renderAccount();
       renderTitles();
+      showReveals();
       break;
     case 'status':
       Object.assign(state, { phase: m.phase, speed: m.speed, loading: m.loading, thinking: m.thinking });
@@ -122,8 +165,14 @@ function handle(m) {
       renderAccount();
       renderTabs();
       m.fills.forEach((f) => toast(`${f.by === 'AI' ? 'AI: ' : ''}${f.qty > 0 ? 'Bought' : 'Sold'} ${Math.abs(f.qty)} ${f.stock} @ ${f.price.toFixed(2)}`));
-      m.fills.filter((f) => f.pnl).forEach((f) => girl.tradeClosed(f.pnl - f.fee));
+      m.fills.filter((f) => f.pnl).forEach((f) => pet.tradeClosed(f.pnl - f.fee + (f.bonus ?? 0)));
+      m.fills.filter((f) => f.bonus).forEach((f) => toast(`🎰 Bonus +$${f.bonus.toFixed(2)} on ${f.stock}!`));
+      if (m.bonus) { state.bonus = m.bonus; renderBonus(); }
       if (m.fills.some((f) => f.pnl)) refreshCoins();
+      break;
+    case 'slot':
+      state.bonus = m.bonus;
+      slot.spin(m);
       break;
     case 'ai':
       state.ai.log = [...state.ai.log, m.entry].slice(-30);
@@ -230,7 +279,7 @@ function renderAccount() {
   setPnl($('pnl-today'), a.today);
   setPnl($('pnl-total'), a.total);
   const open = Object.values(a.positions);
-  girl.setPosition(open.length ? open.reduce((sum, p) => sum + p.pnl, 0) : null);
+  pet.setPosition(open.length ? open.reduce((sum, p) => sum + p.pnl, 0) : null);
   $('buying-power').textContent = money(a.buying_power);
   showLeverage(a.settings.leverage);
   const p = a.positions[view()];

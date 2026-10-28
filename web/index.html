@@ -22,9 +22,10 @@
       <span id="fallback" class="badge warn" hidden></span>
       <span id="ai-badge" class="badge" hidden>AI</span>
       <span id="bg-status" class="muted"></span>
-      <button id="coins-btn" class="badge coin" title="Coins: profit from all your games. Spend them in the store.">🪙 —</button>
+      <button id="coins-btn" class="badge coin" title="Coins: this game's trading profit + home income − spending. Spend them in the store.">🪙 —</button>
       <button id="home-btn">Home</button>
       <button id="store-btn">Store</button>
+      <button id="collection-btn">Collection</button>
       <button id="new-game">New game</button>
       <button id="stats-btn">Stats</button>
       <button id="api-btn">API status</button>
@@ -36,7 +37,7 @@
       <button id="add">+ Add</button>
       <button id="replace">↻ Replace</button>
       <button id="split" hidden>⊞ Split view</button>
-      <div id="girl-box" class="girl-box" title="Pat her!"><canvas class="pixel"></canvas></div>
+      <div id="pet-box" class="pet-box"><canvas class="pixel"></canvas><span class="pet-label small muted"></span></div>
       <button id="quick-save" class="quick-save" title="Save this game in the &quot;Quick save&quot; slot">💾 Quick save</button>
     </aside>
 
@@ -69,6 +70,7 @@
         <div class="kv"><span>Today</span><b id="pnl-today" class="num">—</b></div>
         <div class="kv"><span>Total</span><b id="pnl-total" class="num">—</b></div>
         <div class="kv"><span>Buying power</span><b id="buying-power" class="num">—</b></div>
+        <div id="bonus-line" class="bonus-line small"></div>
       </div>
       <div class="box">
         <div class="box-title">ORDER</div>
@@ -114,7 +116,7 @@
   <section id="home" class="screen" data-theme="neon" hidden>
     <header class="topbar">
       <span class="logo">HOME</span>
-      <span class="group"><button data-view="garden">Garden</button><button data-view="house">House</button></span>
+      <span class="group"><button data-view="garden">Garden</button><button data-view="house">House</button><button data-view="aquarium" id="aquarium-tab" hidden>Aquarium</button></span>
       <span id="home-coins" class="badge coin"></span>
       <span class="spacer"></span>
       <button id="home-store">Store</button>
@@ -142,12 +144,44 @@
       <aside class="box side">
         <div class="box-title">WALLET</div>
         <div id="wallet"></div>
-        <p class="small muted">Coins = profit from all your games (Clear PnL resets a game's share) + home income − spending.</p>
+        <p class="small muted">Every game has its own home. Coins = this game's trading profit + home income − spending.</p>
         <div class="box-title">HISTORY</div>
         <ul id="ledger" class="list"></ul>
       </aside>
     </div>
   </section>
+
+  <section id="collection" class="screen" data-theme="neon" hidden>
+    <header class="topbar">
+      <span class="logo">COLLECTION</span>
+      <span id="collection-count" class="badge coin"></span>
+      <span class="spacer"></span>
+      <button data-back>Back to trading</button>
+    </header>
+    <div class="screen-body">
+      <div id="collection-shelves" class="shelves"></div>
+      <aside id="collection-detail" class="box side piece-detail"></aside>
+    </div>
+  </section>
+
+  <div id="slot" class="slot-screen" hidden>
+    <div class="slot-machine">
+      <div class="slot-lights"></div>
+      <div class="slot-head">LUCKY TAPE</div>
+      <div class="reels">
+        <div class="reel"><div class="reel-strip"></div></div>
+        <div class="reel"><div class="reel-strip"></div></div>
+        <div class="reel"><div class="reel-strip"></div></div>
+      </div>
+      <div class="slot-lever"></div>
+      <div id="slot-result" class="slot-result" hidden>
+        <p id="slot-title" class="slot-title"></p>
+        <p id="slot-text"></p>
+        <div id="slot-detail"></div>
+        <button id="slot-collect" class="primary">Collect &amp; continue</button>
+      </div>
+    </div>
+  </div>
 
   <dialog id="api" class="window">
     <div class="titlebar">API status</div>
@@ -173,18 +207,16 @@
       <section data-panel="style">
         <p>Choose a look:</p>
         <div id="themes" class="group wrap"></div>
-        <label class="check"><input id="show-girl" type="checkbox"> Show the anime girl next to the chart</label>
+        <label class="check"><input id="show-pet" type="checkbox"> Show your pet next to the chart</label>
       </section>
 
       <section data-panel="trading">
-        <label>Add money to the account $ (use a minus sign to withdraw)
-          <span class="row"><input id="deposit" type="number" step="100" placeholder="e.g. 5000 or -2000"><button id="apply-deposit" class="primary">Apply</button></span>
-        </label>
         <div class="form-grid">
           <label>Spread cost on MKT orders $ / share <input id="set-spread" type="number" min="0" step="0.01"></label>
-          <label>Fee per share $ <input id="set-fee" type="number" min="0" step="0.001"></label>
-          <label>Minimum fee per order $ <input id="set-min-fee" type="number" min="0" step="0.5"></label>
+          <label>Fee per share $ (at least 0.001) <input id="set-fee" type="number" min="0.001" step="0.001"></label>
+          <label>Minimum fee per order $ (at least 1) <input id="set-min-fee" type="number" min="1" step="0.5"></label>
         </div>
+        <p class="small">Need more money? Mortgage your home or things in it (Store → Mortgage) for dollars in this account. To start over, make a new game or load a save.</p>
         <p class="small">Market buys fill the spread above the price, market sells the spread below it. Limit orders pay no spread. Leverage is set in the order panel.</p>
         <div class="row"><button id="apply-trading" class="primary">Apply</button><button id="clear-pnl">Clear PnL</button></div>
       </section>

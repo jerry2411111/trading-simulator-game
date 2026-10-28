@@ -231,6 +231,17 @@ export class PriceChart {
     this.series.band[1].setData(side(-1));
   }
 
+  // Slot machine reveals: the highest and lowest price of the next 2 hours as dashed lines.
+  setReveals(list) {
+    (this.priceLines ?? []).forEach(([series, line]) => series.removePriceLine(line));
+    this.priceLines = [];
+    list.forEach((r) => [[r.high, '2H HIGH', this.up], [r.low, '2H LOW', this.down]].forEach(([price, title, color]) => {
+      [this.candle, this.line].forEach((series) => this.priceLines.push([series, series.createPriceLine({
+        price, color, title, lineWidth: 1, lineStyle: 2, axisLabelVisible: true,
+      })]));
+    }));
+  }
+
   // Buy fills: green triangle below the bar; sell fills: red triangle above.
   setTrades(trades) {
     this.trades = trades;

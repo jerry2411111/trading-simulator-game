@@ -1,6 +1,7 @@
-// Home art, drawn in code with whole-pixel rectangles: pets, plants, pool, house exteriors and
-// interiors, and furniture. Everything takes the time `t` so it can idle-animate.
-import { disc, ellipse, hash, icon, rect } from './pixel.js';
+// Garden art, drawn in code with whole-pixel rectangles: pets, flower piles, trees with beehives,
+// birds and bees, the pool, and the garden ground (wasteland, cleared soil, floors and rubble).
+// Everything takes the time `t` so it can idle-animate.
+import { disc, ellipse, glow, hash, icon, outlined, rect, sprite } from './pixel.js';
 
 const K = '#1d1d1d';
 
@@ -141,7 +142,7 @@ export const PET_SIZE = { dog: [20, 13], cat: [16, 13], parrot: [14, 15], turtle
 
 export function drawPet(g, type, x, y, s, t) {
   if (s.dead) return grave(g, x, y);
-  PETS[type](g, Math.round(x), Math.round(y), s, t);
+  outlined(g, x - 17, y - 22, 34, 25, '#120c1c', (sg) => PETS[type](sg, 17, 22, s, t));
   if (s.emote) icon(g, s.emote, x - 2, y - PET_SIZE[type][1] - 7);
 }
 
@@ -155,305 +156,322 @@ function grave(g, x, y) {
   rect(g, x + 5, y - 2, 1, 1, '#ffd84a');
 }
 
-// ---------------------------------------------------------------- plants (x, y = ground)
+// ---------------------------------------------------------------- flowers: a leafy pile covered in blooms (x, y = ground)
 
-const STEM = '#3f9a3f';
-const LEAF = '#5cc85c';
-const BLOOMS = {
-  tulip: (g, x, y) => { rect(g, x - 1, y - 2, 3, 3, '#ff3b5c'); rect(g, x - 1, y - 3, 1, 1, '#ff3b5c'); rect(g, x + 1, y - 3, 1, 1, '#ff3b5c'); rect(g, x, y - 1, 1, 1, '#c81e3c'); },
-  rose: (g, x, y) => { disc(g, x, y - 1, 2, '#c8102e'); rect(g, x, y - 1, 1, 1, '#8a0a1e'); rect(g, x - 1, y - 2, 1, 1, '#ff4f6f'); },
-  sunflower: (g, x, y) => { disc(g, x, y - 4, 3, '#ffd21f'); disc(g, x, y - 4, 1, '#6b3e12'); },
-  daisy: (g, x, y) => { rect(g, x - 2, y - 1, 5, 1, '#ffffff'); rect(g, x, y - 3, 1, 5, '#ffffff'); rect(g, x - 1, y - 2, 3, 3, '#ffffff'); rect(g, x, y - 1, 1, 1, '#ffd21f'); },
-  lavender: (g, x, y) => { for (let i = 0; i < 4; i++) { rect(g, x, y - 1 - i * 2, 1, 1, '#a070e0'); rect(g, x + (i % 2 ? 1 : -1), y - 2 - i * 2, 1, 1, '#7a4fd0'); } },
-  lily: (g, x, y) => { rect(g, x - 2, y - 1, 5, 2, '#ffe4ef'); rect(g, x - 1, y - 2, 3, 1, '#ffe4ef'); rect(g, x, y - 1, 1, 1, '#ff7fb0'); rect(g, x - 2, y - 2, 1, 1, '#ffffff'); },
-  poppy: (g, x, y) => { disc(g, x, y - 1, 2, '#ff4a1c'); rect(g, x, y - 1, 1, 1, K); },
-  bluebell: (g, x, y) => { rect(g, x + 1, y - 2, 1, 1, STEM); [[2, 0], [2, 3], [0, 5]].forEach(([dx, dy]) => rect(g, x + dx, y - 3 + dy, 2, 2, '#4f6dff')); },
+const INK = '#0b1f16';  // outline of plants
+const LEAVES = ['#14452a', '#1f6a3a', '#3a9a4a', '#7fd86a'];
+// petal, shade, center / highlight
+const BLOOM = {
+  daisy: ['#ffffff', '#b8c4e0', '#ffc61f'], poppy: ['#ff4a1c', '#a8200a', '#1a0c0c'], tulip: ['#ff3b6b', '#b01844', '#ffb0c8'],
+  bluebell: ['#6a86ff', '#2f45c0', '#c0ccff'], sunflower: ['#ffd21f', '#d08a10', '#5a3010'], lavender: ['#b888f8', '#6f42c8', '#ecdcff'],
+  rose: ['#f0203f', '#8a0a24', '#ff8a9a'], lily: ['#fff4fa', '#f0a0c8', '#ff4f9a'],
 };
-const BUDS = { tulip: '#ff3b5c', rose: '#c8102e', sunflower: '#ffd21f', daisy: '#ffffff', lavender: '#a070e0', lily: '#ffe4ef', poppy: '#ff4a1c', bluebell: '#4f6dff' };
+const SPOTS9 = [[-6, -6], [-2, -9], [2, -6], [6, -8], [-8, -3], [-3, -4], [4, -3], [8, -4], [0, -11], [-5, -10], [5, -11]];
 
-// stage 0 seed, 1 sprout, 2 bud, 3 bloom
-export function drawFlower(g, type, x, y, stage, t, phase = 0) {
-  if (stage === 0) { rect(g, x - 1, y - 1, 3, 1, '#7a5230'); rect(g, x, y - 2, 1, 1, '#9a6a3a'); return; }
-  if (stage === 1) { rect(g, x, y - 3, 1, 3, STEM); rect(g, x - 1, y - 3, 1, 1, LEAF); rect(g, x + 1, y - 2, 1, 1, LEAF); return; }
-  const tall = type === 'sunflower' ? 11 : 7;
-  const sway = Math.round(Math.sin(t * 1.4 + phase) * 0.7);
-  rect(g, x, y - tall, 1, tall, STEM);
-  rect(g, x - 1, y - 3, 1, 1, LEAF); rect(g, x - 2, y - 4, 1, 1, LEAF); rect(g, x + 1, y - 5, 1, 1, LEAF); rect(g, x + 2, y - 6, 1, 1, LEAF);
-  if (stage === 2) { rect(g, x - 1 + sway, y - tall - 2, 2, 2, BUDS[type]); return; }
-  BLOOMS[type](g, x + sway, y - tall);
+function leafPile(g, x, y, rx, ry, seed) {
+  ellipse(g, x, y - ry, rx, ry, LEAVES[0]);
+  for (let i = 0; i < rx * 2; i++) {
+    const a = hash(seed + i) * Math.PI;
+    const lx = x + Math.round(Math.cos(a) * rx * 0.8 * (0.4 + hash(seed + i + 40) * 0.6));
+    const ly = y - ry - Math.round(Math.sin(a) * ry * 0.9);
+    ellipse(g, lx, ly, 2, 1, LEAVES[1]);
+    rect(g, lx - 1, ly - 1, 2, 1, LEAVES[2]);
+    if (i % 3 === 0) rect(g, lx - 1, ly - 1, 1, 1, LEAVES[3]);
+  }
 }
 
-// stage 0 sapling, 1 small, 2 young, 3 grown; `fruit` shows a harvest is ready
-export function drawTree(g, type, x, y, stage, t, phase = 0, fruit = false) {
-  const trunk = '#7a4a22';
+const BLOOMS = {
+  daisy(g, x, y, [p, s, c]) { rect(g, x - 1, y, 3, 1, p); rect(g, x, y - 1, 1, 3, p); rect(g, x - 2, y, 1, 1, s); rect(g, x + 2, y, 1, 1, s); rect(g, x, y + 2, 1, 1, s); rect(g, x, y, 1, 1, c); },
+  poppy(g, x, y, [p, s, c]) { rect(g, x - 1, y - 1, 3, 3, p); rect(g, x + 1, y, 1, 2, s); rect(g, x - 1, y - 1, 1, 1, '#ff9a6a'); rect(g, x, y, 1, 1, c); },
+  tulip(g, x, y, [p, s, c]) { rect(g, x - 1, y - 1, 3, 3, p); rect(g, x - 1, y - 2, 1, 1, p); rect(g, x + 1, y - 2, 1, 1, s); rect(g, x + 1, y - 1, 1, 3, s); rect(g, x - 1, y - 1, 1, 1, c); rect(g, x, y + 2, 1, 2, LEAVES[2]); },
+  bluebell(g, x, y, [p, s, c]) { rect(g, x - 1, y - 2, 3, 1, LEAVES[2]); rect(g, x - 2, y - 1, 2, 2, p); rect(g, x + 1, y, 2, 2, p); rect(g, x - 2, y + 1, 2, 1, s); rect(g, x + 1, y + 2, 2, 1, s); rect(g, x - 2, y - 1, 1, 1, c); },
+  sunflower(g, x, y, [p, s, c]) { rect(g, x, y + 2, 1, 4, LEAVES[2]); disc(g, x, y, 3, p); rect(g, x - 3, y, 1, 1, s); rect(g, x + 3, y, 1, 1, s); rect(g, x, y + 3, 1, 1, s); disc(g, x, y, 1, c); rect(g, x - 1, y - 1, 1, 1, '#8a5a20'); },
+  lavender(g, x, y, [p, s, c]) { for (let i = 0; i < 5; i++) rect(g, x + (i % 2 ? 0 : -1), y - 2 + i, 2, 1, i % 2 ? s : p); rect(g, x - 1, y - 3, 1, 1, c); rect(g, x, y + 3, 1, 2, LEAVES[2]); },
+  rose(g, x, y, [p, s, c]) { disc(g, x, y, 2, p); rect(g, x, y, 2, 2, s); rect(g, x - 1, y - 1, 1, 1, c); rect(g, x, y, 1, 1, '#5a0414'); },
+  lily(g, x, y, [p, s, c]) { rect(g, x - 2, y, 5, 1, p); rect(g, x, y - 2, 1, 5, p); rect(g, x - 1, y - 1, 3, 3, p); rect(g, x + 1, y + 1, 1, 1, s); rect(g, x - 2, y, 1, 1, s); rect(g, x, y, 1, 1, c); },
+};
+
+// stage 0 seedlings, 1 leafy pile, 2 buds, 3 full bloom
+export function drawFlower(g, type, x, y, stage, t, phase = 0) {
+  x = Math.round(x);
+  y = Math.round(y);
+  const [rx, ry] = [[4, 2], [7, 4], [9, 5], [9, 5]][stage];
+  outlined(g, x - 12, y - 18, 24, 19, INK, (sg) => {
+    leafPile(sg, 12, 18, rx, ry, phase * 31);
+    if (stage === 0) { [[-2, -3], [1, -4], [3, -2]].forEach(([dx, dy]) => rect(sg, 12 + dx, 18 + dy, 1, 2, LEAVES[3])); return; }
+    if (stage === 1) return;
+    const spots = type === 'sunflower' ? [[-4, -9], [3, -11], [0, -6]] : SPOTS9;
+    spots.forEach(([dx, dy], i) => {
+      const sway = Math.round(Math.sin(t * 1.3 + phase + i) * 0.6);
+      const bx = 12 + Math.round(dx * rx / 9) + sway;
+      const by = 18 + Math.round(dy * (type === 'sunflower' ? 1.2 : 0.9)) + 2;
+      if (stage === 2) { rect(sg, bx, by, 1, 2, BLOOM[type][0]); rect(sg, bx, by + 2, 1, 1, LEAVES[2]); } else BLOOMS[type](sg, bx, by, BLOOM[type]);
+    });
+  });
+}
+
+// ---------------------------------------------------------------- trees (x, y = ground at the trunk)
+
+const CANOPY = {  // dark, mid, light, highlight, outline
+  apple: ['#1a5230', '#2a7a3c', '#45a34c', '#9be07a', '#08200f'],
+  maple: ['#7a1e0c', '#c0401a', '#ec7228', '#ffc45a', '#2a0804'],
+  sakura: ['#c0507f', '#ec86b4', '#ffb4d4', '#fff0f6', '#4a1430'],
+  pine: ['#0f3826', '#1a5a3a', '#2c7c4a', '#6fc07a', '#04140c'],
+};
+const LUMPS = [[0, 5, 6], [-9, 2, 5], [9, 2, 5], [-11, -3, 4], [11, -3, 4], [0, 0, 8], [-6, -5, 6], [6, -6, 6], [0, -10, 5], [-3, -12, 3], [4, -13, 3]];
+const BARK = ['#3a2014', '#5a3420', '#7a4a2c'];
+
+function trunk(g, x, y, h, k, sakura) {
+  const [d, m, l] = sakura ? ['#2a141c', '#4a2630', '#6a3a44'] : BARK;
+  rect(g, x - 2, y - h, 4, h, m);
+  rect(g, x - 2, y - h, 1, h, l);
+  rect(g, x + 1, y - h, 1, h, d);
+  for (let j = 3; j < h; j += 4) rect(g, x - 1, y - j, 1, 2, d);
+  rect(g, x - 4, y - 1, 3, 1, m); rect(g, x + 2, y - 1, 3, 1, d); rect(g, x - 3, y - 2, 1, 1, m);
+  if (k >= 0.7) {  // two branches reaching into the crown
+    for (let i = 0; i < 5; i++) { rect(g, x - 3 - i, y - h - i + 2, 2, 1, m); rect(g, x + 2 + i, y - h - i + 1, 2, 1, d); }
+  }
+}
+
+function crown(g, cx, cy, k, pal, t, phase) {
+  const [d, m, l, hi] = pal;
   const sway = Math.round(Math.sin(t * 0.9 + phase) * 0.8);
-  if (stage === 0) { rect(g, x, y - 5, 1, 5, trunk); rect(g, x - 1, y - 5, 1, 1, LEAF); rect(g, x + 1, y - 4, 1, 1, LEAF); return; }
-  const r = [0, 4, 6, 9][stage];
-  const h = [0, 6, 9, 12][stage];
-  rect(g, x - 1, y - h, 3, h, trunk);
-  rect(g, x - 2, y - 1, 5, 1, '#5a3418');
-  const cy = y - h - r + 2;
-  const cx = x + sway;
-  if (type === 'pine') {
-    for (let i = 0; i < 3; i++) {
-      const tw = Math.round(r * (1 - i * 0.28));
-      for (let j = 0; j < 5; j++) rect(g, cx - Math.round(tw * j / 5), cy + 2 - i * 5 + j, Math.round(tw * j / 5) * 2 + 1, 1, j % 2 ? '#1f6b3a' : '#2f8a4a');
+  const lumps = LUMPS.map(([dx, dy, r]) => [cx + Math.round(dx * k) + (dy < -4 ? sway : 0), cy + Math.round(dy * k), Math.max(2, Math.round(r * k))]);
+  lumps.forEach(([x, y, r]) => disc(g, x, y, r, d));
+  lumps.forEach(([x, y, r]) => disc(g, x - 1, y - 1, r - 1, m));
+  lumps.forEach(([x, y, r]) => r > 3 && disc(g, x - 2, y - 2, r - 3, l));
+  lumps.forEach(([x, y, r], i) => r > 3 && rect(g, x - 2 - Math.round(r / 3), y - 2 - Math.round(r / 3), 2, 1, hi));
+  for (let i = 0; i < 14 * k; i++) {  // single leaves breaking the edge
+    const a = hash(i + phase * 7) * 6.28;
+    const rr = 12 * k;
+    rect(g, cx + Math.round(Math.cos(a) * rr), cy - 2 + Math.round(Math.sin(a) * rr * 0.8), 1, 1, i % 2 ? m : l);
+  }
+}
+
+function pine(g, x, y, k, t, phase) {
+  const [d, m, l, hi] = CANOPY.pine;
+  const h = Math.round(6 * k);
+  trunk(g, x, y, h + 4, 0, false);
+  const sway = Math.round(Math.sin(t * 0.8 + phase) * 0.7);
+  for (let i = 0; i < 4; i++) {
+    const w = Math.round((13 - i * 3) * k);
+    const ty = y - h - Math.round((8 + i * 7) * k);
+    const tall = Math.round(9 * k);
+    for (let j = 0; j < tall; j++) {
+      const half = Math.round((w * (j + 1)) / tall);
+      const sx = x + (i > 1 ? sway : 0);
+      rect(g, sx - half, ty + j, half * 2 + 1, 1, d);
+      rect(g, sx - half + 1, ty + j, half, 1, j % 3 === 2 ? m : l);
+      if (j % 3 === 0) rect(g, sx - Math.round(half / 2), ty + j, 1, 1, hi);
     }
-    if (fruit) [[-3, 4], [2, 2]].forEach(([dx, dy]) => rect(g, cx + dx, cy + dy, 2, 2, '#8a5a2a'));
+  }
+  return y - h - Math.round(36 * k);
+}
+
+// stage 0 sapling, 1 small, 2 young, 3 grown; `fruit` shows a harvest is ready. Returns the crown top y.
+export function drawTree(g, type, x, y, stage, t, phase = 0, fruit = false) {
+  x = Math.round(x);
+  y = Math.round(y);
+  const pal = CANOPY[type];
+  let top = y - 50;
+  outlined(g, x - 22, y - 52, 44, 53, pal[4], (sg) => {
+    const X = 22;
+    const Y = 52;
+    if (stage === 0) {
+      rect(sg, X, Y - 7, 1, 7, BARK[1]);
+      [[-2, -7], [1, -8], [-1, -5], [2, -5]].forEach(([dx, dy]) => rect(sg, X + dx, Y + dy, 2, 1, pal[2]));
+      return;
+    }
+    const k = [0, 0.45, 0.7, 1][stage];
+    if (type === 'pine') {
+      pine(sg, X, Y, k, t, phase);
+      if (fruit) [[-5, -16], [4, -22], [-2, -28]].forEach(([dx, dy]) => { rect(sg, X + dx, Y + dy, 2, 3, '#7a4a22'); rect(sg, X + dx, Y + dy, 1, 1, '#b07a3a'); });
+      if (stage === 3) [[-8, -14], [6, -19], [-4, -25], [3, -31], [-6, -21], [8, -12]].forEach(([dx, dy], i) => {
+        if ((t * 2 + i) % 3 < 2) rect(sg, X + dx, Y + dy, 1, 1, ['#00e5ff', '#ff4fd8', '#ffe14d'][i % 3]);  // fairy lights
+      });
+      return;
+    }
+    const h = Math.round(16 * k);
+    trunk(sg, X, Y, h, k, type === 'sakura');
+    const cy = Y - h - Math.round(10 * k);
+    crown(sg, X, cy, k, pal, t, phase);
+    if (type === 'apple' && stage === 3) {
+      [[-7, 0], [6, -4], [-2, 6], [8, 4], [-9, -6], [2, -9], [-4, -2]].slice(0, fruit ? 7 : 3)
+        .forEach(([dx, dy]) => { rect(sg, X + dx, cy + dy, 2, 2, '#e02a2a'); rect(sg, X + dx, cy + dy, 1, 1, '#ff9a8a'); });
+    }
+    if (type === 'sakura' && fruit) [[-6, 3], [5, -2], [1, 6]].forEach(([dx, dy]) => { rect(sg, X + dx, cy + dy, 1, 1, '#c0102a'); rect(sg, X + dx + 2, cy + dy, 1, 1, '#c0102a'); });
+    if (type === 'maple' && fruit) { rect(sg, X + 2, Y - 8, 3, 4, '#9aa0aa'); rect(sg, X + 2, Y - 8, 3, 1, '#d8a040'); }
+  });
+  if (fruit) icon(g, 'star', x - 2, y - 52);
+  return top;
+}
+
+// A beehive hanging from a branch; `level` 0..1 is how far the bees have built it.
+export function drawHive(g, x, y, level) {
+  const rows = 2 + Math.round(level * 6);
+  rect(g, x, y, 1, 2, BARK[0]);
+  for (let j = 0; j < rows; j++) {
+    const w = Math.max(1, Math.round(Math.sin(((j + 1) / (rows + 1)) * Math.PI) * (2 + level * 3)));
+    rect(g, x - w, y + 2 + j, w * 2 + 1, 1, j % 2 ? '#c8861c' : '#f0b83a');
+    rect(g, x - w, y + 2 + j, 1, 1, '#6a4008');
+  }
+  if (level > 0.5) rect(g, x, y + 2 + Math.round(rows * 0.6), 1, 1, '#2a1404');
+}
+
+export function drawBee(g, x, y, t, i) {
+  rect(g, x, y, 2, 1, '#ffd21f');
+  rect(g, x + 1, y, 1, 1, '#1a1a1a');
+  if (Math.floor(t * 20 + i) % 2) rect(g, x, y - 1, 1, 1, '#e8f6ff');
+}
+
+const BIRD = { up: ['k...k', '.kdk.', '..k..'], down: ['..k..', '.kdk.', 'k...k'] };
+export function drawBird(g, x, y, t, i, perched = false) {
+  if (perched) {
+    rect(g, x - 1, y - 2, 3, 2, '#2a2440'); rect(g, x - 1, y - 2, 1, 1, '#4a4a70'); rect(g, x + 2, y - 2, 1, 1, '#ffb000'); rect(g, x, y, 1, 1, '#ffb000');
     return;
   }
-  const [c1, c2, c3] = {
-    maple: ['#c8401a', '#e8682a', '#ffa040'], apple: ['#2d7d3a', '#3fa34d', '#6fd06f'], sakura: ['#ff8fc0', '#ffb7d5', '#ffe4ef'],
-  }[type];
-  disc(g, cx, cy, r, c1);
-  disc(g, cx - Math.round(r / 3), cy - Math.round(r / 3), Math.round(r * 0.7), c2);
-  disc(g, cx + Math.round(r / 2), cy - 1, Math.round(r * 0.5), c2);
-  for (let i = 0; i < r; i++) {
-    const a = hash(i * 7 + phase * 13) * 6.28;
-    const d = hash(i * 3 + 1) * (r - 1);
-    rect(g, cx + Math.round(Math.cos(a) * d), cy + Math.round(Math.sin(a) * d), 1, 1, c3);
-  }
-  if (type === 'maple' && fruit) rect(g, x + 2, y - h + 3, 2, 2, '#c08a3a'); // syrup bucket
-  if (type === 'apple' && (fruit || stage === 3)) {
-    [[-3, 1], [3, -2], [0, 4], [-5, -3], [5, 3]].slice(0, fruit ? 5 : 2).forEach(([dx, dy]) => rect(g, cx + dx, cy + dy, 2, 2, '#e8322b'));
-  }
-  if (fruit && type !== 'apple') icon(g, 'star', x - 2, cy - r - 7);
+  sprite(g, BIRD[Math.floor(t * 8 + i) % 2 ? 'up' : 'down'], { k: '#1c1830', d: '#3fd8ff' }, x - 2, y - 1);
 }
 
 // ---------------------------------------------------------------- pool
 
 export function drawPool(g, x, y, w, h, t) {
-  rect(g, x - 2, y - 2, w + 4, h + 4, '#e6e6ee');
-  for (let i = 0; i < w + 4; i += 4) rect(g, x - 2 + i, y - 2, 1, h + 4, '#c8c8d4');
-  rect(g, x, y, w, h, '#2fa8ef');
-  for (let j = 0; j < h; j += 3) rect(g, x, y + j, w, 1, '#49c2ff');
-  for (let i = 0; i < 9; i++) {
-    const px = x + ((hash(i) * w + t * (4 + i % 3)) % (w - 4)) + 1;
-    const py = y + 2 + Math.floor(hash(i + 9) * (h - 4));
-    rect(g, px, py, 3, 1, '#d8f4ff');
+  rect(g, x - 3, y - 3, w + 6, h + 6, '#20202c');
+  rect(g, x - 2, y - 2, w + 4, h + 4, '#d8d8e4');
+  for (let i = 0; i < w + 4; i += 5) { rect(g, x - 2 + i, y - 2, 1, 2, '#a8a8b8'); rect(g, x - 2 + i, y + h, 1, 2, '#a8a8b8'); }
+  rect(g, x - 2, y - 2, w + 4, 1, '#ffffff');
+  rect(g, x, y, w, h, '#1f8fd8');
+  rect(g, x, y, w, 3, '#156aa8');
+  for (let i = 0; i < w; i += 6) for (let j = 4; j < h; j += 6) rect(g, x + i, y + j, 1, 1, '#2aa0e8');
+  for (let i = 0; i < 14; i++) {  // caustics
+    const px = x + 1 + ((hash(i) * w + t * (3 + (i % 3))) % (w - 5));
+    const py = y + 4 + Math.floor(hash(i + 9) * (h - 6));
+    rect(g, px, py, 3, 1, '#9fe8ff'); rect(g, px + 1, py + 1, 2, 1, '#5fc8ff');
   }
-  rect(g, x + w - 5, y - 3, 1, 6, '#b8b8c8'); rect(g, x + w - 2, y - 3, 1, 6, '#b8b8c8');
-  rect(g, x + w - 5, y - 1, 4, 1, '#b8b8c8'); rect(g, x + w - 5, y + 1, 4, 1, '#b8b8c8');
-  const fx = x + 8 + Math.round(Math.sin(t * 0.7) * 3);
-  const fy = y + h / 2 + Math.round(Math.sin(t * 1.3));
-  disc(g, fx, fy, 3, '#ff6fa8'); disc(g, fx, fy, 1, '#2fa8ef'); rect(g, fx - 3, fy, 1, 1, '#ffffff');
+  [[x + 4, y + h - 1], [x + w - 5, y + h - 1]].forEach(([lx, ly]) => { rect(g, lx, ly, 2, 1, '#bff8ff'); glow(g, lx, ly - 3, 7, '0,229,255', 0.5); });
+  rect(g, x + w - 7, y - 4, 1, 7, '#c8c8d8'); rect(g, x + w - 3, y - 4, 1, 7, '#c8c8d8');
+  for (let j = 0; j < 3; j++) rect(g, x + w - 7, y - 2 + j * 2, 5, 1, '#e8e8f0');
+  const fx = x + 12 + Math.round(Math.sin(t * 0.6) * 4);
+  const fy = y + Math.round(h / 2) + Math.round(Math.sin(t * 1.2));
+  disc(g, fx, fy, 3, '#ff4f9a'); disc(g, fx, fy, 1, '#1f8fd8'); rect(g, fx - 3, fy, 1, 1, '#ffffff'); rect(g, fx + 3, fy, 1, 1, '#ffffff');
 }
 
-// ---------------------------------------------------------------- house exteriors (x, y = door step)
+// ---------------------------------------------------------------- garden ground: wasteland, cleared soil and floors
 
-function steppedRoof(g, cx, top, rows, w0, grow, c1, c2) {
-  for (let i = 0; i < rows; i++) rect(g, cx - (w0 + i * grow) / 2, top + i, w0 + i * grow, 1, i % 3 === 2 ? c2 : c1);
-}
+export const FLOOR_LOOK = {
+  lawn: ['#2c7436', '#378442', '#246630', '#5ab85a'], clover: ['#245e30', '#2f7038', '#1c5028', '#7ed06a'],
+  gravel: ['#8a8a98', '#a2a2b0', '#70707e', '#c8c8d4'], brick: ['#9a3a24', '#b04a30', '#80301c', '#4a3430'],
+  stone: ['#7c7c8c', '#92929e', '#666676', '#30303c'], deck: ['#8e5e32', '#a06c3a', '#734a26', '#40260f'],
+  neon: ['#150b28', '#1c1034', '#0e0820', '#00e5ff'], soil: ['#4a3a2e', '#544234', '#3c2e24', '#6a5a4a'],
+  waste: ['#463a36', '#52443c', '#382c28', '#2a1e1c'],
+};
 
-const HOUSES = {
-  cabin(g, x, y, t) {
-    const L = x - 22;
-    const T = y - 34;
-    rect(g, L + 32, T + 1, 4, 9, '#7a7a80');
-    for (let i = 0; i < 3; i++) {
-      const k = (t * 0.8 + i / 3) % 1;
-      disc(g, L + 34 + Math.round(Math.sin(k * 6 + i) * 2), T - Math.round(k * 14), 1 + Math.round(k * 2), `rgba(200,200,210,${0.8 - k * 0.7})`);
+function noise(g, x0, y0, w, h, pal, seed, step = 2) {
+  for (let y = y0; y < y0 + h; y += step) {
+    for (let x = x0; x < x0 + w; x += step) {
+      const r = hash(x * 0.37 + y * 1.71 + seed);
+      if (r < 0.25) rect(g, x, y, step, step, pal[1]); else if (r > 0.8) rect(g, x, y, step, step, pal[2]);
     }
-    steppedRoof(g, x, T, 13, 8, 3.4, '#5a3a1e', '#4a2e14');
-    rect(g, L + 8, T + 7, 6, 2, '#7a6a4a');
-    rect(g, L, T + 13, 44, 21, '#9a6634');
-    for (let j = T + 15; j < y; j += 4) rect(g, L, j, 44, 1, '#7a4a22');
-    rect(g, x - 4, y - 12, 8, 12, '#4a2e14'); rect(g, x + 2, y - 6, 1, 1, '#f4d35e');
-    rect(g, L + 5, T + 17, 9, 7, '#9fd8ff'); rect(g, L + 9, T + 17, 1, 7, '#4a2e14'); rect(g, L + 5, T + 20, 9, 1, '#4a2e14');
-    rect(g, L + 30, T + 17, 9, 7, '#9fd8ff'); rect(g, L + 34, T + 17, 1, 7, '#4a2e14');
-    return 44;
+  }
+}
+
+const PATTERNS = {
+  lawn(g, x0, y0, w, h, p, s) {
+    noise(g, x0, y0, w, h, p, s);
+    for (let i = 0; i < (w * h) / 18; i++) {
+      const x = x0 + Math.floor(hash(i + s) * w);
+      const y = y0 + Math.floor(hash(i * 3 + s) * h);
+      rect(g, x, y, 1, 2, i % 4 ? p[3] : '#8fe07a');
+      if (i % 37 === 0) rect(g, x + 1, y, 1, 1, i % 2 ? '#ffffff' : '#ffe14d');
+    }
   },
-  modern(g, x, y, t) {
-    const L = x - 30;
-    const T = y - 34;
-    rect(g, L, T + 8, 60, 26, '#f2f2f4'); rect(g, L + 28, T, 32, 14, '#e4e4ea');
-    rect(g, L - 1, T + 7, 30, 2, '#2e2e36'); rect(g, L + 27, T - 1, 34, 2, '#2e2e36');
-    rect(g, L + 4, T + 12, 14, 22, '#c08a5a');
-    for (let i = 0; i < 14; i += 3) rect(g, L + 4 + i, T + 12, 1, 22, '#9a6a3a');
-    rect(g, L + 30, T + 3, 27, 8, '#7fd0ff'); rect(g, L + 22, T + 16, 35, 12, '#7fd0ff');
-    const sh = Math.floor((t * 6) % 50);
-    for (let j = 0; j < 12; j++) rect(g, L + 22 + ((sh + j) % 35), T + 16 + j, 2, 1, 'rgba(255,255,255,0.6)');
-    rect(g, x - 3, y - 14, 6, 14, '#2e3a4a');
-    rect(g, L + 20, y - 4, 4, 4, '#4caf50');
-    return 60;
+  clover(g, x0, y0, w, h, p, s) {
+    noise(g, x0, y0, w, h, p, s, 3);
+    for (let i = 0; i < (w * h) / 30; i++) {
+      const x = x0 + Math.floor(hash(i + s) * w);
+      const y = y0 + Math.floor(hash(i * 3 + s) * h);
+      rect(g, x, y, 1, 1, p[3]); rect(g, x + 1, y + 1, 1, 1, p[3]); rect(g, x - 1, y + 1, 1, 1, '#5aa850');
+    }
   },
-  euro(g, x, y, t) {
-    const L = x - 28;
-    const T = y - 40;
-    rect(g, L + 40, T + 1, 5, 10, '#a33a22');
-    steppedRoof(g, x, T, 17, 4, 3.3, '#c0482c', '#a33a22');
-    rect(g, L, T + 17, 56, 23, '#f3e6c8');
-    [[L + 6], [L + 38]].forEach(([wx]) => {
-      rect(g, wx, T + 22, 10, 8, '#9fd8ff'); rect(g, wx + 5, T + 22, 1, 8, '#ffffff');
-      rect(g, wx - 3, T + 22, 3, 8, '#3a7a4a'); rect(g, wx + 10, T + 22, 3, 8, '#3a7a4a');
-      for (let i = 0; i < 10; i += 2) rect(g, wx + i, T + 31, 1, 1, hash(i + wx) > 0.5 ? '#ff3b5c' : '#ffd84a');
-      rect(g, wx, T + 32, 10, 1, '#7a4a22');
-    });
-    ellipse(g, x, y - 12, 4, 3, '#6b3a1e'); rect(g, x - 4, y - 12, 9, 12, '#6b3a1e'); rect(g, x + 2, y - 6, 1, 1, '#f4d35e');
-    return 56;
+  gravel(g, x0, y0, w, h, p, s) {
+    noise(g, x0, y0, w, h, p, s, 1);
+    for (let y = y0 + 2; y < y0 + h; y += 4) for (let x = x0; x < x0 + w; x++) rect(g, x, y + Math.round(Math.sin(x / 4) * 1), 1, 1, p[3]);
   },
-  tower(g, x, y, t) {
-    const L = x - 20;
-    const T = y - 62;
-    rect(g, x, T - 7, 1, 7, '#9a9aa8');
-    if (t % 1.4 < 0.7) rect(g, x - 1, T - 8, 3, 2, '#ff2a2a');
-    rect(g, L, T, 40, 62, '#2f5f8f');
-    for (let row = 0; row < 11; row++) {
-      for (let col = 0; col < 5; col++) {
-        const lit = hash(row * 5 + col + Math.floor(t / 3) * 0.37) > 0.55;
-        rect(g, L + 2 + col * 8, T + 3 + row * 5, 6, 3, lit ? '#ffe58a' : '#7fb8e8');
+  brick(g, x0, y0, w, h, p, s) {
+    rect(g, x0, y0, w, h, p[3]);
+    for (let y = y0, row = 0; y < y0 + h; y += 4, row++) {
+      for (let x = x0 - (row % 2) * 4; x < x0 + w; x += 8) {
+        const c = p[Math.floor(hash(x + y * 7 + s) * 3)];
+        rect(g, Math.max(x0, x), y, Math.min(7, x + 7 - Math.max(x0, x)), 3, c);
+        rect(g, Math.max(x0, x), y, Math.min(7, x + 7 - Math.max(x0, x)), 1, '#c8644a');
       }
     }
-    rect(g, L - 2, y - 10, 44, 10, '#dfe6ee'); rect(g, x - 6, y - 9, 12, 9, '#7fd0ff'); rect(g, x, y - 9, 1, 9, '#dfe6ee');
-    return 40;
   },
-  palace_cn(g, x, y, t) {
-    const L = x - 42;
-    const T = y - 46;
-    rect(g, L - 2, y - 4, 88, 4, '#e8e0d0'); rect(g, x - 8, y - 4, 16, 4, '#f4f0e8');
-    rect(g, L + 6, T + 22, 72, 20, '#b3261e');
-    for (let i = 0; i < 8; i++) rect(g, L + 8 + i * 10, T + 22, 2, 20, '#8a1a14');
-    rect(g, L + 14, T + 10, 56, 10, '#b3261e');
-    steppedRoof(g, x, T + 4, 7, 50, 4, '#2a7a5a', '#1f5f46');
-    rect(g, L + 10, T + 10, 64, 1, '#d8a520');
-    steppedRoof(g, x, T + 17, 7, 76, 2, '#2a7a5a', '#1f5f46');
-    rect(g, L - 3, T + 23, 90, 1, '#d8a520');
-    [[L - 3, T + 22], [L + 86, T + 22], [L + 9, T + 9], [L + 74, T + 9]].forEach(([cx, cy]) => rect(g, cx, cy, 2, 2, '#d8a520'));
-    rect(g, x - 1, T, 2, 4, '#d8a520');
-    rect(g, x - 6, y - 16, 12, 12, '#7a1010');
-    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) rect(g, x - 4 + i * 4, y - 14 + j * 4, 1, 1, '#d8a520');
-    [L + 14, L + 68].forEach((lx, i) => {
-      const sw = Math.round(Math.sin(t * 2 + i) * 1.5);
-      rect(g, lx + sw, T + 24, 1, 3, '#d8a520');
-      ellipse(g, lx + sw, T + 29, 2, 3, '#e83030');
-      rect(g, lx + sw, T + 28, 1, 2, '#ffd84a');
-    });
-    return 84;
-  },
-  palace_eu(g, x, y, t) {
-    const L = x - 44;
-    const T = y - 52;
-    rect(g, L, T + 24, 16, 28, '#f4efe6'); rect(g, L + 72, T + 24, 16, 28, '#f4efe6');
-    ellipse(g, L + 8, T + 23, 6, 5, '#6a8fbf'); ellipse(g, L + 80, T + 23, 6, 5, '#6a8fbf');
-    [L + 8, L + 80].forEach((fx, i) => {
-      rect(g, fx, T + 10, 1, 9, '#9a9aa8');
-      for (let k = 0; k < 6; k++) rect(g, fx + 1 + k, T + 10 + Math.round(Math.sin(t * 5 + k * 0.8 + i)), 1, 3, '#d8283c');
-    });
-    rect(g, L + 14, T + 18, 60, 34, '#f4efe6');
-    rect(g, L + 14, T + 18, 60, 2, '#ddd6c8');
-    ellipse(g, x, T + 16, 12, 10, '#6a8fbf'); ellipse(g, x - 3, T + 13, 4, 4, '#8fb0d8');
-    rect(g, x - 1, T + 2, 2, 5, '#d8a520'); disc(g, x, T + 2, 1, '#ffd84a');
-    for (let i = 0; i < 6; i++) rect(g, L + 18 + i * 10, T + 24, 3, 24, '#e2dbcc');
-    for (let i = 0; i < 5; i++) {
-      ellipse(g, L + 26 + i * 10, T + 30, 2, 2, '#7fb8e8'); rect(g, L + 24 + i * 10, T + 30, 5, 6, '#7fb8e8');
-      rect(g, L + 24 + i * 10, T + 36, 5, 1, '#d8a520');
+  stone(g, x0, y0, w, h, p, s) {
+    rect(g, x0, y0, w, h, p[3]);
+    for (let y = y0, row = 0; y < y0 + h; y += 7, row++) {
+      for (let x = x0 - (row % 2) * 5; x < x0 + w; x += 10) {
+        const sw = 8 + Math.floor(hash(x + y + s) * 2);
+        const sx = Math.max(x0, x + 1);
+        const ww = Math.min(sw, x + 1 + sw - sx);
+        rect(g, sx, y + 1, ww, 5, p[Math.floor(hash(x * 3 + y + s) * 3)]);
+        rect(g, sx, y + 1, ww, 1, '#b4b4c4');
+        if (hash(x + y * 2) > 0.7) rect(g, sx + ww, y + 3, 1, 2, '#4a8a3a');
+      }
     }
-    rect(g, x - 5, y - 13, 10, 13, '#5a3a1e'); ellipse(g, x, y - 13, 5, 3, '#5a3a1e');
-    rect(g, x - 14, y - 3, 28, 3, '#e8e0d0');
-    return 88;
+  },
+  deck(g, x0, y0, w, h, p, s) {
+    rect(g, x0, y0, w, h, p[3]);
+    for (let y = y0, row = 0; y < y0 + h; y += 4, row++) {
+      for (let x = x0 - Math.floor(hash(row + s) * 20); x < x0 + w; x += 22) {
+        const sx = Math.max(x0, x);
+        rect(g, sx, y, Math.min(21, x + 21 - sx), 3, p[row % 3]);
+        rect(g, sx, y, Math.min(21, x + 21 - sx), 1, '#b88048');
+        if (x + 2 >= x0) rect(g, x + 2, y + 1, 1, 1, '#d0d0d8');
+      }
+    }
+  },
+  neon(g, x0, y0, w, h, p) {
+    for (let y = y0; y < y0 + h; y += 8) for (let x = x0; x < x0 + w; x += 8) rect(g, x, y, 8, 8, p[((x + y) / 8) % 2 ? 0 : 1]);
+  },
+  soil(g, x0, y0, w, h, p, s) {
+    noise(g, x0, y0, w, h, p, s);
+    for (let y = y0 + 2; y < y0 + h; y += 5) rect(g, x0, y, w, 1, p[2]);
+    for (let i = 0; i < (w * h) / 60; i++) rect(g, x0 + Math.floor(hash(i + s) * w), y0 + Math.floor(hash(i * 5 + s) * h), 1, 1, p[3]);
+  },
+  waste(g, x0, y0, w, h, p, s) {
+    noise(g, x0, y0, w, h, p, s, 3);
+    for (let i = 0; i < (w * h) / 220; i++) {  // cracks
+      let x = x0 + Math.floor(hash(i + s) * w);
+      let y = y0 + Math.floor(hash(i * 7 + s) * h);
+      for (let k = 0; k < 7; k++) {
+        rect(g, x, y, 1, 1, p[3]);
+        x += hash(i * 11 + k) > 0.5 ? 1 : -1;
+        y += hash(i * 13 + k) > 0.4 ? 1 : 0;
+      }
+    }
+    for (let i = 0; i < (w * h) / 90; i++) {  // dead grass
+      const x = x0 + Math.floor(hash(i * 3 + s + 1) * w);
+      const y = y0 + Math.floor(hash(i * 9 + s + 2) * h);
+      rect(g, x, y, 1, 2, '#8a7a4a'); rect(g, x + 1, y + 1, 1, 1, '#6a5a32');
+    }
   },
 };
 
-export function drawHouse(g, id, x, y, t) { return HOUSES[id](g, Math.round(x), Math.round(y), t); }
-
-// ---------------------------------------------------------------- house interiors
-
-export const TILE = 12;
-const ROOMS = {
-  cabin: { wall: '#8a5a2b', trim: '#5a3a1e', floor: ['#b07a45', '#a06a38'], deco: 'logs' },
-  modern: { wall: '#eef0f4', trim: '#c8ccd4', floor: ['#d4d8de', '#c6cad2'], deco: 'strip' },
-  euro: { wall: '#e8d8b8', trim: '#a87444', floor: ['#c0884c', '#a87444'], deco: 'paper' },
-  tower: { wall: '#1a2a44', trim: '#4a6a9a', floor: ['#2e3440', '#3a4150'], deco: 'city' },
-  palace_cn: { wall: '#b3261e', trim: '#d8a520', floor: ['#6b2a1a', '#5a2214'], deco: 'gold' },
-  palace_eu: { wall: '#f4efe6', trim: '#d8a520', floor: ['#f0ece4', '#cfc8bc'], deco: 'frames' },
-};
-
-export const roomSize = (gw, gh) => [gw * TILE + 16, gh * TILE + 30];
-
-export function drawRoom(g, id, gw, gh, t, grid) {
-  const r = ROOMS[id];
-  const [W, H] = roomSize(gw, gh);
-  rect(g, 0, 0, W, 22, r.wall);
-  if (r.deco === 'logs') for (let j = 3; j < 22; j += 4) rect(g, 0, j, W, 1, r.trim);
-  if (r.deco === 'paper') for (let i = 4; i < W; i += 8) for (let j = 3; j < 20; j += 6) rect(g, i, j, 1, 2, '#d4b88a');
-  if (r.deco === 'gold') for (let i = 6; i < W; i += 14) { rect(g, i, 4, 6, 1, r.trim); rect(g, i + 2, 2, 2, 5, r.trim); }
-  if (r.deco === 'city') {
-    for (let i = 0; i < W; i += 6) {
-      const bh = 6 + Math.floor(hash(i) * 12);
-      rect(g, i, 22 - bh, 5, bh, '#0e1626');
-      if (hash(i + Math.floor(t / 2)) > 0.5) rect(g, i + 2, 22 - bh + 2, 1, 1, '#ffe58a');
-    }
-  }
-  if (r.deco === 'frames') for (let i = 10; i < W - 10; i += 30) { rect(g, i, 4, 12, 10, r.trim); rect(g, i + 1, 5, 10, 8, '#7fa8c8'); }
-  if (r.deco !== 'city') {
-    const wx = Math.round(W / 2) - 10;
-    rect(g, wx - 1, 3, 22, 15, r.trim); rect(g, wx, 4, 20, 13, '#9fd8ff');
-    const cx = wx + ((t * 2) % 26) - 4;
-    rect(g, Math.max(wx, cx), 7, Math.min(6, wx + 20 - Math.max(wx, cx)), 2, '#ffffff');
-    rect(g, wx + 9, 4, 1, 13, r.trim); rect(g, wx, 10, 20, 1, r.trim);
-  }
-  rect(g, 0, 20, W, 2, r.trim);
-  rect(g, 0, 22, 8, H - 22, r.trim); rect(g, W - 8, 22, 8, H - 22, r.trim); rect(g, 0, H - 8, W, 8, r.trim);
-  rect(g, W / 2 - 8, H - 8, 16, 8, r.floor[1]);
-  for (let gy = 0; gy < gh; gy++) {
-    for (let gx = 0; gx < gw; gx++) {
-      rect(g, 8 + gx * TILE, 22 + gy * TILE, TILE, TILE, r.floor[(gx + gy) % 2]);
-      if (grid) { rect(g, 8 + gx * TILE, 22 + gy * TILE, TILE, 1, 'rgba(0,229,255,0.25)'); rect(g, 8 + gx * TILE, 22 + gy * TILE, 1, TILE, 'rgba(0,229,255,0.25)'); }
-    }
-  }
+export function drawFloor(g, x0, y0, w, h, floor, seed) {
+  PATTERNS[floor](g, x0, y0, w, h, FLOOR_LOOK[floor], seed);
 }
 
-// ---------------------------------------------------------------- furniture (top-down, front at the bottom)
-
-const wood = '#a87444';
-const woodD = '#7a4a22';
-const FURN = {
-  chair: (g) => { rect(g, 2, 1, 8, 3, woodD); rect(g, 2, 4, 8, 6, wood); rect(g, 2, 10, 1, 2, woodD); rect(g, 9, 10, 1, 2, woodD); },
-  cat_bed: (g) => { ellipse(g, 6, 7, 5, 4, '#c94f7c'); ellipse(g, 6, 7, 3, 2, '#f1a7c3'); },
-  plant_pot: (g, w, h, t) => { rect(g, 4, 7, 4, 4, '#c0603a'); rect(g, 3, 7, 6, 1, '#d8774a'); const s = Math.round(Math.sin(t * 1.5)); disc(g, 6 + s, 4, 3, '#3fa34d'); rect(g, 5 + s, 2, 1, 1, '#6fd06f'); },
-  floor_lamp: (g, w, h, t) => { disc(g, 6, 10, 2, '#444'); rect(g, 6, 4, 1, 6, '#666'); disc(g, 6, 3, 3, '#ffe9a8'); g.fillStyle = `rgba(255,233,168,${0.15 + Math.sin(t * 3) * 0.05})`; g.fillRect(0, 0, 12, 12); },
-  big_plant: (g, w, h, t) => { rect(g, 3, 8, 6, 4, '#8a5a3a'); const s = Math.round(Math.sin(t * 1.2)); [[-3, -2], [3, -3], [0, -5], [-2, -6], [2, -6]].forEach(([dx, dy]) => ellipse(g, 6 + dx + s, 7 + dy, 2, 3, '#2d7d3a')); },
-  bean_bag: (g) => { ellipse(g, 6, 7, 5, 4, '#7a4fd0'); ellipse(g, 5, 6, 3, 2, '#9a70f0'); },
-  office_chair: (g) => { rect(g, 3, 1, 6, 3, '#333'); disc(g, 6, 7, 3, '#444'); rect(g, 1, 10, 10, 1, '#222'); },
-  easel: (g, w, h, t) => { rect(g, 2, 2, 8, 7, '#f8f8f0'); [[3, 3, '#ff6fa8'], [6, 4, '#4dc3ff'], [4, 6, '#ffd84a'], [7, 6, '#5cc85c']].forEach(([x, y, c]) => rect(g, x, y, 2, 2, c)); rect(g, 2, 9, 1, 3, woodD); rect(g, 9, 9, 1, 3, woodD); },
-  vase: (g) => { ellipse(g, 6, 8, 3, 3, '#3f6fd8'); rect(g, 5, 4, 3, 3, '#3f6fd8'); rect(g, 4, 8, 4, 1, '#ffffff'); rect(g, 5, 2, 1, 2, '#ff3b5c'); rect(g, 7, 1, 1, 3, '#ffd84a'); },
-  coffee_table: (g) => { rect(g, 1, 2, 22, 8, wood); rect(g, 1, 9, 22, 1, woodD); rect(g, 15, 4, 3, 3, '#ffffff'); rect(g, 16, 5, 1, 1, '#6b3e12'); },
-  rug: (g, w, h) => { rect(g, 0, 0, w, h, '#e0b84a'); rect(g, 2, 2, w - 4, h - 4, '#8e2f4f'); for (let i = 4; i < w - 4; i += 6) { rect(g, i, h / 2 - 1, 3, 2, '#e0b84a'); } },
-  sink: (g, w, h, t) => { rect(g, 0, 2, 12, 9, '#eeeeee'); ellipse(g, 6, 7, 3, 2, '#b8c4cc'); rect(g, 6, 2, 1, 3, '#9aa'); if (t % 1.5 < 0.2) rect(g, 6, 6, 1, 1, '#4dc3ff'); },
-  armchair: (g) => { rect(g, 1, 1, 10, 10, '#2f5f9f'); rect(g, 3, 3, 6, 7, '#3f7fbf'); rect(g, 1, 10, 10, 1, '#1f3f6f'); },
-  desk: (g) => { rect(g, 1, 1, 22, 9, '#b0804a'); rect(g, 3, 3, 5, 4, '#ffffff'); rect(g, 17, 2, 3, 3, '#ffe9a8'); rect(g, 1, 9, 22, 1, woodD); },
-  toilet: (g) => { rect(g, 3, 0, 6, 3, '#ffffff'); ellipse(g, 6, 7, 3, 4, '#f0f0f0'); ellipse(g, 6, 7, 2, 2, '#cfe8f4'); },
-  dresser: (g) => { rect(g, 1, 1, 22, 10, '#8a5a3a'); for (let i = 0; i < 3; i++) { rect(g, 2 + i * 7, 3, 6, 6, '#a06a48'); rect(g, 5 + i * 7, 6, 1, 1, '#f4d35e'); } },
-  bookshelf: (g) => { rect(g, 0, 0, 24, 12, '#6b4220'); for (let i = 1; i < 23; i += 2) rect(g, i, 2, 1, 4, ['#d8283c', '#3f6fd8', '#5cc85c', '#ffd84a', '#a070e0'][i % 5]); for (let i = 2; i < 22; i += 3) rect(g, i, 7, 2, 3, ['#ff8a1e', '#4dc3ff', '#ff6fa8'][i % 3]); },
-  dining_table: (g, w, h, t) => { rect(g, 2, 2, 20, 20, wood); rect(g, 2, 21, 20, 1, woodD); [[5, 5], [15, 5], [5, 15], [15, 15]].forEach(([x, y]) => disc(g, x + 1, y + 1, 2, '#ffffff')); rect(g, 11, 10, 2, 3, '#f4f0e8'); if (t % 0.5 < 0.25) rect(g, 11, 9, 1, 1, '#ffb000'); else rect(g, 12, 9, 1, 1, '#ff7a00'); },
-  guitar: (g) => { ellipse(g, 6, 8, 3, 3, '#d9822b'); disc(g, 6, 8, 1, '#3a2010'); rect(g, 6, 1, 1, 5, '#5a3a1e'); rect(g, 5, 0, 3, 2, '#3a2010'); },
-  counter: (g) => { rect(g, 0, 0, 24, 12, '#d8d8d8'); rect(g, 0, 0, 24, 3, '#efefef'); rect(g, 12, 4, 1, 7, '#b8b8b8'); rect(g, 3, 4, 6, 4, '#c08a5a'); },
-  wardrobe: (g) => { rect(g, 0, 0, 24, 12, '#7a4a2a'); rect(g, 11, 1, 1, 10, '#5a3418'); rect(g, 9, 5, 1, 2, '#f4d35e'); rect(g, 14, 5, 1, 2, '#f4d35e'); },
-  record_player: (g, w, h, t) => { rect(g, 1, 1, 10, 10, '#5a3a1e'); disc(g, 6, 6, 4, '#111'); const a = t * 6; rect(g, 6 + Math.round(Math.cos(a) * 3), 6 + Math.round(Math.sin(a) * 3), 1, 1, '#666'); rect(g, 6, 6, 1, 1, '#d8283c'); rect(g, 9, 2, 1, 5, '#cfcfd8'); },
-  bed: (g) => { rect(g, 0, 0, 24, 36, '#7a4a2a'); rect(g, 2, 2, 20, 32, '#f4f4f4'); rect(g, 4, 3, 16, 6, '#ffffff'); rect(g, 4, 8, 16, 1, '#dddddd'); rect(g, 2, 13, 20, 21, '#4f7fd8'); rect(g, 2, 13, 20, 2, '#7fa8ff'); },
-  double_bed: (g) => { rect(g, 0, 0, 36, 36, '#6b3a1e'); rect(g, 2, 2, 32, 32, '#f4f4f4'); rect(g, 4, 3, 13, 6, '#ffffff'); rect(g, 19, 3, 13, 6, '#ffffff'); rect(g, 2, 13, 32, 21, '#e86fa8'); rect(g, 2, 13, 32, 2, '#ff9fc8'); },
-  fish_tank: (g, w, h, t) => {
-    rect(g, 0, 0, 24, 12, '#5a5a6a'); rect(g, 1, 1, 22, 10, '#4dc3ff'); rect(g, 1, 9, 22, 2, '#e6d28a');
-    [[4, 0], [18, 1]].forEach(([x, k]) => { const s = Math.round(Math.sin(t * 2 + k)); rect(g, x + s, 5, 1, 4, '#2f8a4a'); rect(g, x, 7, 1, 2, '#2f8a4a'); });
-    [['#ff8a1e', 1.1, 3], ['#ffd84a', 0.8, 5], ['#ff4fd8', 1.5, 7]].forEach(([c, sp, fy], i) => {
-      const p = (t * sp * 4 + i * 7) % 36; const fx = p < 18 ? 2 + p : 38 - p; const dir = p < 18 ? 1 : -1;
-      rect(g, fx, fy, 2, 1, c); rect(g, fx - dir, fy, 1, 1, c);
-    });
-    rect(g, 10, 1 + Math.floor((12 - (t * 5) % 9)), 1, 1, '#d8f4ff');
-  },
-  telescope: (g) => { rect(g, 2, 10, 1, 2, '#555'); rect(g, 9, 10, 1, 2, '#555'); rect(g, 5, 7, 2, 4, '#555'); for (let i = 0; i < 6; i++) rect(g, 3 + i, 8 - i, 2, 2, '#cfcfe0'); rect(g, 9, 1, 2, 2, '#4dc3ff'); },
-  sofa: (g) => { rect(g, 0, 0, 36, 4, '#a02a20'); rect(g, 0, 4, 36, 7, '#e04f3f'); rect(g, 0, 0, 3, 11, '#a02a20'); rect(g, 33, 0, 3, 11, '#a02a20'); rect(g, 12, 4, 1, 7, '#c03a2c'); rect(g, 24, 4, 1, 7, '#c03a2c'); },
-  console: (g, w, h, t) => { rect(g, 2, 4, 8, 5, '#222'); rect(g, 3, 5, 1, 1, t % 1 < 0.5 ? '#39ff14' : '#0a3a0a'); rect(g, 1, 10, 3, 2, '#444'); rect(g, 8, 10, 3, 2, '#444'); },
-  stove: (g, w, h, t) => { rect(g, 0, 0, 12, 12, '#555'); [[3, 3], [9, 3], [3, 8], [9, 8]].forEach(([x, y], i) => disc(g, x, y, 2, i === 0 && t % 0.6 < 0.4 ? '#ff4a1c' : '#333')); },
-  tv: (g, w, h, t) => { rect(g, 0, 7, 24, 5, '#333'); rect(g, 2, 0, 20, 8, '#111'); for (let i = 0; i < 18; i++) rect(g, 3 + i, 1 + ((i + Math.floor(t * 8)) % 6), 1, 1, ['#ff4fd8', '#4dc3ff', '#ffd84a'][i % 3]); },
-  clock: (g, w, h, t) => { rect(g, 2, 0, 8, 12, '#6b3a1e'); disc(g, 6, 3, 2, '#ffffff'); const now = new Date(); const a = (now.getSeconds() / 60) * 6.28; rect(g, 6 + Math.round(Math.sin(a) * 2), 3 - Math.round(Math.cos(a) * 2), 1, 1, K); rect(g, 6 + Math.round(Math.sin(t * 3) * 1.5), 8, 1, 3, '#d8a520'); },
-  bathtub: (g, w, h, t) => { rect(g, 0, 0, 24, 12, '#ffffff'); rect(g, 2, 2, 20, 8, '#8fd8ff'); for (let i = 0; i < 5; i++) disc(g, 5 + i * 3, 4 + Math.round(Math.sin(t * 2 + i)), 1, '#f0fbff'); },
-  fridge: (g) => { rect(g, 1, 0, 10, 12, '#e8eef4'); rect(g, 1, 4, 10, 1, '#b8c4cc'); rect(g, 9, 1, 1, 2, '#8a96a0'); rect(g, 9, 6, 1, 3, '#8a96a0'); rect(g, 3, 6, 2, 2, '#ff6fa8'); },
-  fireplace: (g, w, h, t) => { rect(g, 0, 0, 24, 12, '#8a8a8a'); for (let i = 0; i < 24; i += 4) rect(g, i, 3, 1, 9, '#6a6a6a'); rect(g, 6, 4, 12, 8, '#1a1010'); for (let i = 0; i < 5; i++) { const fh = 2 + Math.floor(hash(i + Math.floor(t * 10)) * 4); rect(g, 8 + i * 2, 12 - fh, 2, fh, i % 2 ? '#ffb000' : '#ff4a1c'); } },
-  computer: (g, w, h, t) => { rect(g, 0, 2, 24, 9, '#b0804a'); rect(g, 6, 0, 12, 7, '#222'); for (let i = 0; i < 4; i++) rect(g, 7, 1 + i, 2 + Math.floor(hash(i + Math.floor(t * 2)) * 9), 1, '#39ff14'); rect(g, 7, 8, 10, 2, '#ddd'); },
-  arcade: (g, w, h, t) => { rect(g, 1, 0, 10, 12, '#2a1a6a'); rect(g, 1, 0, 10, 1, '#ff00d4'); rect(g, 2, 2, 8, 5, '#111'); rect(g, 3 + Math.floor(t * 4) % 6, 4, 2, 2, '#ffd84a'); rect(g, 3, 9, 2, 2, '#ff3b5c'); rect(g, 7, 9, 2, 2, '#4dc3ff'); },
-  piano: (g, w, h, t, use) => { rect(g, 0, 0, 24, 8, '#151515'); rect(g, 0, 8, 24, 4, '#ffffff'); for (let i = 1; i < 24; i += 3) rect(g, i, 8, 1, 2, '#151515'); if (use) rect(g, 2 + Math.floor(hash(Math.floor(t * 6)) * 20), 10, 2, 2, '#ffd84a'); },
+// Rubble lying on the wasteland (x, y = ground point).
+const DEBRIS = {
+  rock(g, x, y) { ellipse(g, x, y - 2, 3, 2, '#1a1418'); ellipse(g, x, y - 2, 2, 1, '#6a6070'); rect(g, x - 1, y - 3, 2, 1, '#9a90a0'); },
+  tire(g, x, y) { ellipse(g, x, y - 2, 4, 2, '#0c0c10'); ellipse(g, x, y - 2, 2, 1, '#3a3040'); rect(g, x - 3, y - 4, 2, 1, '#3a3a44'); },
+  bag(g, x, y) { ellipse(g, x, y - 3, 3, 3, '#0e0a14'); ellipse(g, x - 1, y - 3, 2, 2, '#2a2236'); rect(g, x, y - 7, 1, 2, '#2a2236'); rect(g, x - 2, y - 5, 1, 1, '#5a5070'); },
+  crate(g, x, y) { rect(g, x - 4, y - 6, 8, 6, '#2a1a0e'); rect(g, x - 3, y - 5, 6, 4, '#7a5a30'); rect(g, x - 3, y - 3, 6, 1, '#4a3418'); rect(g, x + 1, y - 6, 2, 2, '#2a1a0e'); },
+  barrel(g, x, y) { rect(g, x - 3, y - 7, 6, 7, '#1a0e0a'); rect(g, x - 2, y - 6, 4, 6, '#8a3e1e'); rect(g, x - 2, y - 4, 4, 1, '#5a2a14'); rect(g, x - 2, y - 6, 1, 6, '#b0582e'); ellipse(g, x, y - 7, 2, 0, '#c87040'); },
+  bush(g, x, y) { [[-3, -4], [0, -6], [3, -4], [-1, -3], [2, -2]].forEach(([dx, dy]) => { rect(g, x, y, 1, 1, '#5a4228'); for (let k = 0; k < 4; k++) rect(g, x + Math.round((dx * k) / 4), y + Math.round((dy * k) / 4), 1, 1, '#6a4e2c'); }); },
+  can(g, x, y) { rect(g, x - 1, y - 2, 3, 2, '#a8a8b8'); rect(g, x - 1, y - 2, 1, 2, '#d03a3a'); },
+  puddle(g, x, y, t) { ellipse(g, x, y - 1, 6, 2, '#1e1438'); rect(g, x - 3, y - 2, 4, 1, '#3fd8ff'); rect(g, x + 1, y - 1, 2, 1, '#ff4fd8'); },
 };
-
-// Draw one furniture item into a w x h pixel box (unrotated); `use` is true while the girl uses it.
-export function drawFurniture(g, id, w, h, t, use = false) { FURN[id](g, w, h, t, use); }
+export const DEBRIS_KINDS = Object.keys(DEBRIS);
+export function drawDebris(g, kind, x, y) { DEBRIS[kind](g, Math.round(x), Math.round(y)); }

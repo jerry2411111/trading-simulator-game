@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 MAX_CAPITAL = 10_000.0
 MAX_LEVERAGE = 100.0
+MIN_FEE_PER_SHARE, MIN_FEE_PER_TRADE = 0.001, 1.0  # fees never go to zero
 
 
 class OrderError(Exception):
@@ -45,9 +46,9 @@ class Account:
         self.cash += amount
         self.start += amount
 
-    def order(self, key, side, dollars, prices, market=True, **info):
-        """Buy, sell or close stock `key` at prices[key] (market orders pay the spread); returns the trade
-        record (with `info`) or raises OrderError."""
+    def order(self, key, side, dollars, prices, market=True, free=False, **info):
+        """Buy, sell or close stock `key` at prices[key] (market orders pay the spread; `free` trades pay
+        neither spread nor fee); returns the trade record (with `info`) or raises OrderError."""
         price, held = prices[key], self.shares.get(key, 0)
         if side == "close":
             qty = -held
@@ -58,13 +59,13 @@ class Account:
             if n <= 0:
                 raise OrderError(f"${dollars:,.0f} doesn't buy one share at ${price:,.2f}.")
             qty = n if side == "buy" else -n
-        if market:
+        if market and not free:
             price += self.spread if qty > 0 else -self.spread
         if abs(held + qty) > abs(held):
             limit = self.equity(prices) * self.leverage
             if self.exposure(prices) + (abs(held + qty) - abs(held)) * price > limit:
                 raise OrderError(f"Not enough buying power: at {self.leverage:g}x you can hold up to ${limit:,.0f}.")
-        fee = max(self.min_fee, abs(qty) * self.fee_per_share)
+        fee = 0.0 if free else max(self.min_fee, abs(qty) * self.fee_per_share)
         pnl = self._fill(key, held, qty, price)
         self.cash -= qty * price + fee
         self.fees += fee

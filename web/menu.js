@@ -68,8 +68,8 @@ export function initMenus(ctx) {
   const markTheme = () => $('themes').querySelectorAll('button')
     .forEach((b) => b.classList.toggle('active', b.dataset.theme === document.documentElement.dataset.theme));
   markTheme();
-  $('show-girl').checked = ctx.girlShown();
-  $('show-girl').onchange = () => ctx.showGirl($('show-girl').checked);
+  $('show-pet').checked = ctx.petShown();
+  $('show-pet').onchange = () => ctx.showPet($('show-pet').checked);
 
   // Trading
   function fillTrading(s) {
@@ -77,15 +77,10 @@ export function initMenus(ctx) {
     $('set-spread').value = s.spread;
     $('set-fee').value = s.fee_per_share;
     $('set-min-fee').value = s.min_fee;
-    $('deposit').value = '';
   }
   $('apply-trading').onclick = () => {
     ctx.send('configure', { spread: +$('set-spread').value, fee_per_share: +$('set-fee').value, min_fee: +$('set-min-fee').value });
     ctx.toast('Trading settings applied.');
-  };
-  $('apply-deposit').onclick = () => {
-    ctx.send('deposit', { amount: +$('deposit').value });
-    $('deposit').value = '';
   };
   $('clear-pnl').onclick = () => {
     ctx.send('clear_pnl');

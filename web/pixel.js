@@ -29,6 +29,38 @@ export function sprite(g, rows, pal, x, y, flip = false) {
   });
 }
 
+// A soft neon glow in whole-pixel rings; `rgb` is "r,g,b".
+export function glow(g, cx, cy, r, rgb, alpha = 0.25) {
+  for (let k = r; k > 0; k -= 2) disc(g, cx, cy, k, `rgba(${rgb},${(alpha * (1 - k / (r + 1))) / 2})`);
+}
+
+// Fill only the pixels covered by row spans [[y, x0, x1], ...] (crisp, no anti-aliasing).
+export function clipRows(g, spans) {
+  g.beginPath();
+  spans.forEach(([y, x0, x1]) => g.rect(x0, y, x1 - x0, 1));
+  g.clip();
+}
+
+// Draw a sprite with a 1-pixel dark outline around its silhouette: `draw(sg)` paints into a scratch
+// canvas whose (0, 0) maps to (x0, y0) on `g`; the box is w x h pixels.
+const scratch = [];
+const scratchCanvas = (i) => (scratch[i] ??= document.createElement('canvas'));
+export function outlined(g, x0, y0, w, h, color, draw) {
+  const [a, b] = [scratchCanvas(0), scratchCanvas(1)];
+  a.width = b.width = w + 2;
+  a.height = b.height = h + 2;
+  const ag = a.getContext('2d');
+  ag.translate(1, 1);
+  draw(ag);
+  const bg = b.getContext('2d');
+  [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy]) => bg.drawImage(a, dx, dy));
+  bg.globalCompositeOperation = 'source-in';
+  bg.fillStyle = color;
+  bg.fillRect(0, 0, b.width, b.height);
+  g.drawImage(b, Math.round(x0) - 1, Math.round(y0) - 1);
+  g.drawImage(a, Math.round(x0) - 1, Math.round(y0) - 1);
+}
+
 // Small emote icons drawn above characters.
 const ICONS = {
   heart: ['.r.r.', 'rrrrr', 'rrrrr', '.rrr.', '..r..'],
@@ -46,10 +78,12 @@ export function icon(g, name, x, y) {
   sprite(g, ICONS[name], ICON_PAL, Math.round(x), Math.round(y));
 }
 
-// A canvas of logical size w x h scaled to the largest whole multiple that fits its container.
+// A canvas of logical size w x h scaled to the largest whole multiple that fits its container (in half
+// steps below 4x, so big rooms don't leave the window half empty).
 export function fitCanvas(canvas, w, h) {
   const box = canvas.parentElement.getBoundingClientRect();
-  const s = Math.max(1, Math.floor(Math.min(box.width / w, box.height / h)));
+  const fit = Math.min(box.width / w, box.height / h);
+  const s = Math.max(1, fit < 4 ? Math.floor(fit * 2) / 2 : Math.floor(fit));
   canvas.width = w;
   canvas.height = h;
   canvas.style.width = `${w * s}px`;

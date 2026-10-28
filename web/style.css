@@ -198,6 +198,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent2); }
   padding: 4px 8px;
 }
 .topbar .num { font-size: calc(11px * var(--hs)); }
+#game > .topbar { gap: 5px; }
+#game > .topbar button { padding-left: 6px; padding-right: 6px; white-space: nowrap; }
 #clock { color: var(--warn); }
 .logo { font-size: calc(12px * var(--hs)); color: var(--accent); text-shadow: var(--title-glow); }
 #bg-status { flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -312,13 +314,14 @@ section[data-panel] label.check, .check { display: flex; gap: 6px; align-items: 
 }
 #game.shake { animation: shake 0.4s steps(5) 1; }
 
-/* Coins and the anime girl */
+/* Coins and the pet next to the chart */
 canvas.pixel { image-rendering: pixelated; }
 .badge.coin { color: var(--warn); border-color: var(--warn); }
 button.badge { background: transparent; }
-.girl-box { position: relative; display: grid; place-items: center; padding: 4px 0; }
-.girl-box canvas { width: 144px; height: 144px; cursor: grab; }
-.girl-pop {
+.pet-box { position: relative; display: grid; place-items: center; gap: 2px; padding: 4px 0; }
+.pet-box canvas { width: 144px; height: 144px; cursor: grab; }
+.pet-label { text-align: center; max-width: 150px; }
+.pet-pop {
   position: absolute; top: 4px; left: 50%; pointer-events: none; white-space: nowrap;
   font-family: var(--font-head); font-size: calc(11px * var(--hs)); text-shadow: 2px 2px 0 #000;
   animation: pop 2.6s steps(13) forwards;
@@ -328,6 +331,7 @@ button.badge { background: transparent; }
   10%, 80% { opacity: 1; }
   100% { transform: translate(-50%, -34px); opacity: 0; }
 }
+.bonus-line { margin-top: 3px; line-height: 1.4; color: var(--muted); }
 
 /* Home and Store: full-window screens, always in the neon style */
 .screen {
@@ -354,10 +358,12 @@ button.badge { background: transparent; }
 }
 .card-art { width: 100%; height: 118px; display: grid; place-items: center; background: var(--grid); }
 .card small { min-height: 2.4em; }
+.card.wide { grid-column: span 2; }
+.card.wide .card-art { height: 124px; overflow: hidden; }
 
 /* Narrower windows: tabs above the chart, trading panel below it, setup stacks */
 @media (max-width: 980px) {
-  .girl-box { display: none; }
+  .pet-box { display: none; }
   .screen-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 40%; }
   #game { grid-template: auto auto minmax(0, 1fr) auto / minmax(0, 1fr); }
   .left { flex-direction: row; flex-wrap: wrap; }
@@ -367,3 +373,37 @@ button.badge { background: transparent; }
   .box.grow, #ai-box { display: none; }
   .setup-body, .form-grid { grid-template-columns: 1fr; }
 }
+
+/* Store extras, the collection shelves */
+.mortgage { grid-column: 1 / -1; }
+.mortgage .list li { gap: 8px; }
+.lock-note { grid-column: 1 / -1; color: var(--warn); }
+.shelves { overflow: auto; min-height: 0; display: grid; gap: 8px; align-content: start; }
+.shelf-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.piece { padding: 3px; border: 2px solid var(--grid); background: #0a0614; }
+.piece canvas { width: 80px; height: 64px; display: block; }
+.piece-detail canvas { width: 240px; height: 192px; display: block; margin: 0 auto 6px; background: #0a0614; }
+
+/* The slot machine */
+.slot-screen { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgb(5 2 12 / 0.78); }
+.slot-machine {
+  position: relative; width: min(440px, 92vw); padding: 18px 18px 16px; text-align: center;
+  background: linear-gradient(#2a0f4a, #12062a); border: 4px solid #ff4fd8; border-radius: 14px;
+  box-shadow: 0 0 24px #ff4fd8, inset 0 0 18px #00e5ff55; font-family: 'Press Start 2P', monospace; color: #fff;
+}
+.slot-lights { position: absolute; inset: 6px; border-radius: 10px; pointer-events: none;
+  background: radial-gradient(circle, #ffe14d 2px, transparent 3px) 0 0 / 18px 18px; opacity: 0.6; animation: lights 0.5s steps(2) infinite; }
+.slot-screen.won .slot-lights { animation-duration: 0.2s; opacity: 1; }
+@keyframes lights { 50% { background-position: 9px 9px; } }
+.slot-head { position: relative; font-size: 18px; color: #ffe14d; text-shadow: 0 0 8px #ff4fd8, 3px 3px 0 #000; margin-bottom: 12px; }
+.reels { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.reel { height: 54px; overflow: hidden; background: #f4f0ff; border: 3px solid #00e5ff; border-radius: 6px; box-shadow: inset 0 8px 10px #0006, inset 0 -8px 10px #0006; }
+.reel .sym { height: 54px; display: grid; place-items: center; font-size: 11px; text-shadow: 2px 2px 0 #1a0a2a; background: #1a0a2e; border-bottom: 1px solid #3a2a5a; }
+.slot-lever { position: absolute; right: -20px; top: 60px; width: 10px; height: 70px; background: #c8c8d4; border-radius: 4px; transform-origin: bottom; }
+.slot-lever::before { content: ""; position: absolute; top: -12px; left: -5px; width: 20px; height: 20px; border-radius: 50%; background: #ff2a6d; box-shadow: 0 0 8px #ff2a6d; }
+.slot-screen.spinning .slot-lever { animation: pull 0.6s ease-in-out 1; }
+@keyframes pull { 50% { transform: scaleY(-0.6); } }
+.slot-result { position: relative; padding: 8px 10px; background: #12062af0; border: 2px solid #00e5ff; border-radius: 8px; margin-top: 14px; font-family: var(--font-body); font-size: calc(var(--body-size) * 1.05); }
+.slot-title { font-family: 'Press Start 2P', monospace; font-size: 22px; margin: 4px 0; text-shadow: 0 0 10px currentColor, 3px 3px 0 #000; animation: blink 0.4s steps(2) 6; }
+@keyframes blink { 50% { opacity: 0.3; } }
+.slot-result canvas { width: 160px; height: 128px; display: block; margin: 6px auto; background: #0a0614; }
