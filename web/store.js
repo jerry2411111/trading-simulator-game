@@ -1,6 +1,6 @@
 // Store: buy pets, seeds, saplings, houses, furniture, fish and sea life with coins; sell unused items
 // back; mortgage the home for trading dollars and pay loans back.
-import { drawFloor, drawFlower, drawPet, drawPool, drawTree } from './art.js';
+import { drawFloor, drawFlower, drawPet, drawPool, drawTree, PET_SIZE } from './art.js';
 import { decorItems, dressTree } from './themes.js';
 import { drawFurniture, drawGarage, drawHouse, drawWallPiece, HOUSE_W, TILE, WALL_H } from './build.js';
 import { drawPetHead } from './buddy.js';
@@ -22,11 +22,11 @@ function preview(id, info) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
   const size = {
-    pet: [36, 27], flower: [26, 20], tree: [46, 56], house: [HOUSE_W[id] + 8, 110], fish: [26, 18],
+    pet: [Math.max(36, (PET_SIZE[id]?.[0] ?? 30) + 8), Math.max(27, (PET_SIZE[id]?.[1] ?? 20) + 8)], flower: [26, 20], tree: [46, 56], house: [HOUSE_W[id] + 8, 110], fish: [26, 18],
     sea: SEA_SIZE[id] ?? [26, 26], ice: [26, 24], build: [72, 40], clothes: [48, 48], theme: [96, 60], car: [80, 44],
   }[info.kind] ?? [info.size[0] * TILE + 2, info.size[1] * TILE + 2];
   [c.width, c.height] = size;
-  if (info.kind === 'pet') drawPet(g, id, 18, 24, { dir: 1, pose: id === 'parrot' ? 'perch' : 'idle' }, 0);
+  if (info.kind === 'pet') drawPet(g, id, Math.round(size[0] / 2), size[1] - 3, { dir: 1, pose: id === 'parrot' ? 'perch' : 'idle' }, 0);
   else if (info.kind === 'clothes') { [c.width, c.height] = [48, 48]; drawPetHead(g, info.pet, 'happy', 0.2, '#00e5ff', false, { style: info.style, color: info.color }, false); }
   else if (info.kind === 'flower') drawFlower(g, id, 13, 19, 3, 0);
   else if (info.kind === 'tree') drawTree(g, id, 23, 54, 3, 0, 0, false);

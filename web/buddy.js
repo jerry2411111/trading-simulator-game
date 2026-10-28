@@ -61,14 +61,30 @@ function catHead(L) {
       const ear = pts ? L.d : L.c;
       if (L.ears === 'fold') {
         ellipse(g, 15, 17, 5, 3, ear); ellipse(g, 33, 17, 5, 3, ear);
+      } else if (L.ears === 'big' || L.ears === 'small') {  // tall pointed ears (siamese, russian blue) or small low ones (british, persian)
+        const n = L.ears === 'big' ? 14 : 6;
+        const top = L.ears === 'big' ? 6 : 15;
+        [[16, -1], [32, 1]].forEach(([ex, side]) => {
+          for (let j = 0; j < n; j++) {
+            const half = Math.round(((j + 1) / n) * (L.ears === 'big' ? 6 : 5));
+            const sx = ex + side * Math.round((1 - j / n) * 3) + flat * side;
+            rect(g, sx - half, top + flat + j, half * 2 + 1, 1, ear);
+            if (j > 2 && half > 2) rect(g, sx - half + 2, top + flat + j, half * 2 - 3, 1, '#ff9ab0');
+          }
+        });
       } else {
         for (let j = 0; j < 9; j++) { rect(g, 11 + flat + Math.floor(j / 2), 13 + flat + j, 9 - j, 1, ear); rect(g, 28 + Math.ceil(j / 2), 13 + flat + j, 9 - j, 1, ear); }
         for (let j = 2; j < 7; j++) { rect(g, 14 + flat + Math.floor(j / 2), 13 + flat + j, 4 - Math.floor(j / 2), 1, '#ff9ab0'); rect(g, 31 + Math.ceil(j / 2), 13 + flat + j, 4 - Math.floor(j / 2), 1, '#ff9ab0'); }
         if (L.ears === 'tuft') { rect(g, 15 + flat, 9 + flat, 1, 4, L.d); rect(g, 32, 9 + flat, 1, 4, L.d); }
       }
       if (L.fur === 'long') { ellipse(g, 24, 32, 17, 11, L.w); }
-      ellipse(g, 24, 28, L.chubby ? 15 : 14, 10, L.c); ellipse(g, 22, 25, 9, 5, L.c);
-      if (L.pattern === 'tabby') [20, 24, 28].forEach((x) => rect(g, x, 18, 1, 4, L.d));
+      ellipse(g, 24, 28, L.chubby ? 16 : L.slim ? 12 : 14, L.chubby ? 11 : 10, L.c); ellipse(g, 22, 25, L.slim ? 7 : 9, 5, L.c);
+      if (L.slim) ellipse(g, 24, 35, 7, 5, L.c);  // a long wedge face
+      if (L.pattern === 'tabby' || L.pattern === 'classic') [20, 24, 28].forEach((x) => rect(g, x, 18, 1, 4, L.d));
+      if (L.pattern === 'classic') [[12, 1], [36, -1]].forEach(([x, d]) => { rect(g, x - 1, 26, 3, 1, L.d); rect(g, x + d * 2, 27, 1, 3, L.d); rect(g, x - 1, 30, 3, 1, L.d); });  // swirls on the cheeks
+      if (L.pattern === 'rosettes') [[16, 19], [30, 19], [12, 25], [36, 25], [23, 17]].forEach(([x, y]) => { rect(g, x, y, 3, 2, L.d); rect(g, x + 1, y, 1, 1, '#c87a30'); });
+      if (L.sheen) [[16, 20], [28, 19], [34, 24], [13, 26]].forEach(([x, y]) => rect(g, x, y, 1, 1, '#c8d4ec'));
+      if (L.mitts) ellipse(g, 24, 37, 6, 3, '#ffffff');
       if (L.pattern === 'spots') [[17, 19], [24, 18], [31, 19], [14, 24], [34, 24]].forEach(([x, y]) => { rect(g, x, y, 2, 2, L.d); rect(g, x, y, 1, 1, L.c); });
       if (pts) ellipse(g, 24, 31, 8, 6, L.d);
       ellipse(g, 24, 33, L.flat ? 5 : 6, L.flat ? 3 : 4, pts ? L.d : L.w); rect(g, 23, L.flat ? 31 : 30, 3, 2, '#ff8aa8');

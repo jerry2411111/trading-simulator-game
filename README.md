@@ -91,6 +91,10 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
   rarer pets (sugar glider, hedgehog, leopard gecko, bearded dragon, ball python, chinchilla, ferret,
   pacman frog, capybara, marmoset), hamster, rabbit, guinea pig, parrot, turtle, a green anole and a
   lion. Prices follow real-world prices. Each has its own look, habits and portrait next to the chart.
+  Pets are drawn roughly to real-world scale (a hamster or frog is tiny, a chihuahua small, a Labrador
+  twice a cat, a capybara like a big dog, a lion bigger still). Cat breeds differ in build (slim
+  Siamese / Russian Blue / Bengal, chubby British / Scottish / Persian, large Ragdoll and Maine Coon),
+  ears, tail (whip or plume), coat and markings.
   Up to 5 pets live in the garden and 3 in the house (move them between the two); when both are full the
   store won't sell more. Pets can't be sold, only released for nothing. Pets of 1,000 coins or more open a
   portrait window in the house (pat, treat, play) and have three outfits designed for their breed.
