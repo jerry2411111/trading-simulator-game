@@ -304,7 +304,7 @@ export const FLOOR_LOOK = {
   base: ['#0b0614', '#1c1430', '#12606e', '#6e1c5c'],  // the bare ground: black tiles, neon blue and pink edges
   snow: ['#e8eef8', '#d4dcec', '#c0cce4', '#ffffff'], circuit: ['#06120c', '#0a1a12', '#1f8a5a', '#ffd84a'],
   redtile: ['#9a1e16', '#a8261c', '#d8a520', '#5a0e0a'], royal_lawn: ['#3a8a3a', '#2f7a32', '#4a9a44', '#c8c0a0'],
-  zellige: ['#f0ece0', '#1f5aa8', '#1f8a8a', '#e8b020'],
+  zellige: ['#f0ece0', '#1f5aa8', '#1f8a8a', '#e8b020'], graveyard: ['#1a1a22', '#22262a', '#2e3a2a', '#c8c4b4'],
 };
 export const TILE_G = 16;  // ground tiles are 16 px
 
@@ -413,6 +413,17 @@ const PATTERNS = {
     for (let x = x0; x < x0 + w; x += 8) rect(g, x, y0, Math.min(8, x0 + w - x), h, ((x - x0) / 8) % 2 ? p[0] : p[1]);
     for (let i = 0; i < (w * h) / 80; i++) rect(g, x0 + Math.floor(hash(i + 3) * w), y0 + Math.floor(hash(i * 7 + 1) * h), 1, 2, p[2]);
     rect(g, x0, y0, w, 2, p[3]); rect(g, x0, y0 + h - 2, w, 2, p[3]);
+  },
+  graveyard(g, x0, y0, w, h, p, s) {  // dark mossy earth with dead grass, fallen leaves and the odd bone
+    rect(g, x0, y0, w, h, p[0]);
+    noise(g, x0, y0, w, h, [p[0], p[1], p[0]], s, 4);
+    for (let i = 0; i < (w * h) / 70; i++) {
+      const x = x0 + Math.floor(hash(i + s) * w);
+      const y = y0 + Math.floor(hash(i * 3 + s) * h);
+      rect(g, x, y, 1, 2, i % 3 ? p[2] : '#4a3a2a');
+      if (i % 9 === 0) rect(g, x + 1, y, 2, 1, ['#c8501a', '#8a2a1a', '#d8a020'][i % 3]);
+      if (i % 41 === 0) { rect(g, x, y, 3, 1, p[3]); rect(g, x - 1, y - 1, 1, 1, p[3]); rect(g, x + 3, y + 1, 1, 1, p[3]); }
+    }
   },
   zellige(g, x0, y0, w, h, p) {  // Moroccan mosaic: an eight-pointed star in every tile
     tiles(g, x0, y0, w, h, (x, y, tw, th) => {

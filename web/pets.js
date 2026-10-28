@@ -48,6 +48,10 @@ export const LOOKS = {
   parrot: { g: 'parrot' }, turtle: { g: 'turtle' }, lion: { g: 'lion' },
 };
 export const petGroup = (type) => LOOKS[type]?.g ?? 'critter';
+const dark = (hex) => {  // is a color dark enough that a black eye would vanish on it?
+  const n = parseInt(hex.slice(1), 16);
+  return ((n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11) < 90;
+};
 
 // Draw relative to (x, y) and facing `d` (1 right, -1 left).
 function mirror(g, x, y, d) {
@@ -115,7 +119,7 @@ function dogT(g, x, y, s, t, L) {
     if (L.mask) { R(hx - 2, hy - 2, 4, 1, L.d); R(hx + 1, hy, 3, 2, L.w); }
     R(hx + 2, hy, L.flat ? 1 : 2, 2, L.w);
     R(hx + (L.flat ? 3 : 4), hy, 1, 1, K);
-    R(hx, hy - 1, 1, 1, L.e ?? K);
+    R(hx, hy - 1, 1, 1, L.e ?? (dark(L.c) ? '#fff4d8' : K));  // a light eye on a dark coat
     if (L.coat === 'curly') { R(hx - 1, hy - 3, 3, 1, L.w); R(hx - 2, hy - 2, 1, 1, L.w); }
     if (L.coat === 'fluffy') R(hx - 3, hy + 1, 2, 2, L.w);
     ears(hx, hy);
@@ -179,7 +183,7 @@ function catT(g, x, y, s, t, L) {
     if (L.pattern === 'points') { R(hx, hy, 3, 2, L.d); }
     if (L.fur === 'long') R(hx - 3, hy + 1, 2, 2, L.w);
     ears(hx, hy);
-    R(hx + 1, hy - 1, 1, 1, closed ? K : L.e);
+    R(hx + 1, hy - 1, 1, 1, closed ? K : L.e); if (!closed && dark(L.c)) R(hx + 1, hy - 2, 1, 1, '#fff4d8');
     R(hx + (L.flat ? 2 : 3), hy, 1, 1, '#ff9ab0');
   };
   if (s.pose === 'sleep') {

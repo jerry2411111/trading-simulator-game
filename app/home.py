@@ -112,16 +112,17 @@ FLOORS = {  # name, price per zone
     "lawn": ("Lawn", 60), "clover": ("Clover & moss", 80), "gravel": ("Zen gravel", 90), "brick": ("Red brick", 140),
     "stone": ("Stone paving", 160), "deck": ("Wood deck", 200), "neon": ("Neon tiles", 300),
     "snow": ("Snow", 120), "circuit": ("Circuit board", 200), "redtile": ("Red lacquer tiles", 160),
-    "royal_lawn": ("Royal lawn", 180), "zellige": ("Zellige mosaic", 220),
+    "royal_lawn": ("Royal lawn", 180), "zellige": ("Zellige mosaic", 220), "graveyard": ("Graveyard moss", 150),
 }
 THEMES = {  # name, price, its ground: a whole-garden look; buying one also cleans up every wasteland part
     "christmas": ("Christmas garden", 3000, "snow"), "cny": ("Chinese New Year garden", 4000, "redtile"),
-    "cyberpunk": ("Cyberpunk garden", 5000, "circuit"), "muslim": ("Muslim garden", 6000, "zellige"),
+    "cyberpunk": ("Cyberpunk garden", 5000, "circuit"), "halloween": ("Halloween garden", 4500, "graveyard"), "muslim": ("Muslim garden", 6000, "zellige"),
     "royal": ("Royal garden", 8000, "royal_lawn"),
 }
 HOUSES = {  # name, price, level, floor grid (w, h)
     "shack": ("Concrete shack", 0, 1, (9, 6)), "euro": ("Country house", 4000, 2, (13, 8)),
-    "modern": ("Modern house", 8000, 2, (13, 8)), "villa": ("Modern villa", 20000, 3, (18, 10)),
+    "modern": ("Modern house", 8000, 2, (13, 8)), "xmas_house": ("Christmas cottage", 6000, 2, (13, 8)),
+    "haunted_house": ("Haunted manor", 13000, 3, (16, 10)), "villa": ("Modern villa", 20000, 3, (18, 10)),
     "tower": ("Modern tower", 25000, 3, (18, 10)), "palace_cn": ("Chinese palace", 30000, 3, (20, 11)),
     "palace_eu": ("Muslim palace", 35000, 3, (24, 12)), "church": ("St Sophia cathedral", 40000, 3, (20, 11)),
     "palace_gold": ("Golden palace", 60000, 3, (24, 12)),
@@ -135,6 +136,8 @@ WALLS = {
     "tower": [("v", 6, 0, 10, [2, 7]), ("v", 12, 0, 10, [4]), ("h", 5, 12, 18, [15]), ("h", 5, 0, 6, [3])],
     "palace_cn": [("v", 6, 0, 11, [3, 8]), ("v", 14, 0, 11, [3, 8]), ("h", 5, 0, 6, [3]), ("h", 5, 14, 20, [17])],
     "palace_eu": [("h", 5, 0, 24, [3, 12, 20]), ("v", 8, 5, 12, [8]), ("v", 16, 5, 12, [8]), ("v", 6, 0, 5, [2]), ("v", 18, 0, 5, [2])],
+    "xmas_house": [("v", 8, 0, 8, [2, 6]), ("h", 4, 8, 13, [10])],
+    "haunted_house": [("v", 5, 0, 10, [2, 7]), ("v", 11, 0, 10, [3, 7]), ("h", 5, 11, 16, [13])],
     "villa": [("v", 7, 0, 10, [2, 7]), ("h", 5, 12, 18, [14]), ("v", 12, 0, 5, [2])],
     "church": [("v", 4, 0, 11, [2, 8]), ("v", 16, 0, 11, [2, 8])],
     "palace_gold": [("h", 4, 0, 24, [2, 9, 14, 21]), ("v", 6, 4, 12, [8]), ("v", 18, 4, 12, [8])],
@@ -145,6 +148,7 @@ FURNITURE = {  # name, price, footprint (w, h) in floor tiles
     "office_chair": ("Office chair", 80, (1, 1)), "easel": ("Easel", 90, (1, 1)), "vase": ("Vase", 35, (1, 1)),
     "coffee_table": ("Coffee table", 90, (2, 1)), "rug": ("Rug", 120, (3, 2)), "sink": ("Sink", 130, (1, 1)),
     "armchair": ("Armchair", 150, (1, 1)), "desk": ("Desk", 150, (2, 1)), "toilet": ("Toilet", 150, (1, 1)),
+    "mattress": ("Mattress", 60, (2, 2)), "old_laptop": ("Old laptop", 120, (1, 1)), "shower": ("Shower", 300, (1, 1)),
     "dresser": ("Dresser", 160, (2, 1)), "bookshelf": ("Bookshelf", 180, (2, 1)), "dining_table": ("Dining table", 200, (2, 2)),
     "guitar": ("Guitar", 200, (1, 1)), "counter": ("Kitchen counter", 220, (2, 1)), "wardrobe": ("Wardrobe", 250, (2, 1)),
     "record_player": ("Record player", 250, (1, 1)), "bed": ("Bed", 300, (2, 3)), "fish_tank": ("Fish tank", 350, (2, 1)),
@@ -225,12 +229,36 @@ class HomeError(Exception):
     """A refused action; the message is shown to the player."""
 
 
+# What every home starts with: a shower and a toilet in the bathroom, a mattress on the floor, an old laptop.
+STARTER = [("shower", 7, 0), ("toilet", 8, 0), ("mattress", 0, 3), ("old_laptop", 2, 4)]
+
+
 def new():
     return {"income": 0.0, "spent": 0.0, "log": [], "house": "shack", "houses": ["shack"],
             "pool": False, "aquarium": False, "iceland": False, "zones": {"path": {"floor": None}}, "pets": [], "companion": None,
             "aquatic": [], "aqua_fed": time.time(), "flowers": [None] * FLOWER_SLOTS, "trees": [None] * TREE_SLOTS,
-            "inventory": {}, "layouts": {}, "loans": [], "collection": [], "themes": [], "theme": None,
+            "inventory": {}, "layouts": {"shack": _starter()}, "loans": [], "collection": [], "themes": [], "theme": None,
             "garage": False, "cars": []}
+
+
+def _starter():
+    return [{"id": uuid.uuid4().hex[:6], "item": item, "x": x, "y": y, "rot": 0} for item, x, y in STARTER]
+
+
+def _move_in(d, old, new):
+    """Moving house: the furniture comes along, at the same spot when it fits there, else at the first free
+    spot, else into the inventory."""
+    moved = []
+    gw, gh = HOUSES[new][3]
+    for f in d["layouts"].pop(old, []):
+        spots = [(f["x"], f["y"], f["rot"])] + [(x, -1 if f["item"] in WALL_ITEMS else y, r)
+                                               for y in ([-1] if f["item"] in WALL_ITEMS else range(gh)) for x in range(gw) for r in (0, 1)]
+        spot = next((sp for sp in spots if _fits(d, f["item"], *sp, house=new, only=moved)), None)
+        if spot:
+            moved.append({**f, "x": spot[0], "y": spot[1], "rot": spot[2]})
+        else:
+            d["inventory"][f["item"]] = d["inventory"].get(f["item"], 0) + 1
+    d["layouts"][new] = d["layouts"].get(new, []) + moved
 
 
 def normalize(d):
@@ -238,6 +266,8 @@ def normalize(d):
     d = {**new(), **(d or {})}
     d.pop("earnings", None)
     d["zones"].setdefault("path", {"floor": None})  # the front path is always usable from the start
+    if not any(d["layouts"].values()) and d["house"] == "shack":
+        d["layouts"]["shack"] = _starter()  # older saves with an empty shack get the starter furniture too
     if "cabin" in d["houses"]:  # the cabin became the concrete shack
         d["houses"] = ["shack" if h == "cabin" else h for h in d["houses"]]
         d["house"] = "shack" if d["house"] == "cabin" else d["house"]
@@ -595,6 +625,7 @@ def _act(d, action, body, now, cash):
                               "place": "garden" if room["garden"] else "house", "outfits": [], "wearing": None})
         elif kind == "house":
             d["houses"].append(item)
+            _move_in(d, d["house"], item)  # the furniture moves into the new house
             d["house"] = item
         elif kind == "build":
             d[item] = True

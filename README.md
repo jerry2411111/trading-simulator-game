@@ -76,7 +76,7 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
   wasteland: one plain neon panel per part (black with a blue and pink edge) with garbage on it. The front path is clean from the start; pay to clean up each of the
   other five parts, then lay a floor (lawn, clover, gravel, brick,
   stone, wood deck, neon tiles, snow, circuit board, red lacquer tiles, royal lawn, zellige mosaic).
-  Or buy a garden theme (Christmas, Chinese New Year, Cyberpunk, Muslim garden, Royal garden): it cleans
+  Or buy a garden theme (Christmas, Chinese New Year, Cyberpunk, Halloween, Muslim garden, Royal garden): it cleans
   up everything, lays its ground, adds its decorations and dresses the trees; switch between owned themes
   for free. The flower bed sits in the middle (8 flowers that grow as full piles, bloom in 8 hours and sell
   for twice the seed price); four tree spots: pine, maple, apple, sakura and six cyberpunk trees (synth
@@ -92,10 +92,11 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
   store won't sell more. Pets can't be sold, only released for nothing. Pets of 1,000 coins or more open a
   portrait window in the house (pat, treat, play) and have three outfits designed for their breed.
   Each eats at a different price; hungry after 2 days without food, dead after 7 (real days).
-- **House:** a concrete shack to start; country house (4,000) or modern house (level 2); modern villa,
-  modern tower, Chinese palace, Muslim palace, St Sophia cathedral or the golden palace (level 3). Better
+- **House:** a concrete shack to start (with a shower, a toilet, a mattress on the floor and an old laptop);
+  country house (4,000), Christmas cottage or modern house (level 2); haunted manor, modern villa, modern tower, Chinese palace, Muslim palace, St Sophia cathedral or the golden palace (level 3). Better
   houses are bigger in the garden and inside; the palaces fill the whole garden. Rooms are divided by
-  walls; 48 kinds of furniture to place and rotate, plus paintings and windows that hang on the back wall.
+  walls; 51 kinds of furniture to place and rotate, plus paintings and windows that hang on the back wall.
+  Buying a new house moves your furniture into it.
   Click the front door to go back out.
 - **Garage and cars:** buy a garage (2,000) and it stands next to your house; a house of 4,000 or more has
   it built in (clicking the house asks: house or garage). Inside is a showroom: your car turns on a lit

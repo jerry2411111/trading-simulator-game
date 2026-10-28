@@ -219,8 +219,10 @@ function eyes(g, head, mood, t) {
     }
     const big = mood === 'expecting';
     const r = big ? 3 : 2;
-    disc(g, x, y, r, head.ink);
     const look = mood === 'focus' && t % 9 > 1.4 ? 1 : 0;  // mostly watching the chart, sometimes you
+    disc(g, x, y, r + 1, INK);                               // a dark rim so the eye shows on any fur
+    disc(g, x, y, r, head.ink);                              // the iris
+    rect(g, x - (big ? 1 : 0) + look, y - (big ? 1 : 0), big ? 2 : 1, big ? 2 : 1, INK);  // the pupil
     rect(g, x - 1 + look, y - 1, 1, 1, WHITE);
     if (big) { rect(g, x + 1, y + 1, 1, 1, WHITE); rect(g, x - 1, y - 2, 2, 1, WHITE); }
   });

@@ -88,12 +88,65 @@ const PIECES = {
     rect(g, x - 2, y - 21, 2, 3, '#c87a1a'); rect(g, x + 1, y - 21, 2, 3, '#c87a1a');
   },
   fanoos_post(g, x, y, t, i) { rect(g, x, y - 18, 1, 18, '#6a4a1a'); fanoos(g, x, y - 14, t, i); },
+  // halloween
+  tombstone(g, x, y, t, i) {
+    ellipse(g, x, y - 12, 5, 3, '#6a6a76'); rect(g, x - 5, y - 12, 11, 12, '#6a6a76'); rect(g, x - 5, y - 12, 2, 12, '#8a8a96');
+    rect(g, x - 2, y - 10, 5, 1, '#3a3a44'); rect(g, x, y - 12, 1, 5, '#3a3a44'); rect(g, x - 6, y - 1, 13, 1, '#2e3a2a');
+    if (i % 2) for (let k = 0; k < 3; k++) rect(g, x - 4 + k * 4, y - 3, 1, 3, '#3a6a2a');
+  },
+  jack(g, x, y, t, i) {
+    ellipse(g, x, y - 4, 6, 4, '#ff7a1a'); rect(g, x - 1, y - 9, 2, 2, '#3a7a2a'); rect(g, x - 3, y - 8, 1, 7, '#e8601a'); rect(g, x + 2, y - 8, 1, 7, '#e8601a');
+    const f = Math.sin(t * 9 + i) > -0.5 ? '#ffe14d' : '#ffb000';
+    rect(g, x - 3, y - 6, 2, 2, f); rect(g, x + 1, y - 6, 2, 2, f); for (let k = -3; k <= 3; k += 2) rect(g, x + k, y - 3, 1, 1, f);
+    glow(g, x, y - 4, 9, '255,140,30', 0.4);
+  },
+  scarecrow(g, x, y, t) {
+    const sw = Math.round(Math.sin(t * 1.5));
+    rect(g, x, y - 26, 1, 26, '#6a4a22'); rect(g, x - 9, y - 20 + sw, 19, 1, '#6a4a22');
+    rect(g, x - 4, y - 21, 9, 9, '#4a2a5a'); rect(g, x - 4, y - 21, 9, 1, '#6a3a7a'); rect(g, x - 9, y - 21 + sw, 4, 2, '#d8b040'); rect(g, x + 6, y - 21 + sw, 4, 2, '#d8b040');
+    disc(g, x, y - 25, 3, '#e8c890'); rect(g, x - 1, y - 26, 1, 1, '#1a1a1a'); rect(g, x + 1, y - 26, 1, 1, '#1a1a1a'); rect(g, x - 1, y - 24, 3, 1, '#1a1a1a');
+    rect(g, x - 5, y - 29, 11, 2, '#2a1a10'); rect(g, x - 2, y - 33, 5, 4, '#2a1a10');
+  },
+  cauldron(g, x, y, t) {
+    ellipse(g, x, y - 5, 7, 5, '#1a1a22'); ellipse(g, x, y - 9, 6, 1, '#39ff14');
+    for (let k = 0; k < 4; k++) { const p = (t * 0.8 + k / 4) % 1; disc(g, x - 3 + k * 2, y - 10 - Math.round(p * 10), Math.max(0, Math.round(2 - p * 2)), `rgba(80,255,60,${0.8 - p * 0.7})`); }
+    rect(g, x - 6, y - 1, 2, 2, '#3a3a44'); rect(g, x + 5, y - 1, 2, 2, '#3a3a44');
+    for (let k = -4; k <= 4; k += 2) rect(g, x + k, y, 1, 1, (t * 8 + k) % 2 < 1 ? '#ff4a1c' : '#ffb000');
+    glow(g, x, y - 9, 10, '80,255,60', 0.35);
+  },
+  web_arch(g, x, y) {
+    rect(g, x - 14, y - 22, 2, 22, '#2a1a30'); rect(g, x + 13, y - 22, 2, 22, '#2a1a30');
+    for (let i = -14; i <= 14; i++) rect(g, x + i, y - 24 + Math.round((i * i) / 40), 1, 2, '#2a1a30');
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI; for (let r = 1; r < 9; r++) rect(g, x - 12 + Math.round(Math.cos(a) * r), y - 22 + Math.round(Math.sin(a) * r), 1, 1, '#c8c8d4'); }
+    disc(g, x + 8, y - 14, 1, '#1a1a1a');
+  },
+  // cyberpunk, refined
+  neon_sign(g, x, y, t, i) {
+    rect(g, x, y - 26, 2, 26, '#2a2a3a');
+    rect(g, x - 5, y - 30, 12, 18, '#0a0618'); rect(g, x - 5, y - 30, 12, 1, i % 2 ? '#ff4fd8' : '#00e5ff');
+    const on = Math.sin(t * 7 + i) > -0.85;
+    for (let k = 0; k < 3; k++) {  // three glyphs, one under the other
+      const gy = y - 28 + k * 5;
+      const c = on ? (i % 2 ? '#ff4fd8' : '#00e5ff') : '#3a2a4a';
+      rect(g, x - 2, gy, 6, 1, c); rect(g, x + (k % 2 ? 3 : -2), gy, 1, 4, c); rect(g, x - 1, gy + 2, 4, 1, c);
+    }
+    if (on) glow(g, x + 1, y - 21, 10, i % 2 ? '255,79,216' : '0,229,255', 0.3);
+  },
+  kiosk(g, x, y, t) {
+    rect(g, x - 8, y - 18, 16, 18, '#1a1a2a'); rect(g, x - 9, y - 20, 18, 3, '#ff4fd8');
+    rect(g, x - 6, y - 15, 12, 7, '#0a2a3a'); for (let k = 0; k < 5; k++) rect(g, x - 5 + k * 2, y - 14 + (k % 2) * 3, 1, 2, ['#39ff14', '#ffe14d', '#ff4f6a', '#4fd8ff', '#ff9a1a'][k]);
+    rect(g, x - 6, y - 6, 12, 2, '#3a3a4a'); rect(g, x + 3, y - 5 + ((Math.floor(t * 2)) % 2), 2, 1, '#00e5ff');
+    glow(g, x, y - 12, 12, '0,229,255', 0.2);
+  },
 };
 
 // What each theme puts where: [piece, x, ground y]
 export const DECOR = {
   christmas: [['xmas_tree', 24, 84], ['xmas_tree', 232, 84], ['snowman', 100, 198], ['gifts', 156, 198], ['candy', 114, 108], ['candy', 142, 108], ['candy', 114, 152], ['candy', 142, 152]],
-  cyberpunk: [['neon_arch', 128, 166], ['billboard', 22, 86], ['billboard', 234, 86], ['bollard', 98, 98], ['bollard', 158, 98], ['bollard', 98, 156], ['bollard', 158, 156], ['bollard', 110, 196], ['bollard', 146, 196]],
+  cyberpunk: [['neon_arch', 128, 166], ['billboard', 22, 86], ['billboard', 234, 86], ['neon_sign', 96, 100], ['neon_sign', 160, 100],
+    ['kiosk', 226, 158], ['bollard', 98, 156], ['bollard', 158, 156], ['bollard', 110, 196], ['bollard', 146, 196]],
+  halloween: [['web_arch', 128, 166], ['scarecrow', 24, 86], ['tombstone', 232, 86], ['tombstone', 214, 92], ['jack', 98, 100], ['jack', 158, 100],
+    ['jack', 110, 198], ['jack', 146, 198], ['cauldron', 226, 158], ['tombstone', 30, 158]],
   cny: [['lantern_post', 98, 98], ['lantern_post', 158, 98], ['firecrackers', 110, 202], ['firecrackers', 146, 202], ['fu', 24, 86], ['fu', 232, 86], ['lion_dance', 100, 196]],
   royal: [['fountain', 26, 98], ['fountain', 230, 98], ['topiary', 96, 104], ['topiary', 160, 104], ['topiary', 96, 158], ['topiary', 160, 158], ['statue', 108, 200], ['statue', 148, 200], ['urn', 60, 98], ['urn', 196, 98]],
   muslim: [['pointed_arch', 128, 170], ['octagon_fountain', 26, 98], ['octagon_fountain', 230, 98], ['date_palm', 20, 84], ['date_palm', 236, 84], ['fanoos_post', 98, 98], ['fanoos_post', 158, 98], ['fanoos_post', 110, 198], ['fanoos_post', 146, 198]],
@@ -114,8 +167,21 @@ export function dressTree(g, theme, x, y, t, i) {
     for (let k = -8; k <= 8; k += 2) rect(g, x + k, top + 6 + Math.abs(k) / 2, 2, 1, '#ffffff');  // snow on the crown
     for (let k = 0; k < 8; k++) rect(g, x - 10 + Math.floor(hash(k + i * 9) * 20), top + 10 + Math.floor(hash(k + 3) * 16), 1, 1, ['#ff2a2a', '#ffe14d', '#3a8aff'][(k + Math.floor(t * 2)) % 3]);
     rect(g, x - 1, top - 1, 3, 3, '#ffe14d');
-  } else if (theme === 'cyberpunk') {
-    for (let a = 0; a < 16; a++) { const r = 12; rect(g, x + Math.round(Math.cos(a / 16 * 6.28 + t) * r), top + 16 + Math.round(Math.sin(a / 16 * 6.28 + t) * 3), 1, 1, a % 2 ? '#00e5ff' : '#ff4fd8'); }
+  } else if (theme === 'cyberpunk') {  // two holographic rings turning opposite ways, and data sparks
+    [[12, 16, 1], [9, 8, -1.4]].forEach(([r, dy, sp]) => {
+      for (let a = 0; a < 20; a++) {
+        const ang = a / 20 * 6.28 + t * sp;
+        if (Math.sin(ang) < 0 && a % 2) continue;  // the back half is fainter
+        rect(g, x + Math.round(Math.cos(ang) * r), top + dy + Math.round(Math.sin(ang) * 3), 1, 1, a % 3 ? '#00e5ff' : '#ff4fd8');
+      }
+    });
+    for (let k = 0; k < 3; k++) { const p = (t * 0.7 + k / 3 + i * 0.2) % 1; rect(g, x - 8 + k * 8, top + 30 - Math.round(p * 24), 1, 2, `rgba(57,255,20,${1 - p})`); }
+  } else if (theme === 'halloween') {  // bare-branch shadows, a hanging pumpkin lantern and a bat
+    rect(g, x - 9, top + 14, 1, 6, '#3a2a1a'); ellipse(g, x - 9, top + 22, 2, 2, '#ff7a1a'); rect(g, x - 10, top + 22, 1, 1, '#ffe14d'); rect(g, x - 8, top + 22, 1, 1, '#ffe14d');
+    glow(g, x - 9, top + 22, 6, '255,140,30', 0.4);
+    const f = Math.floor(t * 8 + i) % 2;
+    const bx = x + 6 + Math.round(Math.sin(t * 2 + i) * 6);
+    rect(g, bx, top + 6, 3, 1, '#0a0610'); rect(g, bx - 2, top + 6 - f, 2, 1, '#0a0610'); rect(g, bx + 3, top + 6 - f, 2, 1, '#0a0610');
   } else if (theme === 'cny') {
     lantern(g, x - 8, top + 18, t, i); lantern(g, x + 8, top + 16, t, i + 2);
     rect(g, x - 2, y - 14, 4, 2, '#e81e1e');
@@ -137,7 +203,26 @@ export function weather(g, theme, t, W, H) {
     const fx = 30 + hash(n) * 196;
     const fy = 10 + hash(n + 7) * 20;
     if (p < 0.6) for (let k = 0; k < 14; k++) { const a = (k / 14) * 6.28; rect(g, fx + Math.cos(a) * p * 26, fy + Math.sin(a) * p * 20 + p * p * 8, 1, 1, ['#ff2a2a', '#ffe14d', '#ff8a1a'][k % 3]); }
-  } else if (theme === 'cyberpunk') {
+  } else if (theme === 'halloween') {  // bats across the moon and fog drifting low over the ground
+    for (let b = 0; b < 5; b++) {
+      const x = (t * (14 + b * 3) + b * 60) % (W + 30) - 15;
+      const y = 14 + b * 9 + Math.sin(t * 3 + b) * 4;
+      const f = Math.floor(t * 10 + b) % 2;
+      rect(g, x, y, 3, 1, '#0a0610'); rect(g, x - 2, y - f, 2, 1, '#0a0610'); rect(g, x + 3, y - f, 2, 1, '#0a0610');
+    }
+    for (let k = 0; k < 7; k++) { const x = ((t * 5 + k * 47) % (W + 60)) - 30; ellipse(g, x, 120 + k * 12, 22, 3, 'rgba(200,210,230,0.08)'); }
+  } else if (theme === 'cyberpunk') {  // neon rain, light pulses running along the path, a hologram koi, drones
+    for (let k = 0; k < 70; k++) {
+      const x = (hash(k) * W + t * 40) % W;
+      const y = (hash(k + 50) * H + t * (90 + (k % 4) * 20)) % H;
+      rect(g, x, y, 1, 3, k % 5 ? 'rgba(120,200,255,0.35)' : 'rgba(255,79,216,0.45)');
+    }
+    for (let k = 0; k < 3; k++) { const p = (t * 0.4 + k / 3) % 1; const py = 200 - p * 110; rect(g, 127, py, 2, 2, '#00e5ff'); glow(g, 128, py, 5, '0,229,255', 0.5); }
+    const kx = 128 + Math.cos(t * 0.6) * 26;
+    const ky = 120 + Math.sin(t * 0.6) * 8;
+    const dir = -Math.sin(t * 0.6) > 0 ? 1 : -1;
+    for (let k = 0; k < 7; k++) rect(g, kx - dir * k, ky + Math.round(Math.sin(t * 6 - k) * 1), 1, 2 - (k > 4 ? 1 : 0), `rgba(255,${120 + k * 15},${180 - k * 10},0.75)`);
+    rect(g, kx + dir, ky, 1, 1, '#ffffff');
     [0, 1].forEach((i) => {
       const x = (t * (18 + i * 7) + i * 120) % (W + 40) - 20;
       const y = 40 + i * 30 + Math.sin(t * 2 + i) * 4;

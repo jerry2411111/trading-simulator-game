@@ -630,6 +630,8 @@ export function initHome(ctx) {
     vending: ['beg', false, 'is begging at the vending machine'], treadmill: ['play', true, 'is running on the treadmill'],
     pool_table: ['watch', true, 'is batting the pool balls around'], massage_chair: ['rest', true, 'is getting a massage'],
     grand_fireplace: ['rest', false, 'is warming up by the grand fire'],
+    mattress: ['rest', true, 'is curled up on the mattress'], old_laptop: ['watch', false, 'is watching the old laptop flicker'],
+    shower: ['drink', false, 'is licking drops off the shower'],
     bookshelf: ['hide', false, 'is napping by the books'], desk: ['hide', true, 'is lying on the desk'],
     coffee_table: ['watch', true, 'is sitting on the coffee table'], floor_lamp: ['watch', false, 'is chasing the lamp light'],
   };

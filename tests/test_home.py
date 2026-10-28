@@ -73,7 +73,7 @@ def test_furniture_cannot_cross_inner_walls():
     with pytest.raises(home.HomeError):   # the shack's bathroom wall is left of column 7
         h("place", item="sofa", x=5, y=0, rot=0)
     v = h("place", item="sofa", x=4, y=0, rot=0)
-    assert v["state"]["layouts"]["shack"][0]["x"] == 4
+    assert v["state"]["layouts"]["shack"][-1]["x"] == 4
 
 
 def test_old_cabin_home_becomes_the_shack():
@@ -93,6 +93,7 @@ def test_companion_falls_back_to_a_living_pet():
 
 def test_mortgage_one_house_then_the_whole_home_and_pay_back():
     h = Home()
+    h.d["layouts"]["shack"] = []          # an empty room: only the loans count here
     h("buy", item="modern")
     h("mortgage", kind="house", ref="modern", plan="p70")    # worth the $20,000 base + $8,000
     assert h.cash == pytest.approx(28_000 * 0.7)
@@ -147,6 +148,7 @@ def test_catalog_ids_are_unique():
 
 def test_interest_is_paid_daily_and_unpaid_interest_forecloses():
     h = Home()
+    h.d["layouts"]["shack"] = []          # an empty room: only the loans count here
     h("buy", item="modern")
     h("clean", zone="southwest")
     h("buy", item="pool")
@@ -208,6 +210,7 @@ def test_pricey_pets_have_their_own_clothes():
 
 def test_a_house_mortgages_with_its_furniture_and_pets_never_count():
     h = Home()
+    h.d["layouts"]["shack"] = []          # an empty room
     h("buy", item="sofa")
     h("place", item="sofa", x=4, y=0, rot=0)
     h("buy", item="corgi")
@@ -235,6 +238,7 @@ def test_wall_pieces_hang_side_by_side_on_the_back_wall():
     h = Home()
     for item in ("painting_sunset", "window_arched", "sofa"):
         h("buy", item=item)
+    h.d["layouts"]["shack"] = []          # an empty room
     h("place", item="painting_sunset", x=0, y=-1, rot=0)
     with pytest.raises(home.HomeError):
         h("place", item="window_arched", x=1, y=-1, rot=0)            # overlaps the 2-wide painting
@@ -269,3 +273,20 @@ def test_the_front_path_is_clean_from_the_start():
     assert "path" in home.normalize({"zones": {}})["zones"]
     with pytest.raises(home.HomeError, match="already clean"):
         Home()("clean", zone="path")
+
+
+def test_a_new_home_has_a_bathroom_a_mattress_and_a_laptop_that_move_house():
+    h = Home()
+    items = sorted(f["item"] for f in h.d["layouts"]["shack"])
+    assert items == ["mattress", "old_laptop", "shower", "toilet"]
+    h("buy", item="sofa")
+    h("place", item="sofa", x=4, y=0, rot=0)
+    v = h("buy", item="palace_gold")                       # upgrading: the furniture comes along
+    moved = v["state"]["layouts"]["palace_gold"]
+    assert sorted(f["item"] for f in moved) == ["mattress", "old_laptop", "shower", "sofa", "toilet"]
+    assert v["state"]["layouts"].get("shack", []) == [] and v["state"]["house"] == "palace_gold"
+
+
+def test_an_older_empty_shack_gets_the_starter_furniture():
+    d = home.normalize({"house": "shack", "houses": ["shack"], "layouts": {}})
+    assert len(d["layouts"]["shack"]) == len(home.STARTER)
