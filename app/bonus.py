@@ -1,4 +1,5 @@
-"""The slot machine: every 5 trades the player spins once and wins one of these (weights add up to 100).
+"""The slot machine: every 5 trades the player earns a spin. Spins are banked until the player pulls the
+lever, and each prize goes into storage until the player chooses to use it (weights add up to 100).
 
 Boosts wait for the player's next closing trade (a trade that realizes profit or loss):
   2x / 5x  the net profit of that trade is paid again (once / four times more); losses are not multiplied

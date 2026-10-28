@@ -46,7 +46,9 @@ Tests: `python -m pytest`
   be lowered but never below $0.001/share and $1 per order; the market-order spread can be 0. Money can't
   be added: mortgage your home (Store → Mortgage) instead, or start a new game / load a save. No target
   and no win screen; the game ends only if equity reaches $0.
-- **Slot machine:** every 5 trades the reels spin. 30% shows the next 2 hours' highest and lowest price
+- **Slot machine:** every 5 trades earns a spin. Spins are banked: pull the lever whenever you like from
+  the 🎰 button in the Earnings box. Each prize goes into storage, and you choose when to use it (reveals
+  are for the stock you're viewing, from the moment you use them). 30% shows the next 2 hours' highest and lowest price
   on the chart, 20% pays double the profit of your next closing trade, 10% makes your next closing trade
   unable to lose, 10% shows whether the stock closes up or down the next trading day, 10% gives 10
   trades without fee or spread, 10% gives 30 of them, 5% pays five times the profit of your next closing

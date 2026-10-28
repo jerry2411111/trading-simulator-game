@@ -79,8 +79,8 @@ document.querySelectorAll('[data-back]').forEach((b) => { b.onclick = closeScree
 const petWindow = initPetWindow({ act: (action, body) => screens.home.act(action, body) });
 const refreshCoins = async () => { try { onHome(await (await fetch('/api/home')).json()); } catch { /* offline */ } };
 
-// ----- the slot machine (every 5 trades) and what it gives
-const slot = initSlot({ onBonus: (b) => { state.bonus = b; renderBonus(); showReveals(); }, resume: () => send('speed', { value: lastSpeed }) });
+// ----- the slot machine (a spin every 5 trades, pulled when the player likes) and the stored rewards
+const slot = initSlot({ onBonus: (b) => { state.bonus = b; renderBonus(); showReveals(); }, resume: () => send('speed', { value: lastSpeed }), send: (cmd, extra) => send(cmd, extra) });
 
 function activeReveals() {
   const day = state.session?.day;
@@ -95,7 +95,8 @@ function showReveals() {
 function renderBonus() {
   const b = state.bonus;
   if (!b) return;
-  const parts = [`🎰 spin in ${b.next_spin} trade${b.next_spin === 1 ? '' : 's'}`];
+  slot.render(b);
+  const parts = [];
   if (b.boost.mult > 1) parts.push(`<b class="up">${b.boost.mult}x</b> next close`);
   if (b.boost.shield) parts.push('<b class="up">shield</b> next close');
   if (b.boost.free) parts.push(`<b class="up">${b.boost.free}</b> free trades`);
@@ -175,7 +176,18 @@ function handle(m) {
       break;
     case 'slot':
       state.bonus = m.bonus;
+      renderBonus();
       slot.spin(m);
+      break;
+    case 'prize':
+      state.bonus = m.bonus;
+      renderBonus();
+      showReveals();
+      slot.used(m);
+      break;
+    case 'bonus':
+      state.bonus = m.bonus;
+      renderBonus();
       break;
     case 'ai':
       state.ai.log = [...state.ai.log, m.entry].slice(-30);

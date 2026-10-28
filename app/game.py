@@ -130,7 +130,9 @@ class Game:
         self.thinking = False     # an AI decision is in flight: the clock waits
         self.home = home.new()    # this game's garden, house, coins and collection
         self.boost = bonus.new_boost()
-        self.trade_count = 0      # trades so far: every bonus.EVERY of them spins the slot machine
+        self.trade_count = 0      # trades so far: every bonus.EVERY of them earns a slot machine spin
+        self.spins = 0            # spins earned and not pulled yet
+        self.prizes = {}          # outcome -> how many of that prize are stored, waiting to be used
         self.reveals = []         # slot machine reveals shown on the chart (2-hour range, next-day direction)
 
     # ----- state sent to the frontend
@@ -221,7 +223,12 @@ class Game:
         return msg
 
     def bonus_view(self):
-        return {"boost": self.boost, "next_spin": bonus.EVERY - self.trade_count % bonus.EVERY, "reveals": self.reveals}
+        return {"boost": self.boost, "next_spin": bonus.EVERY - self.trade_count % bonus.EVERY, "reveals": self.reveals,
+                "spins": self.spins, "prizes": [{"outcome": k, "n": n, "title": bonus.OUTCOMES[k][1], "text": bonus.OUTCOMES[k][2]}
+                                                for k, n in self.prizes.items() if n]}
+
+    async def push_bonus(self):
+        await self.broadcast({"type": "bonus", "bonus": self.bonus_view()})
 
     def others(self, a, b):
         """Split view: bars a..b-1 of every stock except the viewed one, by alias."""
@@ -426,30 +433,56 @@ class Game:
     async def count_trades(self, trades):
         before = self.trade_count
         self.trade_count += len(trades)
-        for _ in range(self.trade_count // bonus.EVERY - before // bonus.EVERY):
-            await self.spin()
+        if earned := self.trade_count // bonus.EVERY - before // bonus.EVERY:
+            self.spins += earned
+            self.autosave()
+            await self.push_bonus()
+            await self.broadcast({"type": "notice", "text": "🎰 You earned a slot machine spin! Pull it whenever you like."})
 
     async def spin(self):
-        """One slot machine spin. The clock pauses while the reels turn; the player starts it again."""
-        outcome, detail = bonus.spin(self.rng), None
-        if outcome == "gift":
-            detail = collection.gift({c["id"] for c in self.home["collection"]}, self.rng)
-            if detail:
-                self.home["collection"].append({"id": detail["id"], "t": time.time(), "day": self.s.day_no})
-        elif outcome == "range2h":
-            detail = self.range_reveal()
-        elif outcome == "next_day":
-            detail = await self.next_day_reveal()
-        if outcome in ("gift", "range2h") and detail is None:  # collection complete / day over: a 2x instead
-            outcome = "double"
-        bonus.grant(self.boost, outcome)
-        if outcome in ("range2h", "next_day"):
-            self.reveals = [r for r in self.reveals if r["kind"] != outcome] + [detail]
+        """Pull the lever once: the prize goes into storage. The clock pauses while the reels turn; the
+        player starts it again."""
+        if self.spins < 1:
+            return await self.error(f"No spins yet: you earn one every {bonus.EVERY} trades.")
+        self.spins -= 1
+        outcome = bonus.spin(self.rng)
+        self.prizes[outcome] = self.prizes.get(outcome, 0) + 1
         self.speed = 0
         self.autosave()
         await self.push_status()
         _, title, text = bonus.OUTCOMES[outcome]
-        await self.broadcast({"type": "slot", "outcome": outcome, "title": title, "text": text, "detail": detail,
+        await self.broadcast({"type": "slot", "outcome": outcome, "title": title, "text": text, "bonus": self.bonus_view()})
+
+    async def use_prize(self, outcome):
+        """Use one stored prize now. Reveals are for the stock being viewed, at the current time."""
+        s = self.s
+        if not self.prizes.get(outcome):
+            return await self.error("You don't have that reward.")
+        if outcome in ("range2h", "next_day") and not (s and s.ready()):
+            return await self.error("Start trading first: reveals are for the stock you're viewing.")
+        if outcome == "next_day" and s.day_idx + 1 >= len(s.days):
+            return await self.error("There's no next trading day in this game. Keep it for another time.")
+        detail = None
+        if outcome == "range2h" and (detail := self.range_reveal()) is None:
+            return await self.error("Trading is over for today. Use it tomorrow.")
+        self.prizes[outcome] -= 1
+        if not self.prizes[outcome]:
+            del self.prizes[outcome]
+        used = outcome
+        if outcome == "gift":
+            detail = collection.gift({c["id"] for c in self.home["collection"]}, self.rng)
+            if detail:
+                self.home["collection"].append({"id": detail["id"], "t": time.time(), "day": s.day_no if s else None})
+            else:  # the collection is complete: a 2x instead
+                used = "double"
+        elif outcome == "next_day":
+            detail = await self.next_day_reveal()
+        bonus.grant(self.boost, used)
+        if used in ("range2h", "next_day"):
+            self.reveals = [r for r in self.reveals if r["kind"] != used] + [detail]
+        self.autosave()
+        _, title, text = bonus.OUTCOMES[used]
+        await self.broadcast({"type": "prize", "outcome": used, "title": title, "text": text, "detail": detail,
                               "bonus": self.bonus_view()})
 
     def range_reveal(self):
@@ -576,6 +609,10 @@ class Game:
         elif cmd == "indicators":
             self.shown = set(msg.get("names") or ()) & set(indicators.NAMES)
             await self.push_snapshot()
+        elif cmd == "spin":
+            await self.spin()
+        elif cmd == "use_prize" and msg.get("outcome") in bonus.OUTCOMES:
+            await self.use_prize(msg["outcome"])
         elif cmd == "stats":
             await self.broadcast({"type": "stats", "overall": stats.overall(
                 self.days, self.account.trades, [e for _, e in self.curve + self.today]),
@@ -672,6 +709,7 @@ class Game:
         self.s.stocks[ticker] = self.s.new_stock(ticker)
         self.view, self.pos, self.ai_mark = ticker, 1, 1
         self.home, self.boost, self.trade_count, self.reveals = home.new(), bonus.new_boost(), 0, []
+        self.spins, self.prizes = 0, {}
         self.reset_account()
         self.start_worker()
         self.autosave()
@@ -750,6 +788,7 @@ class Game:
                 "account": asdict(self.account), "day_start": self.day_start, "over": self.over,
                 "days": self.days, "curve": self.curve, "today": self.today, "pending": self.pending,
                 "home": self.home, "boost": self.boost, "trade_count": self.trade_count, "reveals": self.reveals,
+                "spins": self.spins, "prizes": self.prizes,
                 "summary": {"day": s.day_no if s else None, "equity": round(equity, 2)}}
 
     def restore(self, d):
@@ -763,6 +802,8 @@ class Game:
         self.boost = {**bonus.new_boost(), **d.get("boost", {})}
         self.trade_count = d.get("trade_count", len(self.account.trades))
         self.reveals = d.get("reveals", [])
+        self.spins = d.get("spins", 0)
+        self.prizes = {k: n for k, n in d.get("prizes", {}).items() if k in bonus.OUTCOMES and n > 0}
         self.start_worker()
 
     def autosave(self):

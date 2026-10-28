@@ -70,6 +70,7 @@
         <div class="kv"><span>Today</span><b id="pnl-today" class="num">—</b></div>
         <div class="kv"><span>Total</span><b id="pnl-total" class="num">—</b></div>
         <div class="kv"><span>Buying power</span><b id="buying-power" class="num">—</b></div>
+        <button id="prize-btn" class="prize-btn" title="Slot machine spins and stored rewards">🎰 0 spins · 🎁 0 rewards</button>
         <div id="bonus-line" class="bonus-line small"></div>
       </div>
       <div class="box">
@@ -181,10 +182,21 @@
         <p id="slot-title" class="slot-title"></p>
         <p id="slot-text"></p>
         <div id="slot-detail"></div>
-        <button id="slot-collect" class="primary">Collect &amp; continue</button>
+        <button id="slot-collect" class="primary">Store it &amp; continue</button>
       </div>
     </div>
   </div>
+
+  <dialog id="prizes" class="window prize-window">
+    <div class="titlebar">🎰 LUCKY TAPE — spins &amp; rewards</div>
+    <div class="window-body">
+      <div class="prize-top"><span id="prize-spins"></span><button id="prize-spin" class="primary">Pull the lever</button></div>
+      <p class="muted">You earn a spin every 5 trades. Prizes wait here until you choose to use one.</p>
+      <div id="prize-used" class="prize-used" hidden></div>
+      <div id="prize-list" class="prize-list"></div>
+      <div class="row"><button id="prizes-close">Close</button></div>
+    </div>
+  </dialog>
 
   <dialog id="pet-window" class="window pet-window">
     <div class="titlebar"><span id="pet-name"></span></div>

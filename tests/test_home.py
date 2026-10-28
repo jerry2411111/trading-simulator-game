@@ -290,3 +290,44 @@ def test_a_new_home_has_a_bathroom_a_mattress_and_a_laptop_that_move_house():
 def test_an_older_empty_shack_gets_the_starter_furniture():
     d = home.normalize({"house": "shack", "houses": ["shack"], "layouts": {}})
     assert len(d["layouts"]["shack"]) == len(home.STARTER)
+
+
+def test_slot_spins_are_banked_and_prizes_stored():
+    import asyncio
+    from app.game import Game
+    sent = []
+
+    async def out(m):
+        sent.append(m)
+
+    g = Game(out)
+    g.autosave = lambda: None
+
+    async def run():
+        await g.count_trades([{}] * 4)
+        assert g.spins == 0
+        await g.count_trades([{}] * 7)                    # 11 trades: two spins earned, none pulled
+        assert g.spins == 2 and not g.prizes
+        await g.spin()
+        assert g.spins == 1 and sum(g.prizes.values()) == 1
+        assert sent[-1]["type"] == "slot" and sent[-1]["bonus"]["prizes"][0]["n"] == 1
+        g.prizes = {"x5": 1, "gift": 1, "range2h": 1}
+        await g.use_prize("x5")
+        assert g.boost["mult"] == 5 and "x5" not in g.prizes
+        await g.use_prize("gift")
+        assert len(g.home["collection"]) == 1 and "gift" not in g.prizes
+        await g.use_prize("range2h")                      # no game running: refused and kept
+        assert g.prizes == {"range2h": 1} and sent[-1]["type"] == "error"
+        await g.use_prize("shield")                       # not owned
+        assert sent[-1]["type"] == "error" and not g.boost["shield"]
+        g.spins = 0
+        await g.spin()
+        assert sent[-1]["type"] == "error"
+        d = g.to_dict()
+        g2 = Game(out)
+        g2.start_worker = lambda: None
+        d["prizes"] = {**d["prizes"], "bogus": 3}
+        g2.restore(d)
+        assert g2.prizes == {"range2h": 1} and g2.spins == 0
+
+    asyncio.run(run())
