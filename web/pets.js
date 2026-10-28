@@ -69,191 +69,289 @@ export const STYLE_PART = {
   sweater: 'torso', hoodie: 'torso', raincoat: 'torso', vest: 'torso', tuxedo: 'torso', kimono: 'torso', tutu: 'waist', cape: 'back',
 };
 
-function wear(R, outfit, at) {
+function wear(R, outfit, at, k = 1) {  // k: how many pixels one clothing pixel takes on this sprite
   if (!outfit) return;
   const { style, color } = outfit;
   const part = STYLE_PART[style];
   const [nx, ny] = at.neck;
   const [hx, hy] = at.head;
   const [tx, ty, tw] = at.torso;
+  const P = (ax, ay, dx, dy, w, h, c) => R(ax + dx * k, ay + dy * k, w * k, h * k, c);
   if (part === 'torso' || part === 'waist' || part === 'back') {
     const h = part === 'waist' ? 2 : 3;
-    R(tx - tw, ty + (part === 'waist' ? 1 : -1), tw * 2, h, color);
-    if (style === 'tuxedo') { R(tx + tw - 3, ty - 1, 2, 3, '#ffffff'); R(nx, ny, 2, 1, '#d8102e'); }
-    if (style === 'kimono') R(tx - 1, ty - 1, 1, 3, '#ffd84a');
-    if (style === 'sweater') R(tx - tw, ty + 1, tw * 2, 1, '#ffffff');
-    if (style === 'hoodie' || style === 'raincoat') R(hx - 2, hy - 2, 4, 2, color);
-    if (style === 'tutu') R(tx - tw - 1, ty + 2, tw * 2 + 2, 1, '#ffffff');
-    if (style === 'cape') R(tx - tw - 1, ty - 2, 3, 4, color);
+    R(tx - tw, ty + (part === 'waist' ? k : -k), tw * 2, h * k, color);
+    if (style === 'tuxedo') { R(tx + tw - 3 * k, ty - k, 2 * k, 3 * k, '#ffffff'); P(nx, ny, 0, 0, 2, 1, '#d8102e'); }
+    if (style === 'kimono') R(tx - k, ty - k, k, 3 * k, '#ffd84a');
+    if (style === 'sweater') R(tx - tw, ty + k, tw * 2, k, '#ffffff');
+    if (style === 'hoodie' || style === 'raincoat') P(hx, hy, -2, -1, 4, 2, color);
+    if (style === 'tutu') R(tx - tw - k, ty + 2 * k, tw * 2 + 2 * k, k, '#ffffff');
+    if (style === 'cape') R(tx - tw - k, ty - 2 * k, 3 * k, 4 * k, color);
   } else if (part === 'neck') {
-    R(nx - 1, ny, 3, 2, color);
-    if (style === 'bowtie') { R(nx - 2, ny, 1, 2, color); R(nx + 2, ny, 1, 2, color); R(nx, ny, 1, 1, '#1a1a1a'); }
-    if (style === 'scarf') R(nx - 2, ny + 1, 1, 3, color);
-    if (style === 'sailor') { R(nx - 1, ny + 1, 3, 1, '#ffffff'); R(hx - 1, hy - 3, 3, 1, '#ffffff'); R(hx - 1, hy - 4, 3, 1, '#2a4ab8'); }
+    P(nx, ny, -1, 0, 3, 2, color);
+    if (style === 'bowtie') { P(nx, ny, -2, 0, 1, 2, color); P(nx, ny, 2, 0, 1, 2, color); P(nx, ny, 0, 0, 1, 1, '#1a1a1a'); }
+    if (style === 'scarf') P(nx, ny, -2, 1, 1, 3, color);
+    if (style === 'sailor') { P(nx, ny, -1, 1, 3, 1, '#ffffff'); P(hx, hy, -1, -1, 3, 1, '#ffffff'); P(hx, hy, -1, -2, 3, 1, '#2a4ab8'); }
   } else {
-    if (style === 'crown') { R(hx - 1, hy - 4, 4, 2, '#ffd21f'); R(hx - 1, hy - 5, 1, 1, '#ffd21f'); R(hx + 2, hy - 5, 1, 1, '#ffd21f'); R(hx, hy - 3, 1, 1, '#d8102e'); }
-    if (style === 'flower') { R(hx - 2, hy - 3, 1, 1, '#ff4f9a'); R(hx, hy - 4, 1, 1, '#ffd84a'); R(hx + 2, hy - 3, 1, 1, '#9fd8ff'); }
-    if (style === 'yuzu') { R(hx - 1, hy - 5, 3, 3, '#ffb020'); R(hx, hy - 6, 1, 1, '#3a8a2a'); }
+    if (style === 'crown') { P(hx, hy, -1, -2, 4, 2, '#ffd21f'); P(hx, hy, -1, -3, 1, 1, '#ffd21f'); P(hx, hy, 2, -3, 1, 1, '#ffd21f'); P(hx, hy, 0, -1, 1, 1, '#d8102e'); }
+    if (style === 'flower') { P(hx, hy, -2, -1, 1, 1, '#ff4f9a'); P(hx, hy, 0, -2, 1, 1, '#ffd84a'); P(hx, hy, 2, -1, 1, 1, '#9fd8ff'); }
+    if (style === 'yuzu') { P(hx, hy, -1, -3, 3, 3, '#ffb020'); P(hx, hy, 0, -4, 1, 1, '#3a8a2a'); }
   }
 }
 
-// ---------------------------------------------------------------- dogs
+// ---------------------------------------------------------------- shared helpers for the detailed sprites
 
-const DOG_SIZE = { s: { bx: 3, leg: 2, hx: 4 }, m: { bx: 4, leg: 3, hx: 5 }, l: { bx: 5, leg: 3, hx: 6 } };
+const shade = (hex, f) => {  // a lighter (f > 1) or darker (f < 1) version of #rrggbb
+  const n = parseInt(hex.slice(1), 16);
+  const c = (v) => Math.max(0, Math.min(255, Math.round(v * f))).toString(16).padStart(2, '0');
+  return `#${c(n >> 16)}${c((n >> 8) & 255)}${c(n & 255)}`;
+};
+const INKY = '#140c14';
+const PINK = '#ff9ab0';
+
+// an upright triangle ear: base centered at (cx, base), w wide, h tall; `inner` paints the inside
+function ear(R, cx, base, w, h, c, inner) {
+  for (let j = 0; j < h; j++) {
+    const half = Math.max(0, Math.round(((j + 1) / h) * (w / 2)));
+    R(cx - half, base - h + j, half * 2 + 1, 1, c);
+    if (inner && j > 1 && half > 1) R(cx - half + 1, base - h + j, half * 2 - 1, 1, inner);
+  }
+}
+
+// an eye with a highlight (and a light rim on dark fur)
+function eyeAt(R, ex, ey, color, darkFur, size = 2) {
+  if (darkFur) R(ex - 1, ey - 1, size + 2, size + 2, '#e8dcc8');
+  R(ex, ey, size, size, color);
+  R(ex, ey, 1, 1, '#ffffff');
+}
+
+// ---------------------------------------------------------------- dogs (detailed)
+
+const DOG_SIZE = { s: { bx: 7, ry: 4, leg: 4, hr: 4 }, m: { bx: 9, ry: 5, leg: 5, hr: 5 }, l: { bx: 11, ry: 5, leg: 7, hr: 6 } };
 
 function dogT(g, x, y, s, t, L) {
   const { R, E } = mirror(g, x, y, s.dir);
   const Z = DOG_SIZE[L.size];
-  const leg = L.legs === 'short' ? 2 : Z.leg;  // short legs are stubby, but they still show below the body
-  const bx = Z.bx;
-  const step = s.moving ? Math.floor(t * 12) % 2 : 0;
-  const wag = Math.round(Math.sin(t * (s.pose === 'sit' ? 18 : 9)) * 1.5);
-  const ears = (hx, hy) => {
-    if (L.ear === 'flop') R(hx - 2, hy - 1, 2, 3 + step, L.d);
-    if (L.ear === 'up') { R(hx - 1, hy - 4, 1, 2, L.d); R(hx + 1, hy - 4, 1, 2, L.d); }
-    if (L.ear === 'big') { R(hx - 2, hy - 5, 2, 3, L.c); R(hx + 1, hy - 5, 2, 3, L.c); R(hx - 2, hy - 4, 1, 1, '#ffb0b0'); }
-    if (L.ear === 'bat') { R(hx - 2, hy - 4, 2, 2, L.c); R(hx + 1, hy - 4, 2, 2, L.c); }
+  const { bx, ry, hr } = Z;
+  const leg = L.legs === 'short' ? 3 : Z.leg;
+  const c = L.c;
+  const sh = shade(c, 0.78);
+  const hl = shade(c, 1.15);
+  const darkFur = dark(c);
+  const eye = L.e ?? INKY;
+  const paw = L.legs === 'short' || L.ear === 'big' || L.mask ? L.w : sh;
+  const step = s.moving ? Math.floor(t * 10) % 2 : 0;
+  const wag = Math.round(Math.sin(t * (s.pose === 'sit' ? 16 : 8)) * 2);
+
+  const head = (hx, hy, open, closed) => {
+    if (L.ear === 'flop') { E(hx - 3, hy + 1, 2, hr - 1, L.d); E(hx - 3, hy, 1, hr - 2, shade(L.d, 1.2)); }
+    if (L.ear === 'up') { ear(R, hx - 3, hy - hr + 3, 4, 5, sh, null); ear(R, hx, hy - hr + 3, 4, 5, L.d, PINK); }
+    if (L.ear === 'big') { ear(R, hx - 3, hy - hr + 3, 5, 7, sh, null); ear(R, hx + 1, hy - hr + 3, 5, 7, c, PINK); }
+    if (L.ear === 'bat') { E(hx - 3, hy - hr, 2, 3, sh); E(hx + 1, hy - hr, 2, 3, c); R(hx + 1, hy - hr - 1, 1, 3, PINK); }
+    E(hx, hy, hr, hr - 1, c);
+    E(hx - 1, hy - 2, hr - 2, 1, hl);
+    if (L.mask) { E(hx + 1, hy + 1, hr - 1, hr - 2, L.w); R(hx - hr + 1, hy - hr + 1, hr * 2 - 2, 2, L.d); }
+    if (L.coat === 'curly') { [-2, 0, 2].forEach((dx) => E(hx + dx, hy - hr, 2, 1, L.w)); }
+    if (L.coat === 'fluffy') E(hx - 2, hy + 2, 3, 2, L.w);
+    const ml = L.flat ? 2 : 4;
+    R(hx + hr - 2, hy, ml, 3, L.saddle ? L.d : L.w);   // the muzzle
+    R(hx + hr - 2 + ml, hy, 2, 2, '#1a1010'); R(hx + hr - 2 + ml, hy, 1, 1, '#6a6a7a');  // the nose
+    R(hx + hr - 1, hy + 2, ml, 1, sh);
+    if (open) { R(hx + hr, hy + 3, ml, 2, '#7a1020'); R(hx + hr + 1, hy + 4, 2, 1, '#ff7a9a'); }
+    if (closed) R(hx + 1, hy - 1, 3, 1, INKY); else eyeAt(R, hx + 1, hy - 2, eye, darkFur);
+    R(hx, hy - 3, 3, 1, sh);  // brow
   };
-  const head = (hx, hy, open) => {
-    E(hx, hy, 3, 2, L.c);
-    if (L.mask) { R(hx - 2, hy - 2, 4, 1, L.d); R(hx + 1, hy, 3, 2, L.w); }
-    R(hx + 2, hy, L.flat ? 1 : 2, 2, L.w);
-    R(hx + (L.flat ? 3 : 4), hy, 1, 1, K);
-    R(hx, hy - 1, 1, 1, L.e ?? (dark(L.c) ? '#fff4d8' : K));  // a light eye on a dark coat
-    if (L.coat === 'curly') { R(hx - 1, hy - 3, 3, 1, L.w); R(hx - 2, hy - 2, 1, 1, L.w); }
-    if (L.coat === 'fluffy') R(hx - 3, hy + 1, 2, 2, L.w);
-    ears(hx, hy);
-    if (open) R(hx + 3, hy + 2, 2, 1, '#a02030');
-  };
+
   if (s.pose === 'sleep') {
-    E(0, -3, bx + 1, 2, L.c); E(-1, -2, bx - 1, 1, L.w); E(bx + 1, -3, 3, 2, L.c); R(bx - 1, -5, 2, 2, L.d); R(bx + 3, -3, 2, 1, K);
-    if (L.tail !== 'stub') R(-bx - 2, -2, 3, 1, L.d);
-    wear(R, s.outfit, { neck: [bx, -2], head: [bx + 1, -4], torso: [0, -3, bx - 1] });
+    if (L.tail !== 'stub') R(-bx - 2, -3, bx, 2, L.tail === 'long' ? L.d : c);
+    E(0, -ry, bx + 1, ry, c); E(-1, -ry - 1, bx - 1, 1, hl); E(0, -2, bx - 2, 1, L.w);
+    if (L.saddle || L.mask) E(-1, -ry - 1, bx - 2, 2, L.d);
+    head(bx + 1, -hr + 1, false, true);
+    wear(R, s.outfit, { neck: [bx - 1, -2], head: [bx + 1, -hr * 2 + 1], torso: [0, -ry, bx - 2] }, 2);
     return;
   }
   if (s.pose === 'sit') {
-    if (L.tail !== 'stub') R(-bx - 1 + wag, -1, 3, 1, L.d);
-    E(-1, -4 - leg, 3, 3 + leg / 2, L.c); E(-1, -3 - leg, 2, 2, L.w);
-    R(1, -2 - leg, 1, 2 + leg, L.c); R(3, -2 - leg, 1, 2 + leg, L.c);
-    head(2, -9 - leg, false);
-    wear(R, s.outfit, { neck: [1, -7 - leg], head: [2, -11 - leg], torso: [-1, -5 - leg, 3] });
+    if (L.tail !== 'stub') R(-bx + wag, -2, bx - 2, 2, L.tail === 'long' ? L.d : c);
+    E(-2, -ry - 1, bx - 3, ry + 1, sh);                    // haunch
+    E(1, -leg - ry - 3, Math.max(4, bx - 4), ry + 3, c);    // chest, upright
+    E(2, -leg - ry - 2, 2, ry, L.w);
+    if (L.saddle || L.mask) E(-1, -leg - ry - 5, 3, ry, L.d);
+    R(1, -leg - 2, 2, leg + 2, sh); R(4, -leg - 2, 2, leg + 2, c);
+    R(1, -1, 3, 1, paw); R(4, -1, 3, 1, paw);
+    const hy = -leg - ry * 2 - hr;
+    head(4, hy, false, false);
+    wear(R, s.outfit, { neck: [3, hy + hr - 1], head: [4, hy - hr], torso: [1, -leg - ry - 3, 4] }, 2);
     return;
   }
   const low = s.pose === 'dig' || s.pose === 'sniff' || s.pose === 'drink';
-  const by = -leg - (L.legs === 'short' ? 3 : 2);
-  if (L.tail === 'long') { R(-bx - 1, by - 1, 1, 2, L.c); R(-bx - 2, by - 3 - Math.max(0, wag), 1, 2, L.d); }
-  if (L.tail === 'curl') { R(-bx, by - 3, 2, 1, L.c); R(-bx + 1, by - 4 + Math.max(0, wag) / 2, 1, 1, L.w); }
-  if (L.tail === 'stub') R(-bx - 1, by - 1, 1, 1, L.c);
-  if (L.tail === 'pom') { R(-bx - 1, by - 2, 1, 2, L.c); disc(g, x - (bx + 2) * s.dir, y + by - 4, 1, L.w); }
-  E(0, by, bx, 2 + (L.coat === 'fluffy' ? 1 : 0), L.c); E(0, by + 1, bx - 2, 1, L.w);
-  if (L.saddle) R(-bx + 1, by - 2, bx * 2 - 3, 2, L.d);
-  if (L.mask) R(-bx + 1, by - 2, bx * 2 - 2, 1, L.d);
-  if (L.coat === 'curly') for (let i = -bx + 1; i < bx; i += 2) R(i, by - 1, 1, 1, L.w);
-  // legs go over the body's underside so they always show; a moving dog lifts every other paw
-  [-bx + 1, -bx + 2, bx - 2, bx - 1].forEach((lx, i) => {  // a back pair and a front pair
-    const lift = i % 3 ? step : 1 - step;
-    R(lx, -leg - 1, 1, leg + 1 - lift, i < 2 || L.legs === 'short' ? L.d : L.c);  // short legs in the darker coat stand out
-    R(lx, -1 - lift, 1, 1, L.legs === 'short' || L.ear === 'big' ? L.w : L.d);  // paws
-  });
-  const hy = low ? by + 1 : by - 4;
-  head(Z.hx, hy, s.pose === 'bark');
-  if (s.pose === 'dig') R(Z.hx + 4 + (Math.floor(t * 10) % 3), -2 - (Math.floor(t * 10) % 2), 1, 1, '#6b4220');
-  wear(R, s.outfit, { neck: [Z.hx - 2, hy + 2], head: [Z.hx, hy - 2], torso: [0, by, bx - 1] });
+  const by = -leg - ry;
+  if (L.tail === 'long') for (let i = 0; i < 6; i++) R(-bx - 1 - Math.floor(i / 2), by - 1 - i + (i > 3 ? wag : 0), 2, 2, i > 3 ? L.d : c);
+  if (L.tail === 'curl') { R(-bx, by - ry - 1, 3, 2, c); R(-bx + 1, by - ry - 3, 2, 2, L.w); R(-bx + 3, by - ry - 2, 1, 2, c); }
+  if (L.tail === 'stub') R(-bx - 2, by - 2, 2, 2, c);
+  if (L.tail === 'pom') { R(-bx - 2, by - 2, 1, 4, c); disc(g, x - (bx + 3) * s.dir, y + by - 5, 2, L.w); }
+  // far legs, a shade darker
+  [[-bx + 3, step], [bx - 4, 1 - step]].forEach(([lx, lift]) => { R(lx, -leg - 1, 2, leg + 1 - lift, sh); R(lx, -1 - lift, 3, 1, shade(paw, 0.85)); });
+  E(0, by, bx, ry, c);
+  E(-1, by - ry + 1, bx - 2, 1, hl);
+  E(0, by + ry - 1, bx - 3, 1, L.w);
+  if (L.saddle) E(-1, by - 2, bx - 3, 2, L.d);
+  if (L.mask) E(0, by - 2, bx - 1, 2, L.d);
+  if (L.coat === 'fluffy') { E(bx - 3, by, 3, ry, L.w); for (let i = -bx + 1; i < bx; i += 3) R(i, by - ry - 1, 2, 1, c); }
+  if (L.coat === 'curly') for (let i = -bx + 1; i < bx; i += 2) { R(i, by - ry, 1, 1, L.w); R(i + 1, by + ry - 1, 1, 1, L.w); }
+  // near legs with paws
+  [[-bx + 1, 1 - step], [bx - 2, step]].forEach(([lx, lift]) => { R(lx, -leg - 1, 2, leg + 1 - lift, c); R(lx, -1 - lift, 3, 1, paw); });
+  R(bx - 3, by - ry - 2, 4, ry + 1, c);  // the neck
+  const hx = low ? bx + 4 : bx + 2;
+  const hy = low ? by + 2 : by - ry - hr + 1;
+  head(hx, hy, s.pose === 'bark', false);
+  if (s.pose === 'dig') R(hx + hr + 4 + (Math.floor(t * 10) % 3), -2 - (Math.floor(t * 10) % 2), 2, 1, '#6b4220');
+  if (s.pose === 'drink') R(hx + hr + 2, -1, 4, 1, '#4dc3ff');
+  wear(R, s.outfit, { neck: [bx - 2, by - ry + 1], head: [hx, hy - hr], torso: [0, by - 1, bx - 3] }, 2);
 }
 
-// ---------------------------------------------------------------- cats
+// ---------------------------------------------------------------- cats (detailed)
 
 function catT(g, x, y, s, t, L) {
   const { R, E } = mirror(g, x, y, s.dir);
-  const big = L.big ? 1 : 0;
-  const fat = L.chubby ? 1 : 0;
-  const step = s.moving ? Math.floor(t * 10) % 2 : 0;
-  const tail = Math.round(Math.sin(t * 2.2) * 1.5);
-  const marks = (ox, oy, w) => {
-    if (L.pattern === 'tabby') for (let i = 0; i < w; i += 2) R(ox + i, oy, 1, 1, L.d);
-    if (L.pattern === 'spots') for (let i = 0; i < w; i += 2) R(ox + i, oy + (i % 4 ? 1 : 0), 1, 1, L.d);
+  const bx = L.big ? 11 : 9;
+  const ry = L.chubby ? 5 : 4;
+  const leg = 5;
+  const c = L.c;
+  const sh = shade(c, 0.8);
+  const hl = shade(c, 1.12);
+  const pts = L.pattern === 'points';
+  const ext = pts ? L.d : c;               // ears, legs and tail of a pointed cat are dark
+  const fur = L.fur === 'long' ? 1 : 0;
+  const darkFur = dark(c);
+  const step = s.moving ? Math.floor(t * 9) % 2 : 0;
+  const sway = Math.round(Math.sin(t * 2) * 1.5);
+
+  const marks = (cx, cy, rx) => {
+    if (L.pattern === 'tabby') for (let i = -rx + 2; i < rx - 1; i += 3) R(cx + i, cy, 1, 3, L.d);
+    if (L.pattern === 'spots') for (let i = -rx + 2; i < rx - 1; i += 3) { R(cx + i, cy + (i % 2 ? 0 : 2), 2, 2, L.d); R(cx + i, cy + (i % 2 ? 0 : 2), 1, 1, hl); }
   };
-  const ears = (hx, hy) => {
-    if (L.ears === 'fold') { R(hx - 2, hy - 2, 2, 1, L.c); R(hx + 1, hy - 2, 2, 1, L.c); return; }
-    R(hx - 2, hy - 3, 1, 2, L.pattern === 'points' ? L.d : L.c); R(hx + 2, hy - 3, 1, 2, L.pattern === 'points' ? L.d : L.c);
-    if (L.ears === 'tuft') { R(hx - 2, hy - 4, 1, 1, L.d); R(hx + 2, hy - 4, 1, 1, L.d); }
+  const head = (hx, hy, closed, lick) => {
+    if (L.ears === 'fold') { R(hx - 4, hy - 4, 3, 2, ext); R(hx + 1, hy - 4, 3, 2, ext); }
+    else {
+      ear(R, hx - 2, hy - 2, 4, 5, ext, PINK); ear(R, hx + 3, hy - 2, 4, 5, shade(ext, 0.85), null);
+      if (L.ears === 'tuft') { R(hx - 2, hy - 9, 1, 2, L.d); R(hx + 3, hy - 9, 1, 2, L.d); }
+    }
+    if (fur) E(hx - 1, hy + 2, 6, 3, L.w);            // the ruff of a long-haired cat
+    E(hx, hy, L.chubby ? 6 : 5, 4, c);
+    E(hx - 1, hy - 2, 3, 1, hl);
+    if (L.pattern === 'tabby') { R(hx - 1, hy - 4, 1, 2, L.d); R(hx + 1, hy - 4, 1, 2, L.d); }
+    if (pts) E(hx + 2, hy + 1, 3, 2, L.d);
+    if (closed) { R(hx, hy - 1, 2, 1, INKY); R(hx + 3, hy - 1, 2, 1, INKY); }
+    else {
+      eyeAt(R, hx, hy - 1, L.e, darkFur); R(hx + 1, hy - 1, 1, 2, INKY);
+      R(hx + 3, hy - 1, 2, 2, L.e); R(hx + 4, hy - 1, 1, 2, INKY);
+    }
+    R(hx + (L.flat ? 4 : 5), hy + 1, 1, 1, PINK);
+    R(hx + 3, hy + 2, 2, 1, sh);
+    R(hx + 5, hy + 1, 4, 1, '#f4f0e8'); R(hx + 5, hy + 3, 4, 1, '#f4f0e8');  // whiskers
+    if (lick) R(hx + 4, hy + 3, 2, 1, '#ff7a9a');
   };
-  const head = (hx, hy, closed) => {
-    E(hx, hy, 3 + fat, 2, L.c);
-    if (L.pattern === 'points') { R(hx, hy, 3, 2, L.d); }
-    if (L.fur === 'long') R(hx - 3, hy + 1, 2, 2, L.w);
-    ears(hx, hy);
-    R(hx + 1, hy - 1, 1, 1, closed ? K : L.e); if (!closed && dark(L.c)) R(hx + 1, hy - 2, 1, 1, '#fff4d8');
-    R(hx + (L.flat ? 2 : 3), hy, 1, 1, '#ff9ab0');
-  };
-  if (s.pose === 'sleep') {
-    E(0, -3, 5 + big, 2 + fat, L.c); marks(-3, -5, 6); E(4 + big, -3, 2, 2, L.c);
-    R(3 + big, -6, 1, 1, L.c); R(5 + big, -6, 1, 1, L.c); R(3 + big, -3, 2, 1, K); R(-5 - big, -1, 8, 1, L.pattern === 'points' ? L.d : L.c);
-    wear(R, s.outfit, { neck: [3, -2], head: [4, -5], torso: [0, -3, 3] });
+
+  if (s.pose === 'sleep') {  // curled up, tail wrapped round
+    R(-bx - 1, -2, bx * 2, 2 + fur, ext);
+    E(0, -ry - 1, bx, ry + 1, c); E(-1, -ry - 2, bx - 2, 1, hl); marks(0, -ry * 2, bx);
+    head(bx - 3, -ry - 1, true, false);
+    wear(R, s.outfit, { neck: [bx - 5, -ry + 1], head: [bx - 3, -ry * 2 - 4], torso: [0, -ry - 1, bx - 3] }, 2);
     return;
   }
   if (s.pose === 'sit' || s.pose === 'groom') {
-    R(-4 + tail - big, -1, 4 + big, 1 + (L.fur === 'long' ? 1 : 0), L.pattern === 'points' ? L.d : L.c);
-    E(0, -5 - big, 3 + fat, 3 + big, L.c); E(0, -4 - big, 2, 2, L.w); marks(-1, -7 - big, 3);
-    head(1, -10 - big, s.pose === 'groom');
-    if (s.pose === 'groom') R(3, -10 - big + (Math.floor(t * 6) % 2), 1, 3, L.c);
-    wear(R, s.outfit, { neck: [0, -8 - big], head: [1, -12 - big], torso: [0, -6 - big, 3] });
+    for (let i = 0; i < bx; i++) R(-bx + i + sway, -2 - (i < 3 ? 2 - i : 0), 1, 2 + fur, ext);  // tail around the paws
+    E(-2, -ry - 1, bx - 3, ry + 1, sh);
+    E(1, -leg - ry - 2, 5, ry + 3, c); E(2, -leg - ry - 1, 3, ry + 1, L.w); marks(-2, -leg - ry - 3, 4);
+    R(1, -leg - 2, 2, leg + 2, ext); R(4, -leg - 2, 2, leg + 2, ext);
+    R(1, -1, 3, 1, pts ? L.d : L.w); R(4, -1, 3, 1, pts ? L.d : L.w);
+    const hy = -leg - ry * 2 - 4;
+    head(3, hy, s.pose === 'groom', s.pose === 'groom');
+    if (s.pose === 'groom') R(6, hy + 1 + (Math.floor(t * 6) % 2), 2, 4, ext);  // a paw up to the face
+    wear(R, s.outfit, { neck: [2, hy + 4], head: [3, hy - 5], torso: [1, -leg - ry - 2, 4] }, 2);
     return;
   }
-  const crouch = s.pose === 'stalk' ? 1 : 0;
-  R(-3, -2, 1, 2 - step, L.c); R(-1, -2, 1, 1 + step, L.c); R(2, -2, 1, 1 + step, L.c); R(4, -2, 1, 2 - step, L.c);
-  E(0, -4 + crouch, 4 + big, 2 + fat, L.c); marks(-2, -6 + crouch, 5);
-  R(-5 - big, -6, 1 + (L.fur === 'long' ? 1 : 0), 3, L.c); R(-5 - big + (tail > 0 ? -1 : 0), -9 + crouch * 2, 1 + (L.fur === 'long' ? 1 : 0), 3, L.pattern === 'points' ? L.d : L.d);
-  head(5 + big, -7 + crouch * 2, false);
-  wear(R, s.outfit, { neck: [4, -5 + crouch], head: [5 + big, -9 + crouch * 2], torso: [0, -4 + crouch, 3] });
+  const crouch = s.pose === 'stalk' ? 2 : 0;
+  const by = -leg - ry + crouch;
+  for (let i = 0; i < 10; i++) R(-bx - Math.floor(i / 3), by - 1 - i + (i > 6 ? sway : 0) + crouch, 2 + fur, 2, i > 7 && L.pattern === 'tabby' ? L.d : ext);
+  [[-bx + 3, step], [bx - 4, 1 - step]].forEach(([lx, lift]) => { R(lx, -leg - 1 + crouch, 2, leg + 1 - lift - crouch, shade(ext, 0.8)); });
+  E(0, by, bx, ry, c); E(-1, by - ry + 1, bx - 2, 1, hl); E(0, by + ry - 1, bx - 3, 1, L.w);
+  marks(0, by - ry + 1, bx);
+  if (fur) for (let i = -bx; i < bx; i += 2) R(i, by + ry, 1, 1, c);
+  [[-bx + 1, 1 - step], [bx - 2, step]].forEach(([lx, lift]) => { R(lx, -leg - 1 + crouch, 2, leg + 1 - lift - crouch, ext); R(lx, -1 - lift, 3, 1, pts ? L.d : L.w); });
+  const hx = bx + 2;
+  const hy = by - ry - 1 + crouch;
+  head(hx, hy, false, false);
+  wear(R, s.outfit, { neck: [bx - 1, by - ry + 1], head: [hx, hy - 5], torso: [0, by - 1, bx - 3] }, 2);
 }
 
-// ---------------------------------------------------------------- small mammals
+// ---------------------------------------------------------------- small mammals (detailed)
+
+const CRITTER_BODY = {
+  hamster: [7, 5], guineapig: [9, 5], chinchilla: [7, 6], rabbit: [7, 5], hedgehog: [9, 5], ferret: [13, 3],
+  glider: [5, 3], marmoset: [5, 5], capybara: [14, 7],
+};
 
 function critterT(g, x, y, s, t, L, type) {
   const { R, E } = mirror(g, x, y, s.dir);
-  const [rx, ry] = L.body;
+  const [rx, ry] = CRITTER_BODY[type] ?? [7, 5];
+  const c = L.c;
+  const sh = shade(c, 0.8);
+  const hl = shade(c, 1.15);
   const step = s.moving ? Math.floor(t * (L.hop ? 6 : 12)) % 2 : 0;
-  const hop = L.hop && s.moving ? -Math.abs(Math.round(Math.sin(t * 10) * 3)) : 0;
+  const hop = L.hop && s.moving ? -Math.abs(Math.round(Math.sin(t * 10) * 4)) : 0;
   const curl = s.pose === 'sleep' || (type === 'hedgehog' && s.pose === 'hide');
-  const by = -ry - 1 + hop;
-  if (s.pose === 'glide') {  // sugar glider: arms out, gliding membrane
-    R(-5, -6, 11, 2, L.c); R(-5, -5, 11, 1, L.w); R(-8, -6, 3, 1, L.d); R(5, -7, 2, 2, L.c); R(6, -7, 1, 1, K);
+  const up = s.pose === 'sit' || s.pose === 'eat';
+  const legH = type === 'capybara' ? 3 : 2;
+  const by = -ry - legH + hop - (up ? 2 : 0);
+  if (s.pose === 'glide') {  // a sugar glider spreads its membrane
+    R(-9, -12, 19, 3, c); R(-9, -10, 19, 1, L.w); R(-8, -12, 17, 1, L.d);
+    R(-13, -11, 4, 2, L.d); R(9, -13, 4, 3, c); eyeAt(R, 11, -13, INKY, false, 2);
     return;
   }
-  if (L.tail === 'long') R(-rx - 4, by + 1, 4, 1, L.c);
-  if (L.tail === 'bushy') { R(-rx - 3, by - 2, 3, 3, L.c); R(-rx - 4, by - 3, 2, 2, L.d); }
-  if (L.tail === 'puff') disc(g, x - (rx + 1) * s.dir, y + by, 1, L.w);
-  if (L.tail === 'ringed') for (let i = 0; i < 7; i++) R(-rx - 1 - i, by - 1 - Math.round(Math.sin(i / 2 + t) * 1.5), 1, 1, i % 2 ? L.d : L.w);
-  if (!curl && s.pose !== 'sit') { [-rx + 1, rx - 2].forEach((lx, i) => R(lx, by + ry - 1 + 1, 2, 1 + (i ? step : 1 - step), L.d)); }
-  E(0, by, rx, ry, L.c);
-  E(0, by + 1, Math.max(1, rx - 2), Math.max(0, ry - 2), L.w);
-  if (L.patches) { R(-2, by - 2, 3, 2, L.d); R(2, by, 2, 2, L.w); }
-  if (L.stripe) R(-rx, by - ry, rx * 2, 1, L.d);
-  if (L.spikes) for (let i = -rx; i < rx; i += 2) { R(i, by - ry - 1, 1, 2, L.d); R(i + 1, by - ry, 1, 1, '#c8a878'); }
-  if (curl) {
-    R(rx - 2, by - 1, 1, 1, K);
-    if (type === 'capybara') R(rx - 1, by - 2, 2, 1, L.d);
-    wear(R, s.outfit, { neck: [rx - 2, by + 1], head: [rx - 1, by - ry], torso: [0, by, rx - 1] });
+  // tails behind the body
+  if (L.tail === 'long') for (let i = 0; i < 7; i++) R(-rx - 1 - i, by + 1 + Math.round(Math.sin(t * 3 + i / 2)), 2, 2, i > 4 ? L.d : c);
+  if (L.tail === 'bushy') { disc(g, x - (rx + 2) * s.dir, y + by - 1, 3, c); disc(g, x - (rx + 3) * s.dir, y + by - 2, 2, hl); }
+  if (L.tail === 'puff') disc(g, x - (rx + 1) * s.dir, y + by + 1, 2, L.w);
+  if (L.tail === 'ringed') for (let i = 0; i < 14; i++) R(-rx - 1 - Math.floor(i * 0.8), by - Math.round(Math.sin(i / 3 + t) * 3) - Math.floor(i / 3), 2, 2, i % 3 ? L.d : L.w);
+  if (!curl) {
+    if (type === 'capybara') [[-rx + 2, step], [-rx + 5, 1 - step], [rx - 6, 1 - step], [rx - 3, step]].forEach(([lx, lift], i) => R(lx, -legH - 1, 2, legH + 1 - lift, i % 2 ? sh : c));
+    else [[-rx + 2, step], [rx - 3, 1 - step]].forEach(([lx, lift]) => R(lx, -legH - 1, 3, legH + 1 - lift, L.d === c ? sh : shade(c, 0.85)));
+  }
+  E(0, by, rx, ry, c);
+  E(-1, by - ry + 1, rx - 2, 1, hl);
+  E(1, by + Math.ceil(ry / 2), rx - 2, Math.max(1, Math.floor(ry / 2)), L.w);
+  if (L.patches) { E(-3, by - 1, 3, 3, L.d); E(3, by - 2, 2, 2, L.w); }
+  if (L.stripe) R(-rx + 1, by - ry, rx * 2 - 2, 1, L.d);
+  if (type === 'chinchilla') for (let i = -rx; i < rx; i += 2) R(i, by - ry - 1, 1, 1, c);
+  if (L.spikes) for (let i = -rx + 1; i < rx - 1; i += 2) for (let r = 0; r < 2; r++) { R(i + r, by - ry - 2 + r * 3, 1, 3, L.d); R(i + r, by - ry - 2 + r * 3, 1, 1, '#d8b888'); }
+  // the head
+  if (type === 'capybara') {
+    const hx = rx - 2;
+    const hy = by - 3;
+    R(hx, hy - 3, 9, 7, c); R(hx, hy - 3, 9, 1, hl); R(hx + 7, hy - 1, 3, 5, L.d); R(hx + 8, hy, 1, 1, INKY);
+    R(hx + 1, hy - 5, 2, 2, L.d);
+    if (curl) R(hx + 4, hy - 1, 2, 1, INKY); else eyeAt(R, hx + 4, hy - 2, INKY, false);
+    wear(R, s.outfit, { neck: [hx, hy + 3], head: [hx + 3, hy - 5], torso: [0, by, rx - 3] }, 2);
     return;
   }
-  const sitUp = s.pose === 'sit' || s.pose === 'eat';
-  const hx = rx - (type === 'capybara' ? 0 : 1);
-  const hy = by - (sitUp ? 3 : 1) - (type === 'capybara' ? 1 : 0);
-  if (type === 'capybara') { R(hx - 1, hy - 1, 6, 4, L.c); R(hx + 4, hy, 1, 2, L.d); R(hx + 4, hy, 1, 1, K); R(hx + 1, hy - 1, 1, 1, K); }
-  else if (type === 'ferret') { E(hx + 1, hy, 2, 2, L.c); R(hx, hy - 1, 3, 1, L.d); R(hx + 3, hy, 1, 1, '#ff9ab0'); R(hx + 1, hy - 1, 1, 1, K); }
-  else {
-    E(hx + 1, hy, 2 + (L.bigEyes ? 1 : 0), 2, L.c);
-    R(hx + 1, hy - 1, L.bigEyes ? 2 : 1, L.bigEyes ? 2 : 1, K);
-    R(hx + 3, hy, 1, 1, type === 'hedgehog' ? K : '#ff9ab0');
+  const hx = rx - 1;
+  const hy = by - (up ? 4 : 2);
+  if (L.ears === 'long') {
+    const flop = s.moving ? 0 : Math.round(Math.sin(t) * 0.8);
+    E(hx - 1 + flop, hy - 8, 1, 5, c); E(hx + 2, hy - 8, 1, 5, sh); R(hx - 1 + flop, hy - 11, 1, 6, PINK);
   }
-  if (L.ears === 'round') R(hx, hy - 3, 2, 1, L.d);
-  if (L.ears === 'tiny') R(hx, hy - 2, 1, 1, L.d);
-  if (L.ears === 'big') { disc(g, x + (hx - 1) * s.dir, y + hy - 3, 1, L.d); disc(g, x + (hx + 2) * s.dir, y + hy - 3, 1, L.d); }
-  if (L.ears === 'long') { const flop = s.moving ? 0 : Math.round(Math.sin(t) * 0.6); R(hx - 1 + flop, hy - 6, 1, 4, L.c); R(hx + 1, hy - 6, 1, 4, L.c); R(hx + 1, hy - 5, 1, 2, '#ffb0c0'); }
-  if (L.ears === 'tufts') { R(hx - 2, hy - 3, 2, 2, L.w); R(hx + 2, hy - 3, 2, 2, L.w); }
-  if (s.pose === 'eat' && Math.floor(t * 6) % 2) R(hx + 3, hy + 1, 1, 1, '#7ac04a');
-  wear(R, s.outfit, { neck: [hx - 1, hy + 2], head: [hx + 1, hy - 2], torso: [0, by, rx - 1] });
+  if (L.ears === 'big') { disc(g, x + (hx - 1) * s.dir, y + hy - 4, 3, L.d); disc(g, x + (hx - 1) * s.dir, y + hy - 4, 2, PINK); }
+  if (L.ears === 'round') { disc(g, x + (hx) * s.dir, y + hy - 4, 2, L.d); disc(g, x + hx * s.dir, y + hy - 4, 1, PINK); }
+  if (L.ears === 'tiny') R(hx, hy - 4, 2, 2, L.d);
+  if (L.ears === 'tufts') { disc(g, x + (hx - 2) * s.dir, y + hy - 1, 2, L.w); disc(g, x + (hx + 4) * s.dir, y + hy - 1, 2, L.w); }
+  if (type === 'ferret') { E(hx + 3, hy, 4, 3, c); R(hx + 1, hy - 1, 6, 2, L.d); }
+  else E(hx + 2, hy, 4, 3, c);
+  E(hx + 3, hy + 1, 2, 1, L.w);
+  if (curl) R(hx + 3, hy - 1, 2, 1, INKY); else eyeAt(R, hx + 3, hy - 2, INKY, false, L.bigEyes ? 3 : 2);
+  R(hx + 6, hy, 1, 1, type === 'hedgehog' ? INKY : PINK);
+  R(hx + 5, hy + 1, 4, 1, '#f4f0e8');  // whiskers
+  if (s.pose === 'eat') { R(hx + 4, hy + 2, 2, 2, c); if (Math.floor(t * 6) % 2) R(hx + 6, hy + 2, 2, 2, '#7ac04a'); }
+  wear(R, s.outfit, { neck: [hx, hy + 3], head: [hx + 2, hy - 4], torso: [0, by, rx - 3] }, 2);
 }
 
 // ---------------------------------------------------------------- reptiles, snake, frog
@@ -367,26 +465,37 @@ function lion(g, x, y, s, t) {
 // ---------------------------------------------------------------- drawing any pet
 
 const SIZE_OF = {
-  dog: (L) => ({ s: [16, 11], m: [18, 12], l: [20, 14] }[L.size]), cat: (L) => (L.big ? [18, 14] : [16, 13]),
-  critter: (L) => [L.body[0] * 2 + 6, L.body[1] * 2 + (L.ears === 'long' ? 9 : 5)], lizard: () => [18, 6], snake: () => [16, 8],
-  frog: () => [12, 8], parrot: () => [14, 15], turtle: () => [14, 8], lion: () => [26, 17],
+  dog: (L) => ({ s: [22, 18], m: [28, 20], l: [34, 24] }[L.size]), cat: (L) => (L.big ? [34, 24] : [30, 22]),
+  critter: (L, type) => (type === 'capybara' ? [36, 20] : [CRITTER_BODY[type][0] * 2 + 10, CRITTER_BODY[type][1] * 2 + (L.ears === 'long' ? 16 : 8)]),
+  lizard: () => [36, 12], snake: () => [32, 14], frog: () => [24, 16], parrot: () => [28, 30], turtle: () => [28, 16], lion: () => [52, 34],
 };
-export const PET_SIZE = Object.fromEntries(Object.entries(LOOKS).map(([k, L]) => [k, SIZE_OF[L.g](L)]));
+export const PET_SIZE = Object.fromEntries(Object.entries(LOOKS).map(([k, L]) => [k, SIZE_OF[L.g](L, k)]));
+
+// The small sprites (reptiles, frog, parrot, turtle, lion) are drawn at twice their size.
+const small = document.createElement('canvas');
+small.width = 40;
+small.height = 30;
+function twice(g, draw, X, Y, s, t) {
+  const sg = small.getContext('2d');
+  sg.clearRect(0, 0, 40, 30);
+  draw(sg, 20, 26, s, t);
+  g.imageSmoothingEnabled = false;
+  g.drawImage(small, X - 40, Y - 52, 80, 60);
+}
 
 function body(g, type, x, y, s, t) {
   const L = LOOKS[type] ?? LOOKS.hamster;
   if (L.g === 'dog') return dogT(g, x, y, s, t, L);
   if (L.g === 'cat') return catT(g, x, y, s, t, L);
   if (L.g === 'critter') return critterT(g, x, y, s, t, L, type);
-  if (L.g === 'lizard') return lizardT(g, x, y, s, t, L);
-  if (L.g === 'snake') return snakeT(g, x, y, s, t, L);
-  if (L.g === 'frog') return frogT(g, x, y, s, t, L);
-  return { parrot, turtle, lion }[L.g](g, x, y, s, t);
+  const fn = { lizard: (sg, X, Y, ss, tt) => lizardT(sg, X, Y, ss, tt, L), snake: (sg, X, Y, ss, tt) => snakeT(sg, X, Y, ss, tt, L),
+    frog: (sg, X, Y, ss, tt) => frogT(sg, X, Y, ss, tt, L), parrot, turtle, lion }[L.g];
+  return twice(g, fn, x, y, s, t);
 }
 
 export function drawPet(g, type, x, y, s, t) {
   if (s.dead) return grave(g, x, y);
-  outlined(g, x - 17, y - 24, 34, 27, '#120c1c', (sg) => body(sg, type, 17, 24, s, t));
+  outlined(g, x - 40, y - 56, 80, 60, '#120c1c', (sg) => body(sg, type, 40, 56, s, t));
   if (s.emote) icon(g, s.emote, x - 2, y - (PET_SIZE[type]?.[1] ?? 12) - 7);
 }
 

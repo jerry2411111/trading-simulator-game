@@ -649,7 +649,8 @@ export function initHome(ctx) {
   function petNext(p, t) {
     p.on = null;
     p.act = null;
-    const usable = layout().filter((f) => ACTS[f.item]);
+    const busy = new Set([...inside.values()].filter((q) => q !== p && q.act).map((q) => q.act.id));  // one pet per piece
+    const usable = layout().filter((f) => ACTS[f.item] && !busy.has(f.id));
     const here = { x: Math.round(p.x), y: Math.round(p.y) };
     if (usable.length && Math.random() < 0.7) {
       const f = pick(usable);

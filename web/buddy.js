@@ -179,6 +179,20 @@ function headFor(type) {
   return h;
 }
 
+// Shoulders and chest under the head, in the pet's own coat, so the portrait matches its body.
+function bust(g, type) {
+  const L = LOOKS[type];
+  if (!L || !['dog', 'cat', 'critter'].includes(L.g) || type === 'capybara') return;
+  const side = L.pattern === 'points' ? L.d : L.c;
+  ellipse(g, 24, 50, 17, 9, side);
+  ellipse(g, 24, 49, 15, 8, L.c);
+  ellipse(g, 24, 48, 7, 7, L.w);
+  if (L.saddle || L.mask) { ellipse(g, 10, 47, 5, 4, L.d); ellipse(g, 38, 47, 5, 4, L.d); }
+  if (L.pattern === 'tabby') for (let x = 10; x < 40; x += 4) if (Math.abs(x - 24) > 6) rect(g, x, 44, 1, 4, L.d);
+  if (L.pattern === 'spots') [[11, 45], [35, 46], [15, 47], [33, 44]].forEach(([x, y]) => rect(g, x, y, 2, 2, L.d));
+  if (L.coat === 'curly' || L.fur === 'long') for (let x = 9; x < 41; x += 3) rect(g, x, 42 + (x % 2), 2, 2, L.w);
+}
+
 // Clothes on the portrait: around the neck, on the shoulders or on top of the head.
 function drawOutfit(g, outfit, t) {
   if (!outfit) return;
@@ -264,6 +278,7 @@ export function drawPetHead(g, type, mood, t, accent = '#00e5ff', hungry = false
   const hop = mood === 'happy' ? -Math.abs(Math.round(Math.sin(t * 8) * 3)) : mood === 'expecting' ? -Math.abs(Math.round(Math.sin(t * 4))) : 0;
   g.save();
   g.translate(shake, hop);
+  bust(g, type);
   head.draw(g, mood, t);
   eyes(g, head, mood, t);
   mouth(g, head, mood, t);
