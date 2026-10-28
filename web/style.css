@@ -1,0 +1,138 @@
+/* Fixed palette: every color in the UI and the chart comes from these variables. */
+:root {
+  --bg: #cfc6ae;
+  --panel: #f3eedf;
+  --ink: #1c1c1c;
+  --muted: #6b6455;
+  --grid: #e1d9c4;
+  --hi: #ffffff;
+  --lo: #7d7563;
+  --up: #2e8b47;
+  --down: #c8372d;
+  --warn: #d6a300;
+  --accent: #2b4ea6;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 20px/1.2 VT323, monospace;
+}
+
+h1, .logo, .num, .titlebar { font-family: "Press Start 2P", monospace; }
+h1 { font-size: 14px; line-height: 1.6; margin: 0 0 12px; }
+a { color: var(--accent); }
+.muted, .small { color: var(--muted); }
+.small { font-size: 17px; }
+
+/* Win95-style beveled buttons that press in */
+button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 2px solid;
+  border-color: var(--hi) var(--lo) var(--lo) var(--hi);
+  padding: 2px 10px;
+  cursor: pointer;
+}
+button:active, button.active { border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: var(--grid); }
+button:active { transform: translate(1px, 1px); }
+button:disabled { color: var(--muted); cursor: default; transform: none; }
+button.primary { background: var(--accent); color: var(--hi); }
+
+input {
+  font: inherit;
+  border: 2px solid;
+  border-color: var(--lo) var(--hi) var(--hi) var(--lo);
+  background: var(--hi);
+  padding: 2px 6px;
+  width: 100%;
+}
+
+.window { background: var(--panel); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); padding: 0; }
+.titlebar { background: var(--accent); color: var(--hi); font-size: 11px; padding: 6px 8px; }
+.window-body { padding: 14px 18px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.group { display: inline-flex; gap: 2px; }
+
+.badge { border: 2px solid var(--ink); padding: 0 6px; background: var(--hi); }
+.badge.warn { background: var(--warn); }
+
+/* Setup wizard */
+#setup { display: grid; place-items: center; min-height: 100vh; padding: 16px; }
+.setup { max-width: 720px; width: 100%; }
+.setup ol { padding-left: 24px; }
+.setup li { margin-bottom: 4px; }
+.setup form { display: grid; gap: 10px; margin-top: 12px; }
+.notice { background: var(--warn); border: 2px solid var(--ink); padding: 6px 8px; }
+#key-result.good { color: var(--up); }
+#key-result.bad { color: var(--down); }
+
+/* Game layout (full mode) */
+#game {
+  display: grid;
+  grid-template: auto 1fr / 170px 1fr;
+  gap: 6px;
+  height: 100vh;
+  padding: 6px;
+}
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  padding: 4px 8px;
+}
+.topbar .num { font-size: 11px; }
+.logo { font-size: 12px; color: var(--accent); }
+.spacer { flex: 1; }
+
+.left { display: flex; flex-direction: column; gap: 4px; }
+.tab { display: flex; justify-content: space-between; align-items: baseline; text-align: left; }
+.tab .num { font-size: 9px; }
+
+.center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 2px solid var(--ink);
+  background: var(--panel);
+}
+.chart-tools { padding: 4px; border-bottom: 2px solid var(--ink); }
+#chart { flex: 1; min-height: 300px; }
+
+#overlay {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 90%);
+  padding: 16px;
+  text-align: center;
+  z-index: 5;
+}
+#overlay-title { font-size: 12px; }
+.progress { height: 16px; border: 2px solid var(--ink); background: var(--hi); margin: 10px 0; }
+#overlay-bar { height: 100%; width: 0; background: var(--accent); }
+
+dialog.window::backdrop { background: rgb(28 28 28 / 0.4); }
+dialog .window-body { display: grid; gap: 8px; min-width: 260px; }
+
+#toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--hi);
+  padding: 6px 12px;
+  z-index: 10;
+}

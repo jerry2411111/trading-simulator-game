@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TapeTrainer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="setup" hidden></div>
+
+  <main id="game" hidden>
+    <header class="topbar">
+      <span class="logo">TAPETRAINER</span>
+      <span id="date" class="num">—</span>
+      <span id="clock" class="num">--:--:--</span>
+      <span id="speeds" class="group"></span>
+      <span id="feed" class="badge"></span>
+      <span id="fallback" class="badge warn" hidden></span>
+      <span id="bg-status" class="muted"></span>
+      <span class="spacer"></span>
+      <button id="new-game">New game</button>
+      <button id="settings-btn">Settings</button>
+    </header>
+
+    <aside class="left">
+      <div id="tabs"></div>
+      <button id="add">+ Add</button>
+      <button id="replace">↻ Replace</button>
+    </aside>
+
+    <section class="center">
+      <div class="chart-tools group">
+        <button data-style="candle">Candle</button>
+        <button data-style="line">Line</button>
+      </div>
+      <div id="chart"></div>
+      <div id="overlay" class="window" hidden>
+        <p id="overlay-title" class="num"></p>
+        <p id="overlay-text"></p>
+        <div class="progress"><div id="overlay-bar"></div></div>
+        <button id="overlay-btn" class="primary"></button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="settings" class="window">
+    <div class="titlebar">Settings</div>
+    <div class="window-body">
+      <p>Alpaca key: <span id="settings-feed"></span></p>
+      <button id="change-key">Change key</button>
+      <button id="forget-key">Forget key</button>
+      <button id="settings-close">Close</button>
+    </div>
+  </dialog>
+
+  <div id="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

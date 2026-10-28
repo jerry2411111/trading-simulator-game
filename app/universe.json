@@ -1,0 +1,14 @@
+{
+  "_note": "Maintainer-editable seed list: liquid US stocks above ~$2B market cap known for large intraday moves. Tickers with no data on a game's start date are skipped automatically.",
+  "tickers": [
+    "TSLA", "NVDA", "AMD", "COIN", "MSTR", "PLTR", "SMCI", "MARA", "RIOT", "CLSK",
+    "HUT", "IREN", "CORZ", "HOOD", "SOFI", "AFRM", "UPST", "RIVN", "LCID", "NIO",
+    "XPEV", "LI", "SNOW", "NET", "CRWD", "DDOG", "ZS", "MDB", "SHOP", "ROKU",
+    "DKNG", "U", "RBLX", "PATH", "AI", "IONQ", "RKLB", "ASTS", "CVNA", "CELH",
+    "ENPH", "FSLR", "RUN", "ARM", "AVGO", "MU", "INTC", "MRVL", "ON", "LRCX",
+    "AMAT", "TSM", "META", "NFLX", "AMZN", "DELL", "ANET", "VRT", "APP", "TTD",
+    "OKTA", "TWLO", "PINS", "SNAP", "LYFT", "UBER", "DASH", "ABNB", "ETSY", "CHWY",
+    "W", "GME", "MRNA", "VKTX", "CRSP", "HIMS", "SOUN", "SMR", "OKLO", "CCJ",
+    "FCX", "BA"
+  ]
+}
