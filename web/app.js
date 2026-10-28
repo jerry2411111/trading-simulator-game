@@ -6,6 +6,7 @@ import { fillTable, money, signed, summaryRows } from './format.js';
 import { Buddy } from './buddy.js';
 import { initCollection } from './collect.js';
 import { initHome } from './home.js';
+import { initPetWindow } from './petwin.js';
 import { applyStoredTheme, initMenus } from './menu.js';
 import { showSetup } from './setup.js';
 import { initSlot } from './slot.js';
@@ -45,7 +46,8 @@ const setCoins = (c) => { $('coins-btn').textContent = `🪙 ${Math.floor(c).toL
 function onHome(d) {  // coins and the companion pet next to the chart
   setCoins(d.coins);
   const p = d.state.pets.find((x) => x.id === d.companion);
-  pet.setPet(p ? { type: p.type, name: d.catalog[p.type].name, hungry: p.status === 'hungry' } : null);
+  const outfit = p?.wearing ? { style: d.catalog[p.wearing].style, color: d.catalog[p.wearing].color } : null;
+  pet.setPet(p ? { type: p.type, name: d.catalog[p.type].name, hungry: p.status === 'hungry', outfit } : null);
 }
 let screenOpen = false;
 function openScreen(which, arg) {
@@ -63,7 +65,7 @@ function closeScreens() {
   refreshCoins();
 }
 const screens = {
-  home: initHome({ toast, theme, coins: setCoins, onHome, openStore: (tab) => openScreen('store', tab) }),
+  home: initHome({ toast, theme, coins: setCoins, onHome, openStore: (tab) => openScreen('store', tab), openPet: (id) => petWindow.open(id) }),
   store: initStore({ toast, coins: setCoins, onHome }),
   collection: initCollection({ toast }),
 };
@@ -74,6 +76,7 @@ $('coins-btn').onclick = () => openScreen('store');
 $('home-store').onclick = () => openScreen('store');
 $('store-home').onclick = () => openScreen('home');
 document.querySelectorAll('[data-back]').forEach((b) => { b.onclick = closeScreens; });
+const petWindow = initPetWindow({ act: (action, body) => screens.home.act(action, body) });
 const refreshCoins = async () => { try { onHome(await (await fetch('/api/home')).json()); } catch { /* offline */ } };
 
 // ----- the slot machine (every 5 trades) and what it gives

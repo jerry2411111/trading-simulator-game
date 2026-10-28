@@ -6,7 +6,8 @@ Coins = this game's trading profit
       - spending (purchases, cleanup, floors, food). Every coin movement is logged.
 
 Things can be mortgaged for dollars paid into the trading account: one house, building or piece of
-furniture, or the whole home (worth $20,000 plus everything in it; it locks the home until paid back).
+furniture (a house is worth $20,000 plus its price), or the whole home (worth $20,000 plus everything in
+it; it locks the home until paid back).
 Each mortgage picks a plan from PLANS: how much of the value is lent and the daily interest. Interest is
 paid every trading day from the account's cash at the close (interest only; paying the loan back takes
 the same dollars out again); if the cash can't cover it, the bank takes the mortgaged thing (and the loan
@@ -34,10 +35,60 @@ PLANS = {  # mortgage plans: share of the value lent, interest per trading day o
 }
 HOME_LOAN_BASE = 20_000                           # the whole home is worth this much plus what's in it
 
-PETS = {  # name, price, cost of one meal
-    "turtle": ("Turtle", 60, 2), "lizard": ("Lizard", 150, 3), "cat": ("Cat", 250, 5),
-    "dog": ("Dog", 400, 8), "parrot": ("Parrot", 600, 4), "lion": ("Lion", 4000, 40),
+PETS = {  # name, price (close to what the pet costs in real life), cost of one meal
+    # dogs
+    "chihuahua": ("Chihuahua", 800, 3), "bichon": ("Bichon Frise", 1200, 4), "labrador": ("Labrador Retriever", 1200, 9),
+    "husky": ("Siberian Husky", 1200, 9), "shepherd": ("German Shepherd", 1500, 10), "poodle": ("Poodle", 1500, 6),
+    "dog": ("Golden Retriever", 1800, 9), "pomeranian": ("Pomeranian", 1800, 3), "corgi": ("Corgi", 2000, 6),
+    "frenchie": ("French Bulldog", 3500, 6),
+    # cats
+    "cat": ("Orange Tabby", 150, 4), "siamese": ("Siamese Cat", 800, 5), "american": ("American Shorthair", 800, 5),
+    "british": ("British Shorthair", 1500, 5), "russianblue": ("Russian Blue", 1500, 5), "ragdoll": ("Ragdoll", 1800, 5),
+    "persian": ("Persian Cat", 2000, 6), "mainecoon": ("Maine Coon", 2000, 7), "scottish": ("Scottish Fold", 2000, 5),
+    "bengal": ("Bengal Cat", 2500, 6),
+    # rare and unusual
+    "frog": ("Pacman Frog", 50, 1), "gecko": ("Leopard Gecko", 60, 1), "dragon": ("Bearded Dragon", 120, 2),
+    "python": ("Ball Python", 150, 3), "hedgehog": ("Hedgehog", 250, 2), "ferret": ("Ferret", 250, 3),
+    "glider": ("Sugar Glider", 300, 2), "chinchilla": ("Chinchilla", 300, 2), "capybara": ("Capybara", 3000, 12),
+    "marmoset": ("Marmoset", 4000, 6),
+    # other common pets
+    "hamster": ("Hamster", 20, 1), "guineapig": ("Guinea Pig", 40, 2), "rabbit": ("Rabbit", 60, 2),
+    "turtle": ("Turtle", 60, 2), "parrot": ("Parrot", 1200, 4),
+    # fantasy
+    "lizard": ("Green Anole", 30, 1), "lion": ("Lion", 20000, 40),
 }
+PREMIUM_AT = 1000                                 # pets this pricey get a portrait window and clothes
+GARDEN_PETS, HOUSE_PETS = 5, 3                    # how many pets fit outside and inside
+CLOTH_STYLES = {  # name, price
+    "bandana": ("bandana", 30), "yuzu": ("yuzu hat", 25), "bowtie": ("bow tie", 40), "scarf": ("scarf", 45),
+    "flower": ("flower crown", 60), "vest": ("vest", 70), "sweater": ("sweater", 80), "hoodie": ("hoodie", 90),
+    "raincoat": ("raincoat", 90), "sailor": ("sailor suit", 110), "tutu": ("tutu", 120), "cape": ("cape", 140),
+    "kimono": ("kimono", 160), "tuxedo": ("tuxedo", 200), "crown": ("crown", 300),
+}
+PET_CLOTHES = {  # each pricey pet's own three designs: style, color, color name
+    "corgi": [("bandana", "#d8283c", "Red"), ("sweater", "#2a3a8a", "Navy"), ("crown", "#ffd21f", "Royal")],
+    "shepherd": [("vest", "#1a2a5a", "K-9"), ("bandana", "#4a6a3a", "Camo"), ("scarf", "#8a8a96", "Grey")],
+    "labrador": [("raincoat", "#ffd21f", "Yellow"), ("bandana", "#2a6ad8", "Blue"), ("hoodie", "#c8202a", "Red")],
+    "husky": [("scarf", "#3a8ad8", "Snow"), ("hoodie", "#6a6a7a", "Grey"), ("sailor", "#2a4ab8", "Navy")],
+    "poodle": [("tutu", "#ff8ac0", "Pink"), ("bowtie", "#1a1a1a", "Black"), ("cape", "#7a3ac8", "Purple")],
+    "dog": [("bowtie", "#d8102e", "Red"), ("sweater", "#f0e0c0", "Cream"), ("flower", "#ff4f9a", "Spring")],
+    "pomeranian": [("crown", "#ffd21f", "Princess"), ("tutu", "#ffb0d8", "Pink"), ("sweater", "#ff7ab0", "Pink")],
+    "frenchie": [("hoodie", "#1a1a1a", "Black"), ("tuxedo", "#1a1a24", "Dapper"), ("kimono", "#c8102e", "Red")],
+    "bichon": [("flower", "#ffd84a", "Daisy"), ("bowtie", "#3a8ad8", "Blue"), ("tutu", "#ffffff", "White")],
+    "british": [("bowtie", "#1a3a8a", "Navy"), ("sweater", "#8a1a2a", "Burgundy"), ("cape", "#2a2a3a", "Night")],
+    "russianblue": [("cape", "#c8c8d8", "Silver"), ("bowtie", "#2a2a3a", "Black"), ("scarf", "#7a3ac8", "Violet")],
+    "ragdoll": [("flower", "#ff9ac0", "Rose"), ("kimono", "#3a6ad8", "Blue"), ("bowtie", "#ff4f9a", "Pink")],
+    "persian": [("crown", "#ffd21f", "Queen"), ("cape", "#8a1a5a", "Velvet"), ("tutu", "#f0e0ff", "Lilac")],
+    "mainecoon": [("scarf", "#3a6a3a", "Forest"), ("hoodie", "#6a4a2a", "Bear"), ("crown", "#ffd21f", "King")],
+    "scottish": [("scarf", "#c8102e", "Tartan"), ("sweater", "#3a6a3a", "Highland"), ("bowtie", "#1a2a6a", "Navy")],
+    "bengal": [("bandana", "#ff7a1a", "Jungle"), ("hoodie", "#1a1a1a", "Panther"), ("crown", "#ffd21f", "Wild")],
+    "capybara": [("yuzu", "#ffb020", "Yuzu"), ("raincoat", "#4ab8d8", "Spa"), ("kimono", "#3a8a5a", "Onsen")],
+    "marmoset": [("sweater", "#e8a040", "Banana"), ("hoodie", "#4a8ad8", "Sky"), ("crown", "#ffd21f", "Tiny king")],
+    "parrot": [("bowtie", "#1a1a1a", "Black"), ("cape", "#2a8a5a", "Jungle"), ("sailor", "#2a4ab8", "Pirate")],
+    "lion": [("crown", "#ffd21f", "King"), ("cape", "#a8102e", "Royal"), ("bowtie", "#1a1a1a", "Gala")],
+}
+CLOTHES = {f"{pet}.{style}": (pet, style, color, cname) for pet, designs in PET_CLOTHES.items()
+           for style, color, cname in designs}
 FLOWERS = {  # name, price
     "daisy": ("Daisy", 5), "poppy": ("Poppy", 7), "tulip": ("Tulip", 8), "bluebell": ("Bluebell", 9),
     "sunflower": ("Sunflower", 10), "lavender": ("Lavender", 12), "rose": ("Rose", 15), "lily": ("Lily", 18),
@@ -104,7 +155,10 @@ BUILD = {  # name, price, needs
 }
 
 CATALOG = {
-    **{k: {"kind": "pet", "name": n, "price": p, "meal": m} for k, (n, p, m) in PETS.items()},
+    **{k: {"kind": "pet", "name": n, "price": p, "meal": m, "premium": p >= PREMIUM_AT,
+           "clothes": [f"{k}.{st}" for st, _, _ in PET_CLOTHES.get(k, [])]} for k, (n, p, m) in PETS.items()},
+    **{cid: {"kind": "clothes", "name": f"{cname} {CLOTH_STYLES[style][0]}", "price": CLOTH_STYLES[style][1], "pet": pet,
+             "style": style, "color": color} for cid, (pet, style, color, cname) in CLOTHES.items()},
     **{k: {"kind": "flower", "name": n, "price": p, "hours": FLOWER_HOURS, "sells": p * FLOWER_SELL}
        for k, (n, p) in FLOWERS.items()},
     **{k: {"kind": "tree", "name": n, "price": p, "hours": h, "yield": y, "every": e}
@@ -148,6 +202,11 @@ def normalize(d):
                 d["zones"].setdefault(zone, {"floor": None})
     if d["pool"]:
         d["zones"].setdefault(ZONE_OF["pool"], {"floor": None})
+    for i, pet in enumerate(d["pets"]):  # older saves: pets get a place, clothes and a known species
+        pet.setdefault("place", "garden" if i < GARDEN_PETS else "house")
+        pet.setdefault("outfits", [])
+        pet.setdefault("wearing", None)
+    d["pets"] = [pet for pet in d["pets"] if pet["type"] in PETS]
     return d
 
 
@@ -186,6 +245,14 @@ def has_tank(d):
         f["item"] == "fish_tank" for layout in d["layouts"].values() for f in layout)
 
 
+def pet_room(d):
+    """Free places for pets: {"garden": n, "house": n} (a pet that died keeps its place until buried)."""
+    used = {"garden": 0, "house": 0}
+    for pet in d["pets"]:
+        used[pet["place"]] += 1
+    return {"garden": GARDEN_PETS - used["garden"], "house": HOUSE_PETS - used["house"]}
+
+
 def companion(d, now):
     """The pet shown next to the chart: the chosen one while it lives, else the first living pet."""
     alive = [p for p in d["pets"] if pet_status(p, now) != "dead"]
@@ -198,7 +265,7 @@ def view(d, pnl):
     buddy = companion(d, now)
     return {"ok": True, "coins": coins(d, pnl), "trading": round(pnl, 2), "now": now,
             "state": {**d, "pets": [{**p, "status": pet_status(p, now)} for p in d["pets"]]}, "catalog": CATALOG,
-            "loan_offers": loan_offers(d), "plans": PLANS, "locked": locked(d), "has_tank": has_tank(d), "companion": buddy and buddy["id"],
+            "loan_offers": loan_offers(d), "plans": PLANS, "pet_room": pet_room(d), "locked": locked(d), "has_tank": has_tank(d), "companion": buddy and buddy["id"],
             "aqua_hungry": now - d["aqua_fed"] >= HUNGRY_AFTER,
             "aqua_meal": round(sum(CATALOG[a["type"]]["meal"] for a in d["aquatic"]), 2)}
 
@@ -290,7 +357,8 @@ def home_value(d):
     value = sum(HOUSES[h][1] for h in d["houses"]) + sum(BUILD[b][1] for b in BUILD if d[b])
     value += sum(FURNITURE[f["item"]][1] for _, f in _furniture(d))
     value += sum(FURNITURE[k][1] * n for k, n in d["inventory"].items() if k in FURNITURE)
-    value += sum(PETS[p["type"]][1] for p in d["pets"]) + sum(CATALOG[a["type"]]["price"] for a in d["aquatic"])
+    value += sum(PETS[p["type"]][1] + sum(CATALOG[c]["price"] for c in p.get("outfits", [])) for p in d["pets"])
+    value += sum(CATALOG[a["type"]]["price"] for a in d["aquatic"])
     value += sum(CATALOG[p["type"]]["price"] for p in d["flowers"] + d["trees"] if p)
     value += sum(ZONES[z][1] + (FLOORS[v["floor"]][1] if v["floor"] else 0) for z, v in d["zones"].items())
     return value
@@ -298,17 +366,18 @@ def home_value(d):
 
 def loan_offers(d):
     """Everything that can be mortgaged now: [{kind, ref, label, value}]; the loan is a plan's share of the
-    value. The whole home is worth $20,000 plus everything in it that isn't mortgaged yet."""
+    value. A house is worth the $20,000 base plus its price; the whole home is worth the base plus
+    everything in it, less what is already mortgaged (so the base is never counted twice)."""
     if locked(d):
         return []
     taken = {(loan["kind"], loan["ref"]) for loan in d["loans"]}
-    offers = [{"kind": "house", "ref": h, "label": HOUSES[h][0], "value": HOUSES[h][1]} for h in d["houses"] if HOUSES[h][1]]
+    offers = [{"kind": "house", "ref": h, "label": HOUSES[h][0], "value": HOME_LOAN_BASE + HOUSES[h][1]} for h in d["houses"]]
     offers += [{"kind": "build", "ref": b, "label": BUILD[b][0].split(" (")[0], "value": BUILD[b][1]} for b in BUILD if d[b]]
     offers += [{"kind": "furniture", "ref": f["id"], "label": f"{FURNITURE[f['item']][0]} ({HOUSES[h][0].lower()})",
                 "value": FURNITURE[f["item"]][1]} for h, f in _furniture(d)]
     offers = [o for o in offers if (o["kind"], o["ref"]) not in taken]
     pledged = sum(loan["value"] for loan in d["loans"] if loan["kind"] != "all")
-    whole = HOME_LOAN_BASE + max(0, home_value(d) - pledged)
+    whole = max(0, HOME_LOAN_BASE + home_value(d) - pledged)
     return [{"kind": "all", "ref": "all", "label": "The whole home (garden, houses and everything in them)", "value": whole}] + offers
 
 
@@ -387,7 +456,7 @@ def _foreclose(d, loan):
 
 # ----- actions
 
-LOCKED_ACTIONS = {"buy", "sell", "clean", "floor", "plant", "dig", "stash", "house", "mortgage"}
+LOCKED_ACTIONS = {"buy", "sell", "clean", "floor", "plant", "dig", "stash", "house", "mortgage", "buy_clothes"}
 
 
 def act(home, action, body, pnl=0.0, cash=0.0):
@@ -418,6 +487,9 @@ def _act(d, action, body, now, cash):
         if kind in AQUATIC:
             _buy_aquatic(d, item, info, now)
             return 0
+        room = pet_room(d)
+        if kind == "pet" and not (room["garden"] or room["house"]):
+            raise HomeError(f"Your home is full of pets ({GARDEN_PETS} in the garden, {HOUSE_PETS} in the house). Release one first.")
         if kind == "build":
             if item == "pool":
                 _need_clean(d, ZONE_OF["pool"])
@@ -427,7 +499,8 @@ def _act(d, action, body, now, cash):
                 raise HomeError("Build the aquarium first.")
         _spend(d, info["price"], f"Bought {info['name'].split(' (')[0].lower()}")
         if kind == "pet":
-            d["pets"].append({"id": uuid.uuid4().hex[:6], "type": item, "fed": now, "bought": now})
+            d["pets"].append({"id": uuid.uuid4().hex[:6], "type": item, "fed": now, "bought": now,
+                              "place": "garden" if room["garden"] else "house", "outfits": [], "wearing": None})
         elif kind == "house":
             d["houses"].append(item)
             d["house"] = item
@@ -461,7 +534,7 @@ def _act(d, action, body, now, cash):
             raise HomeError("That floor is already there.")
         _spend(d, FLOORS[item][1], f"{FLOORS[item][0]} for the {ZONES[zone][0].lower()}")
         d["zones"][zone]["floor"] = item
-    elif action in ("feed", "bury", "companion"):
+    elif action in ("feed", "bury", "companion", "release", "move_pet", "buy_clothes", "wear"):
         pet = next((p for p in d["pets"] if p["id"] == body.get("id")), None)
         if pet is None:
             raise HomeError("That pet is gone.")
@@ -474,6 +547,26 @@ def _act(d, action, body, now, cash):
             _log(d, f"Said goodbye to the {name.lower()}", 0)
         elif dead:
             raise HomeError("It's too late for this pet.")
+        elif action == "release":  # pets are never sold: they can be let go, for nothing
+            d["pets"].remove(pet)
+            _log(d, f"Released the {name.lower()} to a good new home", 0)
+        elif action == "move_pet":
+            to = "house" if pet["place"] == "garden" else "garden"
+            if pet_room(d)[to] <= 0:
+                raise HomeError(f"The {to} is full ({HOUSE_PETS if to == 'house' else GARDEN_PETS} pets).")
+            pet["place"] = to
+        elif action == "buy_clothes":
+            if item not in CLOTHES or CLOTHES[item][0] != pet["type"]:
+                raise HomeError("Those clothes aren't made for this pet.")
+            if item in pet["outfits"]:
+                raise HomeError("It already has those.")
+            _spend(d, info["price"], f"{info['name']} for the {name.lower()}")
+            pet["outfits"].append(item)
+            pet["wearing"] = item
+        elif action == "wear":
+            if item is not None and item not in pet["outfits"]:
+                raise HomeError("Buy those clothes first.")
+            pet["wearing"] = item
         elif action == "companion":
             d["companion"] = pet["id"]
         else:

@@ -5,6 +5,7 @@ import {
   drawBee, drawBird, drawFloor, drawGarbage, drawFlower, drawHive, drawPet, drawPool, drawTree, GARBAGE_KINDS, PET_SIZE,
 } from './art.js';
 import { drawFurniture, drawHouse, drawRoom, HOUSE_W, ROOM, roomSize, TILE, tileOrigin, wallPieces } from './build.js';
+import { petGroup } from './pets.js';
 import { AQ, drawAquarium, drawSea } from './sea.js';
 import { disc, ellipse, fitCanvas, glow, hash, icon, mouse, now, rect } from './pixel.js';
 
@@ -31,7 +32,6 @@ const STONES = [
 ];
 const RING = Array.from({ length: 22 }, (_, k) => ({ x: BED.x + Math.round(Math.cos((k / 22) * 6.28) * (BED.rx + 6)), y: BED.y + Math.round(Math.sin((k / 22) * 6.28) * (BED.ry + 5)) }));
 const LAMPS = [{ x: 98, y: 98 }, { x: 158, y: 98 }, { x: 110, y: 200 }, { x: 146, y: 200 }];
-const NAMES = { dog: 'dog', cat: 'cat', parrot: 'parrot', turtle: 'turtle', lizard: 'lizard', lion: 'lion' };
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -91,7 +91,7 @@ export function initHome(ctx) {
     const d = await api(`/api/home/${action}`, body);
     if (!d.ok) return ctx.toast(d.message);
     await refresh(d);
-    return true;
+    return d;
   }
 
   // ------------------------------------------------------------- growth
@@ -114,7 +114,8 @@ export function initHome(ctx) {
     st().pets.forEach((p, i) => {
       if (!pets.has(p.id)) pets.set(p.id, { id: p.id, type: p.type, x: 128 + (i % 3) * 8, y: 196, dir: 1, pose: 'idle', moving: false, until: 0, emote: null, phase: i });
       if (!inside.has(p.id)) inside.set(p.id, { id: p.id, type: p.type, x: 0, y: 0, path: [], until: 0, pose: 'idle', dir: 1, emote: null, act: null, on: null, label: 'is looking around', phase: i });
-      [pets.get(p.id), inside.get(p.id)].forEach((b) => Object.assign(b, { status: p.status, fed: p.fed }));
+      const outfit = p.wearing ? { style: cat(p.wearing).style, color: cat(p.wearing).color } : null;
+      [pets.get(p.id), inside.get(p.id)].forEach((b) => Object.assign(b, { status: p.status, fed: p.fed, place: p.place, outfit }));
     });
   }
 
@@ -122,7 +123,9 @@ export function initHome(ctx) {
   const near = (p, r) => ({ x: Math.min(LAWN.x1, Math.max(LAWN.x0, p.x + rand(-r, r))), y: Math.min(LAWN.y1, Math.max(LAWN.y0, p.y + rand(-r / 2, r / 2))) });
   const bloomed = () => st().flowers.map((f, i) => f && stage(f) === 3 && FLOWERS[i]).filter(Boolean);
   const grownTrees = () => st().trees.map((f, i) => f && stage(f) >= 2 && SPOTS[i]).filter(Boolean);
-  const alive = () => [...pets.values()].filter((p) => p.status !== 'dead');
+  const outside = () => [...pets.values()].filter((p) => p.place === 'garden');
+  const alive = () => outside().filter((p) => p.status !== 'dead');
+  const G = (p) => petGroup(p.type);
   const inPool = (p) => st().pool && p.x > POOL.x + 4 && p.x < POOL.x + POOL.w - 4 && p.y > POOL.y + 4 && p.y < POOL.y + POOL.h;
 
   function go(p, target, speed, then, movePose = 'walk') {
@@ -143,7 +146,7 @@ export function initHome(ctx) {
       else if (r < 0.58 && others.length) {
         const o = pick(others);
         go(p, { x: o.x, y: o.y }, 40, ['bark', 1.2, 'bang']);
-        if (o.type === 'cat' || o.type === 'lizard') flee(o, p, t);
+        if (['cat', 'lizard', 'critter'].includes(G(o))) flee(o, p, t);
       } else if (r < 0.68 && st().pool) go(p, { x: POOL.x + POOL.w + 3, y: POOL.y + 10 }, 26, ['drink', 2.5]);
       else if (r < 0.76 && clean('southeast')) go(p, { x: 222, y: 194 }, 30, ['sleep', rand(5, 8), 'z']);  // the dog house
       else if (r < 0.88) hold(p, t, 'sit', rand(2, 4));
@@ -183,6 +186,30 @@ export function initHome(ctx) {
       else if (r < 0.85) go(p, pick([...STONES, ...RING]), 50, ['bask', rand(4, 8)]);
       else go(p, pick(FLOWERS), 50, ['idle', 3]);
     },
+    critter(p, t) {  // hamsters, rabbits, guinea pigs, hedgehogs, ferrets, chinchillas, gliders, marmosets, capybaras
+      const r = Math.random();
+      const fast = { ferret: 34, rabbit: 30, glider: 30, marmoset: 26, capybara: 6 }[p.type] ?? 14;
+      if (p.type === 'glider' && r < 0.35 && grownTrees().length) return go(p, (({ x, y }) => ({ x, y: y - 30 }))(pick(grownTrees())), 32, ['sit', rand(3, 6)], 'glide');
+      if (p.type === 'marmoset' && r < 0.4 && grownTrees().length) return go(p, (({ x, y }) => ({ x: x + 3, y: y - 22 }))(pick(grownTrees())), 22, ['sit', rand(3, 7), 'note']);
+      if (p.type === 'capybara' && r < 0.35 && st().pool) return go(p, { x: rand(POOL.x + 12, POOL.x + POOL.w - 12), y: POOL.y + POOL.h - 6 }, 5, ['sleep', rand(8, 14), 'heart']);
+      if (r < 0.35) go(p, near(p, p.type === 'rabbit' ? 50 : 30), fast, ['idle', rand(1, 3)]);
+      else if (r < 0.55 && bloomed().length) go(p, pick(bloomed()), fast, ['eat', rand(3, 5), 'heart']);
+      else if (r < 0.7) hold(p, t, 'sit', rand(2, 4), p.type === 'hamster' ? 'star' : null);
+      else if (r < 0.85) hold(p, t, 'sleep', rand(5, 10), 'z');
+      else go(p, pick([...STONES, ...SPOTS, DOOR]), fast, ['sit', 3]);
+    },
+    snake(p, t) {
+      const r = Math.random();
+      if (r < 0.35) go(p, near(p, 40), 6, ['idle', rand(3, 6)]);
+      else if (r < 0.7) go(p, pick([...STONES, ...RING]), 6, ['bask', rand(6, 12)]);
+      else hold(p, t, 'sleep', rand(8, 14), 'z');
+    },
+    frog(p, t) {
+      const r = Math.random();
+      if (r < 0.3) go(p, near(p, 24), 20, ['idle', rand(4, 8)]);
+      else if (r < 0.5 && st().pool) go(p, { x: POOL.x + POOL.w + 2, y: POOL.y + 6 }, 20, ['idle', 6, 'note']);
+      else hold(p, t, 'idle', rand(5, 10), Math.random() < 0.3 ? 'note' : null);
+    },
     lion(p, t) {
       const r = Math.random();
       if (r < 0.4) go(p, pick([{ x: 30, y: 110 }, { x: 226, y: 110 }, { x: 226, y: 196 }, { x: 100, y: 196 }, { x: 176, y: 130 }]), 9, ['idle', 2]);
@@ -195,16 +222,17 @@ export function initHome(ctx) {
   };
 
   function flee(p, from, t) {
-    if (p.status === 'dead' || p.type === 'lion') return;
-    if (p.type === 'turtle') return hold(p, t, 'hide', 4);
-    if (p.type === 'parrot') return go(p, { x: rand(20, 236), y: rand(40, 80) }, 34, ['perch', 3], 'fly');
+    if (p.status === 'dead' || G(p) === 'lion' || p.type === 'capybara') return;  // nothing scares a capybara
+    if (G(p) === 'turtle') return hold(p, t, 'hide', 4);
+    if (p.type === 'hedgehog') return hold(p, t, 'sleep', 4, 'bang');  // rolls into a ball
+    if (G(p) === 'parrot') return go(p, { x: rand(20, 236), y: rand(40, 80) }, 34, ['perch', 3], 'fly');
     const away = { x: p.x + Math.sign(p.x - from.x || 1) * 40, y: p.y + Math.sign(p.y - from.y || 1) * 20 };
     go(p, near(away, 4), p.type === 'lizard' ? 55 : 36, ['sit', 2, 'bang']);
   }
 
   function roar(p, t) {
     shake = t + 0.6;
-    alive().filter((o) => o !== p && dist(o, p) < 90).forEach((o) => (o.type === 'dog' ? hold(o, t, 'sit', 2, 'bang') : flee(o, p, t)));
+    alive().filter((o) => o !== p && dist(o, p) < 90).forEach((o) => (G(o) === 'dog' ? hold(o, t, 'sit', 2, 'bang') : flee(o, p, t)));
     if (birds.perch) birds.perch.leave = 0;
   }
 
@@ -216,12 +244,12 @@ export function initHome(ctx) {
   }
 
   function thinkPet(p, t, dt) {
-    if (p.status === 'dead') return;
+    if (p.status === 'dead' || p.place !== 'garden') return;
     const slow = p.status === 'hungry' ? 0.5 : 1;
     if (hoverPet === p) {
       p.moving = false;
-      p.pose = { dog: 'sit', cat: 'sit', parrot: 'sing', turtle: 'idle', lizard: 'idle', lion: 'lie' }[p.type];
-      p.emote = p.type === 'parrot' ? 'note' : 'heart';
+      p.pose = { dog: 'sit', cat: 'sit', parrot: 'sing', turtle: 'idle', lizard: 'idle', lion: 'lie', critter: 'sit', snake: 'idle', frog: 'idle' }[G(p)];
+      p.emote = G(p) === 'parrot' ? 'note' : 'heart';
       p.until = t + 0.5;
       return;
     }
@@ -242,11 +270,11 @@ export function initHome(ctx) {
       }
       return;
     }
-    if (['cat', 'turtle', 'lizard'].includes(p.type) && p.pose !== 'hide') {
-      const threat = alive().find((o) => (o.type === 'dog' || o.type === 'lion') && o.moving && dist(o, p) < 16);
+    if (['cat', 'turtle', 'lizard', 'critter', 'frog'].includes(G(p)) && p.pose !== 'hide') {
+      const threat = alive().find((o) => (G(o) === 'dog' || G(o) === 'lion') && o.moving && dist(o, p) < 16);
       if (threat) return flee(p, threat, t);
     }
-    if (t > p.until) BRAINS[p.type](p, t);
+    if (t > p.until) BRAINS[G(p)](p, t);
   }
 
   // ------------------------------------------------------------- birds flying by, one landing in a tree
@@ -396,12 +424,12 @@ export function initHome(ctx) {
         },
       });
     });
-    pets.forEach((p) => items.push({
+    outside().forEach((p) => items.push({
       y: p.y,
       draw: () => {
-        const flying = p.type === 'parrot' && (p.pose === 'fly' || p.pose === 'perch');
+        const flying = p.pose === 'fly' || p.pose === 'perch' || p.pose === 'glide';
         if (!flying && p.pose !== 'swim') ellipse(g, p.x, p.y, Math.ceil(PET_SIZE[p.type][0] / 3), 1, 'rgba(0,0,0,0.3)');
-        drawPet(g, p.type, p.x, p.y, { dir: p.dir, pose: p.pose, moving: p.moving, dead: p.status === 'dead', emote: p.emote }, t + p.phase);
+        drawPet(g, p.type, p.x, p.y, { dir: p.dir, pose: p.pose, moving: p.moving, dead: p.status === 'dead', emote: p.emote, outfit: p.outfit }, t + p.phase);
         if (selected?.kind === 'pet' && selected.id === p.id) icon(g, 'star', p.x - 2, p.y + 2);
       },
     }));
@@ -566,14 +594,14 @@ export function initHome(ctx) {
     bookshelf: ['hide', false, 'is napping by the books'], desk: ['hide', true, 'is lying on the desk'],
     coffee_table: ['watch', true, 'is sitting on the coffee table'], floor_lamp: ['watch', false, 'is chasing the lamp light'],
   };
-  const POSES = {  // action -> pose per species
-    rest: { dog: 'sleep', cat: 'sleep', parrot: 'perch', turtle: 'hide', lizard: 'bask', lion: 'sleep' },
-    watch: { dog: 'sit', cat: 'sit', parrot: 'perch', turtle: 'idle', lizard: 'idle', lion: 'lie' },
-    play: { dog: 'bark', cat: 'groom', parrot: 'sing', turtle: 'idle', lizard: 'pushup', lion: 'roar' },
-    beg: { dog: 'sit', cat: 'sit', parrot: 'sing', turtle: 'eat', lizard: 'idle', lion: 'idle' },
-    drink: { dog: 'drink', cat: 'sit', parrot: 'preen', turtle: 'swim', lizard: 'idle', lion: 'lie' },
-    sniff: { dog: 'sniff', cat: 'stalk', parrot: 'perch', turtle: 'eat', lizard: 'idle', lion: 'idle' },
-    hide: { dog: 'sit', cat: 'sleep', parrot: 'perch', turtle: 'hide', lizard: 'bask', lion: 'lie' },
+  const POSES = {  // action -> pose per kind of pet
+    rest: { dog: 'sleep', cat: 'sleep', parrot: 'perch', turtle: 'hide', lizard: 'bask', lion: 'sleep', critter: 'sleep', snake: 'sleep', frog: 'idle' },
+    watch: { dog: 'sit', cat: 'sit', parrot: 'perch', turtle: 'idle', lizard: 'idle', lion: 'lie', critter: 'sit', snake: 'idle', frog: 'idle' },
+    play: { dog: 'bark', cat: 'groom', parrot: 'sing', turtle: 'idle', lizard: 'pushup', lion: 'roar', critter: 'sit', snake: 'bask', frog: 'idle' },
+    beg: { dog: 'sit', cat: 'sit', parrot: 'sing', turtle: 'eat', lizard: 'idle', lion: 'idle', critter: 'eat', snake: 'idle', frog: 'idle' },
+    drink: { dog: 'drink', cat: 'sit', parrot: 'preen', turtle: 'swim', lizard: 'idle', lion: 'lie', critter: 'eat', snake: 'idle', frog: 'idle' },
+    sniff: { dog: 'sniff', cat: 'stalk', parrot: 'perch', turtle: 'eat', lizard: 'idle', lion: 'idle', critter: 'eat', snake: 'idle', frog: 'idle' },
+    hide: { dog: 'sit', cat: 'sleep', parrot: 'perch', turtle: 'hide', lizard: 'bask', lion: 'lie', critter: 'sleep', snake: 'sleep', frog: 'idle' },
   };
   const EMOTES = { rest: 'z', watch: 'star', play: 'note', beg: 'food', drink: 'drop', sniff: 'heart', hide: 'bang' };
 
@@ -596,7 +624,7 @@ export function initHome(ctx) {
       p.path = path(here, [{ x: Math.floor(rand(0, gw)), y: Math.floor(rand(0, gh)) }]);
       p.label = 'is exploring the house';
     } else {
-      const [pose, label, emote] = pick([['sit', 'is resting', null], ['idle', 'is looking around', null], [POSES.play[p.type], 'is playing', 'note'], [POSES.rest[p.type], 'is dozing', 'z']]);
+      const [pose, label, emote] = pick([['sit', 'is resting', null], ['idle', 'is looking around', null], [POSES.play[G(p)], 'is playing', 'note'], [POSES.rest[G(p)], 'is dozing', 'z']]);
       Object.assign(p, { pose, label, emote, until: t + rand(2, 4) });
     }
   }
@@ -604,16 +632,17 @@ export function initHome(ctx) {
   function petArrive(p, t) {
     const f = p.act;
     const [kind, on, label] = ACTS[f.item];
-    Object.assign(p, { pose: POSES[kind][p.type], label, emote: EMOTES[kind], until: t + rand(5, 11) });
+    Object.assign(p, { pose: POSES[kind][G(p)], label, emote: EMOTES[kind], until: t + rand(5, 11) });
     if (on) p.on = f;
     const [w] = size(f.item, f.rot);
     p.dir = f.x + w / 2 > p.x ? 1 : -1;
-    if (kind === 'play' && p.type === 'lion') shake = t + 0.4;
+    if (p.type === 'glider' || G(p) === 'parrot') p.pose = 'perch';
+    if (kind === 'play' && G(p) === 'lion') shake = t + 0.4;
   }
 
   function thinkInside(p, t, dt) {
-    if (p.status === 'dead') return;
-    if (p.petted) { Object.assign(p, { pose: POSES.watch[p.type], emote: 'heart', label: 'is being petted' }); return; }
+    if (p.status === 'dead' || p.place !== 'house') return;
+    if (p.petted) { Object.assign(p, { pose: POSES.watch[G(p)], emote: 'heart', label: 'is being petted' }); return; }
     if (p.path.length) {
       const n = p.path[0];
       const dx = n.x - p.x;
@@ -626,7 +655,7 @@ export function initHome(ctx) {
       if (!p.path.length) {
         p.moving = false;
         if (p.act) petArrive(p, t);
-        else if (p.called) Object.assign(p, { pose: POSES.watch[p.type], emote: 'heart', label: 'came when you called', until: t + 2.5, called: false });
+        else if (p.called) Object.assign(p, { pose: POSES.watch[G(p)], emote: 'heart', label: 'came when you called', until: t + 2.5, called: false });
         else Object.assign(p, { pose: 'idle', until: t + rand(1, 3) });
       }
       return;
@@ -651,7 +680,7 @@ export function initHome(ctx) {
     const b = blocked();
     const free = [];
     for (let y = gh - 1; y >= 0; y--) for (let x = 0; x < gw; x++) if (!b[x][y]) free.push({ x, y });
-    [...inside.values()].forEach((p, i) => {
+    [...inside.values()].filter((p) => p.place === 'house').forEach((p, i) => {
       const spot = free[Math.min(free.length - 1, Math.floor(free.length / 2) + i * 2)] ?? { x: 0, y: 0 };
       Object.assign(p, { x: spot.x, y: spot.y, path: [], act: null, on: null, until: 0 });
     });
@@ -680,7 +709,8 @@ export function initHome(ctx) {
     const [gw, gh] = grid();
     drawRoom(g, st().house, gw, gh, t, editing);
     layout().filter((f) => f.item === 'rug').forEach((f) => drawItem(f.item, f.x, f.y, f.rot, t, false));
-    const using = new Set([...inside.values()].filter((p) => p.act && !p.path.length).map((p) => p.act.id));
+    const home = () => [...inside.values()].filter((p) => p.place === 'house' && p.status !== 'dead');
+    const using = new Set(home().filter((p) => p.act && !p.path.length).map((p) => p.act.id));
     const stand = layout().filter((f) => f.item !== 'rug').map((f) => ({
       key: f.y + size(f.item, f.rot)[1],
       draw: () => {
@@ -693,14 +723,14 @@ export function initHome(ctx) {
       },
     }));
     stand.push(...wallPieces(g, st().house, walls()));
-    inside.forEach((p) => {
+    home().forEach((p) => {
       const { px, py } = petPixel(p);
       stand.push({
         key: (p.on ? p.on.y + size(p.on.item, p.on.rot)[1] : p.y + 1) + 0.1,
         draw: () => {
           if (p.status === 'dead') return;
           if (!p.on) ellipse(g, px, py, Math.ceil(PET_SIZE[p.type][0] / 3), 1, 'rgba(0,0,0,0.3)');
-          drawPet(g, p.type, px, py, { dir: p.dir, pose: p.pose, moving: p.moving, emote: t % 2 < 1.4 ? p.emote : null }, t + p.phase);
+          drawPet(g, p.type, px, py, { dir: p.dir, pose: p.pose === 'fly' ? 'glide' : p.pose, moving: p.moving, emote: t % 2 < 1.4 ? p.emote : null, outfit: p.outfit }, t + p.phase);
           if (p.on?.item === 'bathtub') rect(g, px - 8, py - 5, 16, 4, '#8fd8ff');
         },
       });
@@ -856,14 +886,14 @@ export function initHome(ctx) {
   new ResizeObserver(fit).observe(canvas.parentElement);
 
   function petAt(m) {
-    return [...pets.values()].reverse().find((p) => {
+    return outside().reverse().find((p) => {
       const [w, h] = PET_SIZE[p.type];
       return Math.abs(m.x - p.x) <= w / 2 && m.y <= p.y + 2 && m.y >= p.y - h;
     });
   }
   function petInsideAt(m) {
     return [...inside.values()].reverse().find((p) => {
-      if (p.status === 'dead') return false;
+      if (p.status === 'dead' || p.place !== 'house') return false;
       const { px, py } = petPixel(p);
       const [w, h] = PET_SIZE[p.type];
       return Math.abs(m.x - px) <= w / 2 && m.y <= py + 2 && m.y >= py - h;
@@ -933,13 +963,15 @@ export function initHome(ctx) {
     }
     const t = t0();
     const p = petInsideAt(m);
-    if (p) {  // a trick
-      const trick = { dog: ['bark', 'heart'], cat: ['groom', 'heart'], parrot: ['sing', 'note'], turtle: ['hide', 'bang'], lizard: ['pushup', 'star'], lion: ['roar', 'bang'] }[p.type];
+    if (p) {
+      if (cat(p.type).premium) return ctx.openPet(p.id);  // pricey pets open their portrait window
+      const trick = { dog: ['bark', 'heart'], cat: ['groom', 'heart'], parrot: ['sing', 'note'], turtle: ['hide', 'bang'], lizard: ['pushup', 'star'], lion: ['roar', 'bang'], critter: ['sit', 'heart'], snake: ['bask', 'star'], frog: ['idle', 'note'] }[G(p)];
       Object.assign(p, { pose: trick[0], emote: trick[1], label: 'shows off a trick', until: t + 1.6, path: [], act: null, on: null });
-      if (p.type === 'lion') shake = t + 0.5;
+      if (G(p) === 'lion') shake = t + 0.5;
       return;
     }
-    const buddy = inside.get(data.companion) ?? [...inside.values()].find((q) => q.status !== 'dead');
+    const indoor = [...inside.values()].filter((q) => q.place === 'house' && q.status !== 'dead');
+    const buddy = indoor.find((q) => q.id === data.companion) ?? indoor[0];
     if (!buddy) return;
     const steps = path({ x: Math.round(buddy.x), y: Math.round(buddy.y) }, [tile]);
     if (steps.length) Object.assign(buddy, { path: steps, act: null, on: null, called: true, label: 'is coming over' });
@@ -971,8 +1003,8 @@ export function initHome(ctx) {
   function renderStatusLine() {
     const s = $('home-status');
     if (!s || view !== 'house') return;
-    s.innerHTML = [...inside.values()].filter((p) => p.status !== 'dead').map((p) => `The ${NAMES[p.type]} ${p.label}.`).join('<br>')
-      || 'Nobody lives here yet: pets you adopt move in.';
+    s.innerHTML = [...inside.values()].filter((p) => p.status !== 'dead' && p.place === 'house').map((p) => `The ${petName(p.type).toLowerCase()} ${p.label}.`).join('<br>')
+      || 'No pets inside: move some in from the garden (up to 3).';
   }
 
   function renderSide() {
@@ -1054,18 +1086,27 @@ export function initHome(ctx) {
         }
       }
     }
-    if (s.pets.length) {
-      side.append(el('<div class="box-title">PETS</div>'));
-      const ul = document.createElement('ul');
-      ul.className = 'list';
-      s.pets.forEach((p) => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span>${petName(p.type)}${p.id === data.companion ? ' ★' : ''} <i class="${p.status === 'ok' ? 'up' : 'down'}">${p.status === 'ok' ? 'fed' : p.status}</i></span>`;
-        if (p.status !== 'dead') li.append(button(`Feed ${cat(p.type).meal}`, () => act('feed', { id: p.id })));
-        ul.append(li);
-      });
-      side.append(ul);
-    }
+    renderPetList(s);
+  }
+
+  function renderPetList(s) {
+    if (!s.pets.length) return;
+    const room = data.pet_room;
+    side.append(el(`<div class="box-title">PETS · garden ${5 - room.garden}/5 · house ${3 - room.house}/3</div>`));
+    const ul = document.createElement('ul');
+    ul.className = 'list pet-list';
+    s.pets.forEach((p) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${p.place === 'house' ? '🏠' : '🌳'} ${petName(p.type)}${p.id === data.companion ? ' ★' : ''} <i class="${p.status === 'ok' ? 'up' : 'down'}">${p.status === 'ok' ? 'fed' : p.status}</i></span>`;
+      if (p.status !== 'dead') {
+        li.append(button(`Feed ${cat(p.type).meal}`, () => act('feed', { id: p.id })));
+        li.append(button(p.place === 'house' ? 'To garden' : 'To house', () => act('move_pet', { id: p.id })));
+        if (cat(p.type).premium) li.append(button('Portrait', () => ctx.openPet(p.id)));
+        li.append(button('Release', () => { if (window.confirm(`Release the ${petName(p.type).toLowerCase()}? Pets can't be sold: it leaves for free.`)) act('release', { id: p.id }); }));
+      } else li.append(button('Bury', () => act('bury', { id: p.id })));
+      ul.append(li);
+    });
+    side.append(ul);
   }
 
   function renderHouseSide(s) {
@@ -1077,6 +1118,7 @@ export function initHome(ctx) {
       side.append(row);
     }
     side.append(el('<p id="home-status" class="muted"></p>'));
+    renderPetList(s);
     side.append(button(editing ? 'Done arranging' : 'Arrange furniture', () => { editing = !editing; holding = null; selected = null; renderSide(); }, editing ? 'active' : 'primary'));
     if (!editing) {
       side.append(el('<p class="muted">Your pets live here and use the furniture. Hover a pet to pet it, click it for a trick, click the floor to call your companion. Click the front door (bottom) to go back out.</p>'));
@@ -1148,5 +1190,6 @@ export function initHome(ctx) {
     },
     close() { running = false; $('home').hidden = true; },
     refresh,
+    act,
   };
 }

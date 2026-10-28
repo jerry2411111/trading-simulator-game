@@ -77,8 +77,15 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
   twice the seed price); four tree spots (pine, maple, apple, sakura: grow in 1–3 days, then give a
   harvest every day or two; bees build a hive in the grown trees, sakura petals fall); a pool; a play
   corner. Birds fly over and land in the trees.
-- **Pets:** turtle, lizard, cat, dog, parrot, lion, each with its own habits in the garden; inside the
-  house they use the furniture (nap on the bed, watch the fish, beg at the fridge, walk on the piano...).
+- **Pets:** 38 kinds: 10 dog breeds (Corgi, German Shepherd, Labrador, Golden Retriever, Poodle,
+  Husky, French Bulldog, Bichon Frise, Pomeranian, Chihuahua), 10 cat breeds (Siamese, Orange Tabby,
+  British and American Shorthair, Ragdoll, Persian, Maine Coon, Scottish Fold, Russian Blue, Bengal),
+  rarer pets (sugar glider, hedgehog, leopard gecko, bearded dragon, ball python, chinchilla, ferret,
+  pacman frog, capybara, marmoset), hamster, rabbit, guinea pig, parrot, turtle, a green anole and a
+  lion. Prices follow real-world prices. Each has its own look, habits and portrait next to the chart.
+  Up to 5 pets live in the garden and 3 in the house (move them between the two); when both are full the
+  store won't sell more. Pets can't be sold, only released for nothing. Pets of 1,000 coins or more open a
+  portrait window in the house (pat, treat, play) and have three outfits designed for their breed.
   Each eats at a different price; hungry after 2 days without food, dead after 7 (real days).
 - **House:** a concrete shack to start; modern or European house (level 2); modern tower, Chinese
   palace or European palace (level 3). Better houses are bigger in the garden and inside; the European

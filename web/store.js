@@ -2,11 +2,12 @@
 // back; mortgage the home for trading dollars and pay loans back.
 import { drawFlower, drawPet, drawPool, drawTree } from './art.js';
 import { drawFurniture, drawHouse, HOUSE_W, TILE } from './build.js';
+import { drawPetHead } from './buddy.js';
 import { drawSea } from './sea.js';
 import { rect } from './pixel.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['Pets', 'Flowers', 'Trees', 'Garden & houses', 'Furniture', 'Fish', 'Sea life', 'Mortgage', 'Sell'];
+const TABS = ['Pets', 'Pet clothes', 'Flowers', 'Trees', 'Garden & houses', 'Furniture', 'Fish', 'Sea life', 'Mortgage', 'Sell'];
 const KINDS = {
   Pets: ['pet'], Flowers: ['flower'], Trees: ['tree'], 'Garden & houses': ['house'], Furniture: ['furniture'],
   Fish: ['fish'], 'Sea life': ['sea', 'ice'],
@@ -20,10 +21,11 @@ function preview(id, info) {
   const g = c.getContext('2d');
   const size = {
     pet: [36, 27], flower: [26, 20], tree: [46, 56], house: [HOUSE_W[id] + 8, 110], fish: [26, 18],
-    sea: SEA_SIZE[id] ?? [26, 26], ice: [26, 24], build: [72, 40],
+    sea: SEA_SIZE[id] ?? [26, 26], ice: [26, 24], build: [72, 40], clothes: [48, 48],
   }[info.kind] ?? [info.size[0] * TILE + 2, info.size[1] * TILE + 2];
   [c.width, c.height] = size;
   if (info.kind === 'pet') drawPet(g, id, 18, 24, { dir: 1, pose: id === 'parrot' ? 'perch' : 'idle' }, 0);
+  else if (info.kind === 'clothes') { [c.width, c.height] = [48, 48]; drawPetHead(g, info.pet, 'happy', 0.2, '#00e5ff', false, { style: info.style, color: info.color }, false); }
   else if (info.kind === 'flower') drawFlower(g, id, 13, 19, 3, 0);
   else if (info.kind === 'tree') drawTree(g, id, 23, 54, 3, 0, 0, false);
   else if (info.kind === 'house') drawHouse(g, id, size[0] / 2, 108, 0);
@@ -70,7 +72,8 @@ function crop(c) {
 }
 
 function detail(info) {
-  if (info.kind === 'pet') return `Meal: ${info.meal} coins`;
+  if (info.kind === 'pet') return `Meal: ${info.meal} coins${info.premium ? ' · portrait window & clothes' : ''}`;
+  if (info.kind === 'clothes') return 'Made for this breed';
   if (info.kind === 'flower') return `Blooms in ${info.hours} h, sells for ${info.sells}`;
   if (info.kind === 'tree') return `Grows in ${info.hours} h, then +${info.yield} every ${info.every} h`;
   if (info.kind === 'house') return `Level ${info.level} · ${info.grid[0]}×${info.grid[1]} floor`;
@@ -103,7 +106,7 @@ export function initStore(ctx) {
     if (await post(action, { item })) ctx.toast(action === 'buy' ? `Bought ${data.catalog[item].name.split(' (')[0]}!` : `Sold ${data.catalog[item].name}.`);
   }
 
-  function card(id, info, price, label, action, disabled, note = '') {
+  function card(id, info, price, label, action, disabled, note = '', body = { item: id }) {
     const div = document.createElement('div');
     div.className = `card${info.kind === 'house' ? ' wide' : ''}`;
     const pv = document.createElement('div');
@@ -116,7 +119,7 @@ export function initStore(ctx) {
     b.textContent = label;
     b.className = 'primary';
     b.disabled = disabled;
-    b.onclick = () => act(action, id);
+    b.onclick = () => (action === 'buy' || action === 'sell' ? act(action, id) : post(action, body).then((r) => r && ctx.toast('Done!')));
     div.append(b);
     return div;
   }
@@ -198,7 +201,17 @@ export function initStore(ctx) {
     }));
     const entries = Object.entries(data.catalog);
     let cards = [];
-    if (tab === 'Mortgage') {
+    if (tab === 'Pet clothes') {
+      const fancy = s.pets.filter((pt) => pt.status !== 'dead' && data.catalog[pt.type].premium);
+      cards = fancy.flatMap((pt) => data.catalog[pt.type].clothes.map((cid) => {
+        const info = data.catalog[cid];
+        const owned = pt.outfits.includes(cid);
+        const short = Math.ceil(info.price - data.coins);
+        return card(cid, { ...info, name: `${info.name} (${data.catalog[pt.type].name})` }, info.price, owned ? 'Owned' : short > 0 ? `Need ${short} more` : 'Buy',
+          'buy_clothes', owned || short > 0 || data.locked, '', { id: pt.id, item: cid });
+      }));
+      if (!cards.length) cards = [Object.assign(document.createElement('p'), { className: 'muted lock-note', textContent: 'Clothes are designed for pets that cost 1,000 coins or more. Adopt one (dogs, many cats, the capybara, the marmoset, the parrot...) and its outfits show up here.' })];
+    } else if (tab === 'Mortgage') {
       cards = mortgageTab();
     } else if (tab === 'Sell') {
       cards = Object.entries(s.inventory).filter(([, n]) => n > 0).map(([id, n]) => {
@@ -214,13 +227,22 @@ export function initStore(ctx) {
         const own = (info.kind === 'house' && s.houses.includes(id)) || (info.kind === 'build' && s[id]);
         const iceLock = info.kind === 'ice' && !s.iceland;
         const buildLock = info.kind === 'build' && ((id === 'aquarium' && !data.has_tank) || (id === 'iceland' && !s.aquarium));
-        const locked = (lock && info.kind !== 'build') || iceLock || buildLock;
+        const full = info.kind === 'pet' && !(data.pet_room.garden || data.pet_room.house);
+        const locked = (lock && info.kind !== 'build') || iceLock || buildLock || full;
         const note = iceLock ? 'Needs the ice land' : buildLock ? (id === 'aquarium' ? 'Needs a fish tank' : 'Needs the aquarium') : '';
         const short = Math.ceil(info.price - data.coins);
         const label = own ? 'Owned' : locked ? 'Locked' : short > 0 ? `Need ${short.toLocaleString()} more` : 'Buy';
         return card(id, info, info.price, label, 'buy', own || locked || data.locked || short > 0, note);
       });
       if (lock) cards.unshift(Object.assign(document.createElement('p'), { className: 'muted lock-note', textContent: lock }));
+      if (tab === 'Pets') {
+        const r = data.pet_room;
+        cards.unshift(Object.assign(document.createElement('p'), {
+          className: 'muted lock-note',
+          textContent: r.garden || r.house ? `Room for ${r.garden} more in the garden and ${r.house} more in the house (5 and 3 at most). Pets can't be sold, only released.`
+            : 'Your home is full of pets (5 in the garden, 3 in the house): release one in Home to adopt another.',
+        }));
+      }
       if (data.coins <= 0) cards.unshift(Object.assign(document.createElement('p'), { className: 'muted lock-note', textContent: 'No coins yet: profit from trading in this game becomes coins. Your home starts as a concrete shack on a wasteland.' }));
     }
     $('store-grid').replaceChildren(...cards);

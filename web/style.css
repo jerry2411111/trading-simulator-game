@@ -407,3 +407,12 @@ button.badge { background: transparent; }
 .slot-title { font-family: 'Press Start 2P', monospace; font-size: 22px; margin: 4px 0; text-shadow: 0 0 10px currentColor, 3px 3px 0 #000; animation: blink 0.4s steps(2) 6; }
 @keyframes blink { 50% { opacity: 0.3; } }
 .slot-result canvas { width: 160px; height: 128px; display: block; margin: 6px auto; background: #0a0614; }
+
+/* A pricey pet's portrait window */
+.pet-window { width: min(640px, 94vw); }
+.pet-window-body { display: grid; grid-template-columns: 192px minmax(0, 1fr); gap: 12px; align-items: start; }
+.pet-window canvas { width: 192px; height: 192px; background: #0a0614; border: 2px solid var(--accent); cursor: grab; }
+.pet-window .list li { gap: 6px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border: 1px solid #fff; vertical-align: middle; }
+.pet-list li { flex-wrap: wrap; }
+.pet-list li button { padding: 1px 5px; }

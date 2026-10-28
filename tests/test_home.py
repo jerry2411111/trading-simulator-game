@@ -94,24 +94,24 @@ def test_companion_falls_back_to_a_living_pet():
 def test_mortgage_one_house_then_the_whole_home_and_pay_back():
     h = Home()
     h("buy", item="modern")
-    h("mortgage", kind="house", ref="modern", plan="p70")
-    assert h.cash == 8000 * 0.7
+    h("mortgage", kind="house", ref="modern", plan="p70")    # worth the $20,000 base + $8,000
+    assert h.cash == pytest.approx(28_000 * 0.7)
     with pytest.raises(home.HomeError):
         h("mortgage", kind="house", ref="modern", plan="p50")   # already pledged
     with pytest.raises(home.HomeError, match="plan"):
         h("mortgage", kind="all", ref="all", plan="p999")
-    v = h("mortgage", kind="all", ref="all", plan="p150")     # 150% of $20,000 + what isn't pledged (nothing)
-    assert h.cash == pytest.approx(5600 + 30_000)
+    v = h("mortgage", kind="all", ref="all", plan="p150")     # the base is already pledged: nothing left
+    assert h.cash == pytest.approx(19_600)
     assert v["locked"] and v["loan_offers"] == []
     with pytest.raises(home.HomeError, match="mortgaged"):
         h("buy", item="cat")
     whole = next(loan for loan in h.d["loans"] if loan["kind"] == "all")
-    h.cash = 100.0
+    h.cash = whole["amount"] - 1 if whole["amount"] else -1
     with pytest.raises(home.HomeError, match="cash"):
         h("redeem", id=whole["id"])
-    h.cash = 40_000.0
+    h.cash = 100.0 + whole["amount"]
     v = h("redeem", id=whole["id"])
-    assert h.cash == 10_000.0 and not v["locked"]
+    assert h.cash == pytest.approx(100.0) and not v["locked"]
 
 
 def test_slot_machine_bonuses():
@@ -141,7 +141,7 @@ def test_collection_gifts_are_unique_until_complete():
 
 def test_catalog_ids_are_unique():
     tables = (home.PETS, home.FLOWERS, home.TREES, home.ZONES, home.FLOORS, home.HOUSES, home.FURNITURE,
-              home.FISH, home.SEA, home.ICE, home.BUILD)
+              home.FISH, home.SEA, home.ICE, home.BUILD, home.CLOTHES)
     assert sum(len(t) for t in tables) == len(home.CATALOG)  # no id is shadowed by another kind
 
 
@@ -150,12 +150,12 @@ def test_interest_is_paid_daily_and_unpaid_interest_forecloses():
     h("buy", item="modern")
     h("clean", zone="southwest")
     h("buy", item="pool")
-    h("mortgage", kind="house", ref="modern", plan="p100")   # $8,000 loan at 0.25%: $20 a day
+    h("mortgage", kind="house", ref="modern", plan="p100")   # $28,000 loan at 0.25%: $70 a day
     h("mortgage", kind="build", ref="pool", plan="p150")     # $3,750 loan at 0.5%: $18.75 a day
     d, paid, notes = home.charge_interest(h.d, cash=100)
-    assert paid == 38.75 and not notes and len(d["loans"]) == 2
-    d, paid, notes = home.charge_interest(h.d, cash=30)   # pays the house's interest, not the pool's
-    assert paid == 20 and not d["pool"] and [x["ref"] for x in d["loans"]] == ["modern"] and "pool" in notes[0]
+    assert paid == 88.75 and not notes and len(d["loans"]) == 2
+    d, paid, notes = home.charge_interest(h.d, cash=80)   # pays the house's interest, not the pool's
+    assert paid == 70 and not d["pool"] and [x["ref"] for x in d["loans"]] == ["modern"] and "pool" in notes[0]
     d, paid, notes = home.charge_interest(d, cash=0)      # now the house goes too
     assert "modern" not in d["houses"] and d["house"] == "shack" and d["loans"] == []
     h.d = d
@@ -171,3 +171,34 @@ def test_foreclosing_the_whole_home_keeps_coins_and_collection():
     d, paid, notes = home.charge_interest(h.d, cash=1)
     assert d["pets"] == [] and d["loans"] == [] and d["collection"][0]["id"] == "hope"
     assert home.coins(d, RICH) == home.coins(h.d, RICH)
+
+
+def test_pets_fill_the_garden_then_the_house_then_the_store_refuses():
+    h = Home()
+    for _ in range(home.GARDEN_PETS + home.HOUSE_PETS):
+        v = h("buy", item="hamster")
+    places = [p["place"] for p in v["state"]["pets"]]
+    assert places.count("garden") == 5 and places.count("house") == 3 and v["pet_room"] == {"garden": 0, "house": 0}
+    with pytest.raises(home.HomeError, match="full"):
+        h("buy", item="rabbit")
+    with pytest.raises(home.HomeError, match="full"):
+        h("move_pet", id=v["state"]["pets"][0]["id"])
+    with pytest.raises(home.HomeError):
+        h("sell", item="hamster")                       # pets are never sold...
+    v = h("release", id=v["state"]["pets"][0]["id"])   # ...only released, for nothing
+    assert v["pet_room"] == {"garden": 1, "house": 0} and v["coins"] == RICH - 8 * 20
+    h("buy", item="rabbit")
+
+
+def test_pricey_pets_have_their_own_clothes():
+    h = Home()
+    corgi = h("buy", item="corgi")["state"]["pets"][0]["id"]
+    assert home.CATALOG["corgi"]["premium"] and not home.CATALOG["hamster"]["premium"]
+    with pytest.raises(home.HomeError, match="made for"):
+        h("buy_clothes", id=corgi, item="poodle.tutu")
+    v = h("buy_clothes", id=corgi, item="corgi.crown")
+    pet = v["state"]["pets"][0]
+    assert pet["outfits"] == ["corgi.crown"] and pet["wearing"] == "corgi.crown"
+    assert h("wear", id=corgi, item=None)["state"]["pets"][0]["wearing"] is None
+    with pytest.raises(home.HomeError, match="Buy"):
+        h("wear", id=corgi, item="corgi.sweater")
