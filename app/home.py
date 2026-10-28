@@ -227,7 +227,7 @@ class HomeError(Exception):
 
 def new():
     return {"income": 0.0, "spent": 0.0, "log": [], "house": "shack", "houses": ["shack"],
-            "pool": False, "aquarium": False, "iceland": False, "zones": {}, "pets": [], "companion": None,
+            "pool": False, "aquarium": False, "iceland": False, "zones": {"path": {"floor": None}}, "pets": [], "companion": None,
             "aquatic": [], "aqua_fed": time.time(), "flowers": [None] * FLOWER_SLOTS, "trees": [None] * TREE_SLOTS,
             "inventory": {}, "layouts": {}, "loans": [], "collection": [], "themes": [], "theme": None,
             "garage": False, "cars": []}
@@ -237,6 +237,7 @@ def normalize(d):
     """A home from a save (None for games saved before homes were per game), filled out to the current shape."""
     d = {**new(), **(d or {})}
     d.pop("earnings", None)
+    d["zones"].setdefault("path", {"floor": None})  # the front path is always usable from the start
     if "cabin" in d["houses"]:  # the cabin became the concrete shack
         d["houses"] = ["shack" if h == "cabin" else h for h in d["houses"]]
         d["house"] = "shack" if d["house"] == "cabin" else d["house"]
@@ -413,7 +414,8 @@ def home_value(d):
     value += sum(FURNITURE[k][1] * n for k, n in d["inventory"].items() if k in FURNITURE)
     value += sum(CATALOG[a["type"]]["price"] for a in d["aquatic"])
     value += sum(CATALOG[p["type"]]["price"] for p in d["flowers"] + d["trees"] if p)
-    value += sum(ZONES[z][1] + (FLOORS[v["floor"]][1] if v["floor"] else 0) for z, v in d["zones"].items())
+    value += sum((ZONES[z][1] if z != "path" else 0) + (FLOORS[v["floor"]][1] if v["floor"] else 0)  # the path came free
+                 for z, v in d["zones"].items())
     value += sum(THEMES[t][1] for t in d["themes"])
     value += sum(CARS[c["type"]][1] for c in d["cars"])
     return value

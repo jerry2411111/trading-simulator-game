@@ -73,7 +73,8 @@ Every game has its own home, saved with the game. Coins = this game's trading pr
 home − what you spend. The game pauses while you're in Home, Store or Collection.
 
 - **Garden:** sits inside a wall (the house stands in front of its back wall) and starts as a
-  wasteland: one plain neon panel per part (black with a blue and pink edge) with garbage on it. Pay to clean up each of its six parts, then lay a floor (lawn, clover, gravel, brick,
+  wasteland: one plain neon panel per part (black with a blue and pink edge) with garbage on it. The front path is clean from the start; pay to clean up each of the
+  other five parts, then lay a floor (lawn, clover, gravel, brick,
   stone, wood deck, neon tiles, snow, circuit board, red lacquer tiles, royal lawn, zellige mosaic).
   Or buy a garden theme (Christmas, Chinese New Year, Cyberpunk, Muslim garden, Royal garden): it cleans
   up everything, lays its ground, adds its decorations and dresses the trees; switch between owned themes

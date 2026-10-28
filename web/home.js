@@ -343,7 +343,7 @@ export function initHome(ctx) {
         for (let y = r.y + 16; y <= r.y + r.h - 2; y += 20) {
           for (let x = r.x + 12; x <= r.x + r.w - 12; x += 28) {
             const k = zi * 97 + ri * 31 + x * 0.13 + y * 0.71;
-            if (hash(k) < 0.5) continue;
+            if (hash(k) < 0.75) continue;  // a few pieces per part
             junk.push({ x: x + Math.round((hash(k + 1) - 0.5) * 10), y: y - Math.round(hash(k + 2) * 5), kind: GARBAGE_KINDS[Math.floor(hash(k + 3) * GARBAGE_KINDS.length)] });
           }
         }
@@ -1202,7 +1202,7 @@ export function initHome(ctx) {
     side.append(el('<div class="box-title">GARDEN</div>'));
     if (!selected) {
       const dirty = Object.keys(ZONES).filter((z) => !s.zones[z]).length;
-      side.append(el(`<p class="muted">${dirty ? `${dirty} of 6 parts are still wasteland: click one to clean it up, or buy a garden theme (Store) that cleans everything. ` : ''}Click the flower bed, a tree spot, a pet or any part of the garden. Hover a pet to pet it. Click the house to go inside.</p>`));
+      side.append(el(`<p class="muted">${dirty ? `${dirty} of 6 parts are still wasteland (the front path is clean from the start): click one to clean it up, or buy a garden theme (Store) that cleans everything. ` : ''}Click the flower bed, a tree spot, a pet or any part of the garden. Hover a pet to pet it. Click the house to go inside.</p>`));
       renderThemes(s);
     }
     if (selected?.kind === 'zone') renderZone(selected.id);

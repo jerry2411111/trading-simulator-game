@@ -100,7 +100,7 @@ const DOG_SIZE = { s: { bx: 3, leg: 2, hx: 4 }, m: { bx: 4, leg: 3, hx: 5 }, l: 
 function dogT(g, x, y, s, t, L) {
   const { R, E } = mirror(g, x, y, s.dir);
   const Z = DOG_SIZE[L.size];
-  const leg = L.legs === 'short' ? 1 : Z.leg;
+  const leg = L.legs === 'short' ? 2 : Z.leg;  // short legs are stubby, but they still show below the body
   const bx = Z.bx;
   const step = s.moving ? Math.floor(t * 12) % 2 : 0;
   const wag = Math.round(Math.sin(t * (s.pose === 'sit' ? 18 : 9)) * 1.5);
@@ -136,8 +136,7 @@ function dogT(g, x, y, s, t, L) {
     return;
   }
   const low = s.pose === 'dig' || s.pose === 'sniff' || s.pose === 'drink';
-  const by = -leg - 2;
-  [-bx + 1, -bx + 3, bx - 3, bx - 1].forEach((lx, i) => R(lx, by + 1, 1, leg + 1 - (i % 3 ? step : 1 - step), L.c));
+  const by = -leg - (L.legs === 'short' ? 3 : 2);
   if (L.tail === 'long') { R(-bx - 1, by - 1, 1, 2, L.c); R(-bx - 2, by - 3 - Math.max(0, wag), 1, 2, L.d); }
   if (L.tail === 'curl') { R(-bx, by - 3, 2, 1, L.c); R(-bx + 1, by - 4 + Math.max(0, wag) / 2, 1, 1, L.w); }
   if (L.tail === 'stub') R(-bx - 1, by - 1, 1, 1, L.c);
@@ -146,6 +145,12 @@ function dogT(g, x, y, s, t, L) {
   if (L.saddle) R(-bx + 1, by - 2, bx * 2 - 3, 2, L.d);
   if (L.mask) R(-bx + 1, by - 2, bx * 2 - 2, 1, L.d);
   if (L.coat === 'curly') for (let i = -bx + 1; i < bx; i += 2) R(i, by - 1, 1, 1, L.w);
+  // legs go over the body's underside so they always show; a moving dog lifts every other paw
+  [-bx + 1, -bx + 2, bx - 2, bx - 1].forEach((lx, i) => {  // a back pair and a front pair
+    const lift = i % 3 ? step : 1 - step;
+    R(lx, -leg - 1, 1, leg + 1 - lift, i < 2 || L.legs === 'short' ? L.d : L.c);  // short legs in the darker coat stand out
+    R(lx, -1 - lift, 1, 1, L.legs === 'short' || L.ear === 'big' ? L.w : L.d);  // paws
+  });
   const hy = low ? by + 1 : by - 4;
   head(Z.hx, hy, s.pose === 'bark');
   if (s.pose === 'dig') R(Z.hx + 4 + (Math.floor(t * 10) % 3), -2 - (Math.floor(t * 10) % 2), 1, 1, '#6b4220');

@@ -80,7 +80,7 @@ def test_old_cabin_home_becomes_the_shack():
     d = home.normalize({"house": "cabin", "houses": ["cabin"], "pool": True, "earnings": {"x": 5},
                         "trees": [{"type": "pine", "planted": 0, "harvested": 0}, None, None, None]})
     assert (d["house"], d["houses"]) == ("shack", ["shack"])
-    assert set(d["zones"]) == {"west", "southwest"} and "earnings" not in d
+    assert set(d["zones"]) == {"path", "west", "southwest"} and "earnings" not in d
 
 
 def test_companion_falls_back_to_a_living_pet():
@@ -262,3 +262,10 @@ def test_garage_holds_five_cars_sells_at_half_and_merges_into_a_big_house():
     assert h("buy", item="euro")["garage_merged"]                   # the country house has it built in
     offers = {(o["kind"], o["ref"]) for o in v["loan_offers"]}
     assert ("car", v["state"]["cars"][0]["id"]) in offers
+
+
+def test_the_front_path_is_clean_from_the_start():
+    assert home.new()["zones"] == {"path": {"floor": None}}
+    assert "path" in home.normalize({"zones": {}})["zones"]
+    with pytest.raises(home.HomeError, match="already clean"):
+        Home()("clean", zone="path")
