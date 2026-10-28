@@ -1,5 +1,5 @@
 // Main chart: price (candle or line, player's choice) on top, volume bars always below.
-// The view always shows the last N minutes (5-120, player's choice) and follows the clock.
+// The view always shows the last N minutes (30 s to 120 min, player's choice) and follows the clock.
 import {
   createChart, CandlestickSeries, LineSeries, HistogramSeries,
 } from 'https://unpkg.com/lightweight-charts@5.0.0/dist/lightweight-charts.standalone.production.mjs';

@@ -3,7 +3,8 @@ import { PriceChart } from './chart.js';
 import { showSetup } from './setup.js';
 
 const $ = (id) => document.getElementById(id);
-const SPEED_LABELS = { 0: '⏸', 1: '1x', 10: '10x', 60: '60x', 300: '300x' };
+const SPEED_LABELS = { 0: '⏸', 1: '▶', 10: '10x', 60: '60x', 300: '300x' };
+const WINDOW_STEPS = [0.5, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120]; // chart window, minutes
 const AUTH_REASON = 'Alpaca stopped accepting your key, so the game is paused. Connect again to continue.';
 
 let ws = null;
@@ -75,14 +76,14 @@ function renderClock() {
 
 function renderTabs() {
   const s = state.session;
-  $('tabs').replaceChildren(...(s?.tickers ?? []).map((t) => {
+  $('tabs').replaceChildren(...(s?.stocks ?? []).map((name) => {
     const b = document.createElement('button');
-    b.className = `tab${t === s.view ? ' active' : ''}`;
-    b.innerHTML = `<b>${t}</b><span class="num">${state.prices?.[t]?.toFixed(2) ?? '—'}</span>`;
-    b.onclick = () => send('view', { ticker: t });
+    b.className = `tab${name === s.view ? ' active' : ''}`;
+    b.innerHTML = `<b>${name}</b><span class="num">${state.prices?.[name]?.toFixed(2) ?? '—'}</span>`;
+    b.onclick = () => send('view', { stock: name });
     return b;
   }));
-  $('add').disabled = !s || s.tickers.length >= 5;
+  $('add').disabled = !s || s.stocks.length >= 5;
   $('replace').disabled = !s;
 }
 
@@ -142,15 +143,17 @@ function markStyle() {
   document.querySelectorAll('[data-style]').forEach((b) => b.classList.toggle('active', b.dataset.style === chart.style));
 }
 
-$('window').oninput = () => { chart.setWindow(+$('window').value); showWindow(); };
+$('window').max = WINDOW_STEPS.length - 1;
+$('window').oninput = () => { chart.setWindow(WINDOW_STEPS[+$('window').value]); showWindow(); };
 function showWindow() {
-  $('window').value = chart.minutes;
-  $('window-val').textContent = `${chart.minutes}m`;
+  const m = chart.minutes;
+  $('window').value = WINDOW_STEPS.reduce((best, s, i) => (Math.abs(s - m) < Math.abs(WINDOW_STEPS[best] - m) ? i : best), 0);
+  $('window-val').textContent = m < 1 ? `${m * 60}s` : `${m}m`;
 }
 
 $('new-game').onclick = () => send('new_game');
 $('add').onclick = () => send('add');
-$('replace').onclick = () => send('replace', { ticker: state.session?.view });
+$('replace').onclick = () => send('replace', { stock: state.session?.view });
 $('overlay-btn').onclick = () => overlayCmd && send(overlayCmd);
 
 $('settings-btn').onclick = () => {

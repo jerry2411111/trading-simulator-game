@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import random
+import string
 import uuid
 
 import httpx
@@ -24,6 +25,11 @@ def rows(df):
     return np.column_stack([t, df[COLS].to_numpy()]).round(4).tolist()
 
 
+def alias(n):
+    """Display name of the n-th stock added to a session: STOCK A, STOCK B, ..., STOCK A1, ..."""
+    return f"STOCK {string.ascii_uppercase[n % 26]}{n // 26 or ''}"
+
+
 class Session:
     """One random game: trading days (WARMUP days, then day 1 onward), the stock pool, loaded stocks."""
 
@@ -32,9 +38,18 @@ class Session:
         self.days, self.first, self.pool = days, first, pool
         self.day_idx = first
         self.minute_end = min(first + SESSION_DAYS - 1, len(days) - 1)  # last day with 1-minute bars
-        self.stocks = {}
+        self.stocks = {}          # real ticker -> Stock; tickers never leave the backend
+        self.added = 0
         self.cache = Cache(self.id)
         self.wake = asyncio.Event()
+
+    def new_stock(self, ticker):
+        st = Stock(ticker, alias(self.added))
+        self.added += 1
+        return st
+
+    def ticker_of(self, name):
+        return next((t for t, st in self.stocks.items() if st.alias == name), None)
 
     @property
     def day(self):
@@ -84,7 +99,7 @@ class Game:
         return self.s.bars(self.view).index[self.pos - 1].tz_convert(ET).strftime("%H:%M:%S")
 
     def prices(self):
-        return {t: float(st.seconds[self.s.day.date]["c"].iloc[self.pos - 1]) for t, st in self.s.stocks.items()}
+        return {st.alias: float(st.seconds[self.s.day.date]["c"].iloc[self.pos - 1]) for st in self.s.stocks.values()}
 
     def snapshot(self):
         msg = {**self.status(), "type": "snapshot", "feed": self.client and self.client.feed,
@@ -92,9 +107,10 @@ class Game:
         s = self.s
         if s:
             msg["session"] = {"date": s.day.date, "day": s.day_idx - s.first + 1,
-                              "last_day": s.day_idx == len(s.days) - 1, "tickers": list(s.stocks),
-                              "view": self.view,
-                              "fallback": [t for t, st in s.stocks.items() if s.day.date in st.fallback]}
+                              "last_day": s.day_idx == len(s.days) - 1,
+                              "stocks": [st.alias for st in s.stocks.values()],
+                              "view": s.stocks[self.view].alias,
+                              "fallback": [st.alias for st in s.stocks.values() if s.day.date in st.fallback]}
             if s.ready():
                 msg.update(clock=self.clock(), prices=self.prices(), bars=rows(s.bars(self.view).iloc[: self.pos]))
         return msg
@@ -182,14 +198,14 @@ class Game:
         elif cmd == "add":
             await self.add_stock()
         elif cmd == "replace":
-            await self.replace_stock(msg.get("ticker"))
+            await self.replace_stock(self.s and self.s.ticker_of(msg.get("stock")))
         elif cmd == "next_day":
             await self.next_day()
         elif cmd == "speed" and msg.get("value") in SPEEDS:
             self.speed = msg["value"]
             await self.push_status()
-        elif cmd == "view" and self.s and msg.get("ticker") in self.s.stocks:
-            self.view = msg["ticker"]
+        elif cmd == "view" and self.s and (ticker := self.s.ticker_of(msg.get("stock"))):
+            self.view = ticker
             await self.push_snapshot()
 
     async def error(self, text):
@@ -213,7 +229,7 @@ class Game:
             await self.push_snapshot()
             return await self.error("No stocks had data on the picked day. Try New game again.")
         self.s = Session(days[first - universe.WARMUP:], universe.WARMUP, pool)
-        self.s.stocks[ticker] = Stock(ticker)
+        self.s.stocks[ticker] = self.s.new_stock(ticker)
         self.view, self.pos = ticker, 1
         self.start_worker()
         await self.push_snapshot()
@@ -225,7 +241,7 @@ class Game:
         ticker = universe.pick(s.pool, s.stocks, self.rng)
         if ticker is None:
             return await self.error("No more stocks left in this game's pool.")
-        s.stocks[ticker] = Stock(ticker)
+        s.stocks[ticker] = s.new_stock(ticker)
         s.wake.set()
         await self.push_snapshot()
 
@@ -237,7 +253,7 @@ class Game:
         if new is None:
             return await self.error("No more stocks left in this game's pool.")
         self.stop_worker()  # it may be downloading the old ticker
-        s.stocks = {(new if t == old else t): (Stock(new) if t == old else st) for t, st in s.stocks.items()}
+        s.stocks = {(new if t == old else t): (s.new_stock(new) if t == old else st) for t, st in s.stocks.items()}
         s.cache.drop_ticker(old)
         if self.view == old:
             self.view = new

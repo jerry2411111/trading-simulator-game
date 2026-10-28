@@ -38,7 +38,8 @@ class Day:
 
 @dataclass
 class Stock:
-    ticker: str
+    ticker: str                                   # real symbol: backend only
+    alias: str                                    # the only name the player sees
     daily: pd.DataFrame | None = None
     minutes: pd.DataFrame | None = None           # regular-hours 1-minute bars
     seconds: dict = field(default_factory=dict)   # date -> 1-second bars
@@ -264,7 +265,7 @@ class Prefetcher:
 
     async def load_history(self, st):
         s = self.s
-        await self.listener.on_load(f"Downloading {st.ticker} history…")
+        await self.listener.on_load(f"Downloading {st.alias} history…")
         start = pd.Timestamp(s.days[s.first].date, tz="UTC") - pd.Timedelta(days=HISTORY_DAYS)
         daily = await self.client.bars([st.ticker], "1Day", start, s.days[s.first - 1].close)
         minutes = await self.fetch_minutes([st.ticker], 0, s.minute_end)
@@ -283,7 +284,7 @@ class Prefetcher:
 
     async def load_seconds(self, st, day):
         s, name = self.s, f"sec_{day.date}"
-        label = f"Downloading {st.ticker} trades for {day.date}"
+        label = f"Downloading {st.alias} trades for {day.date}"
         await self.listener.on_load(label, 0.0)
         bars = s.cache.load(st.ticker, name)
         if bars is None:

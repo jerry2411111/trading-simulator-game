@@ -23,8 +23,10 @@ Tests: `python -m pytest`
 ## Game rules
 
 - Price and volume are always shown on the main chart. Volume is always a bar chart; price can be
-  switched between candles and a line. A slider sets how many minutes (5-120) the chart shows; the
-  view follows the clock.
+  switched between candles and a line. A slider sets how much time the chart shows (30 seconds to
+  120 minutes); the view follows the clock.
+- Stock names are hidden: stocks appear as STOCK A, STOCK B, ... and the real ticker never leaves the
+  backend.
 - Only liquid stocks are picked (at least 250,000 trades a day on average over the previous 20 trading
   days), so the 1-second chart has a trade in almost every second.
 - Leverage from 1x up to 100x.
