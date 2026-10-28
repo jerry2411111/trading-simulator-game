@@ -96,6 +96,13 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
   houses are bigger in the garden and inside; the palaces fill the whole garden. Rooms are divided by
   walls; 48 kinds of furniture to place and rotate, plus paintings and windows that hang on the back wall.
   Click the front door to go back out.
+- **Garage and cars:** buy a garage (2,000) and it stands next to your house; a house of 4,000 or more has
+  it built in (clicking the house asks: house or garage). Inside is a showroom: your car turns on a lit
+  turntable (drag it, or let it turn by itself) and up to 5 cars wait in their bays. Cars are small voxel
+  models: Toyota Corolla, Honda Civic, Hyundai Elantra; Toyota Camry, Honda Accord, Tesla Model 3, BMW 3
+  Series; Mercedes-Benz S-Class, BMW 7 Series, Audi A8, Porsche 911, Porsche Panamera, Lexus LS, Range
+  Rover, Bentley Continental GT and Flying Spur, Rolls-Royce Ghost and Phantom, Ferrari Roma and
+  Lamborghini Huracán, priced close to real life. They sell back at half price and count in mortgages.
 - **Fish and the aquarium:** a fish tank unlocks 12 kinds of fish (they swim in the tank). Upgrade it to
   the aquarium for sea life (starfish, seahorse, jellyfish, lionfish, moray eel, octopus, sea turtle,
   manta ray, shark, whale), then build the ice land in it for penguins, seals and sea dogs. Water animals

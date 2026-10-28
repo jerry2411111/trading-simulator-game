@@ -141,7 +141,7 @@ def test_collection_gifts_are_unique_until_complete():
 
 def test_catalog_ids_are_unique():
     tables = (home.PETS, home.FLOWERS, home.TREES, home.ZONES, home.FLOORS, home.HOUSES, home.FURNITURE,
-              home.FISH, home.SEA, home.ICE, home.BUILD, home.CLOTHES, home.THEMES)
+              home.FISH, home.SEA, home.ICE, home.BUILD, home.CLOTHES, home.THEMES, home.CARS)
     assert sum(len(t) for t in tables) == len(home.CATALOG)  # no id is shadowed by another kind
 
 
@@ -243,3 +243,22 @@ def test_wall_pieces_hang_side_by_side_on_the_back_wall():
     h("place", item="window_arched", x=2, y=-1, rot=0)
     v = h("place", item="sofa", x=0, y=0, rot=0)                      # the floor below is still free
     assert len(v["state"]["layouts"]["shack"]) == 3
+
+
+def test_garage_holds_five_cars_sells_at_half_and_merges_into_a_big_house():
+    h = Home(cash=0)
+    h.d["income"] = 500_000
+    with pytest.raises(home.HomeError, match="garage"):
+        h("buy", item="corolla")
+    v = h("buy", item="garage")
+    assert not v["garage_merged"]                                    # the shack is too small
+    for _ in range(home.GARAGE_CARS):
+        v = h("buy", item="civic")
+    with pytest.raises(home.HomeError, match="full"):
+        h("buy", item="civic")
+    before = v["coins"]
+    v = h("sell_car", id=v["state"]["cars"][0]["id"])
+    assert v["coins"] == before + 12000 and len(v["state"]["cars"]) == 4
+    assert h("buy", item="euro")["garage_merged"]                   # the country house has it built in
+    offers = {(o["kind"], o["ref"]) for o in v["loan_offers"]}
+    assert ("car", v["state"]["cars"][0]["id"]) in offers

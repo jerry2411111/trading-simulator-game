@@ -416,3 +416,7 @@ button.badge { background: transparent; }
 .swatch { display: inline-block; width: 10px; height: 10px; border: 1px solid #fff; vertical-align: middle; }
 .pet-list li { flex-wrap: wrap; }
 .pet-list li button { padding: 1px 5px; }
+
+/* Choosing between the house and its built-in garage */
+.door-choice { position: fixed; z-index: 60; display: grid; gap: 4px; padding: 6px; transform: translate(-50%, -110%);
+  background: var(--panel); border: 2px solid var(--accent); box-shadow: 0 0 12px var(--accent); }

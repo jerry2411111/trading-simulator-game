@@ -177,8 +177,23 @@ SEA = {  # aquarium animals
     "whale": ("Whale", 6000, 20),
 }
 ICE = {"penguin": ("Penguin", 500, 3), "seal": ("Seal", 1200, 5), "sea_dog": ("Sea dog (fur seal)", 1400, 6)}
+CARS = {  # name, price (close to the real price), class
+    "elantra": ("Hyundai Elantra", 21000, "cheap"), "corolla": ("Toyota Corolla", 22000, "cheap"),
+    "civic": ("Honda Civic", 24000, "cheap"), "camry": ("Toyota Camry", 28000, "mid-range"),
+    "accord": ("Honda Accord", 28000, "mid-range"), "model3": ("Tesla Model 3", 40000, "mid-range"),
+    "bmw3": ("BMW 3 Series", 45000, "mid-range"), "lexus_ls": ("Lexus LS", 80000, "luxury"),
+    "audi_a8": ("Audi A8", 88000, "luxury"), "bmw7": ("BMW 7 Series", 95000, "luxury"),
+    "panamera": ("Porsche Panamera", 100000, "luxury"), "range_rover": ("Range Rover", 105000, "luxury"),
+    "sclass": ("Mercedes-Benz S-Class", 115000, "luxury"), "p911": ("Porsche 911", 115000, "luxury"),
+    "flying_spur": ("Bentley Flying Spur", 210000, "luxury"), "continental": ("Bentley Continental GT", 235000, "luxury"),
+    "roma": ("Ferrari Roma", 245000, "luxury"), "huracan": ("Lamborghini Huracán", 250000, "luxury"),
+    "ghost": ("Rolls-Royce Ghost", 340000, "luxury"), "phantom": ("Rolls-Royce Phantom", 460000, "luxury"),
+}
+GARAGE_CARS = 5
+MERGE_AT = 4000                                   # a house this pricey has the garage built in
+
 BUILD = {  # name, price, needs
-    "pool": ("Swimming pool", 2500, None), "aquarium": ("Small aquarium (upgrade the fish tank)", 5000, "fish_tank"),
+    "pool": ("Swimming pool", 2500, None), "garage": ("Garage", 2000, None), "aquarium": ("Small aquarium (upgrade the fish tank)", 5000, "fish_tank"),
     "iceland": ("Ice land (in the aquarium)", 3000, "aquarium"),
 }
 
@@ -195,6 +210,7 @@ CATALOG = {
        for k, (n, p, lv, g) in HOUSES.items()},
     **{k: {"kind": "furniture", "name": n, "price": p, "size": s, "wall": k in WALL_ITEMS} for k, (n, p, s) in FURNITURE.items()},
     **{k: {"kind": "theme", "name": n, "price": p, "ground": gr} for k, (n, p, gr) in THEMES.items()},
+    **{k: {"kind": "car", "name": n, "price": p, "tier": tier} for k, (n, p, tier) in CARS.items()},
     **{k: {"kind": "floor", "name": n, "price": p} for k, (n, p) in FLOORS.items()},
     **{k: {"kind": "zone", "name": n, "price": p} for k, (n, p) in ZONES.items()},
     **{k: {"kind": "fish", "name": n, "price": p, "meal": m} for k, (n, p, m) in FISH.items()},
@@ -213,7 +229,8 @@ def new():
     return {"income": 0.0, "spent": 0.0, "log": [], "house": "shack", "houses": ["shack"],
             "pool": False, "aquarium": False, "iceland": False, "zones": {}, "pets": [], "companion": None,
             "aquatic": [], "aqua_fed": time.time(), "flowers": [None] * FLOWER_SLOTS, "trees": [None] * TREE_SLOTS,
-            "inventory": {}, "layouts": {}, "loans": [], "collection": [], "themes": [], "theme": None}
+            "inventory": {}, "layouts": {}, "loans": [], "collection": [], "themes": [], "theme": None,
+            "garage": False, "cars": []}
 
 
 def normalize(d):
@@ -294,7 +311,8 @@ def view(d, pnl):
     buddy = companion(d, now)
     return {"ok": True, "coins": coins(d, pnl), "trading": round(pnl, 2), "now": now,
             "state": {**d, "pets": [{**p, "status": pet_status(p, now)} for p in d["pets"]]}, "catalog": CATALOG,
-            "loan_offers": loan_offers(d), "plans": PLANS, "pet_room": pet_room(d), "locked": locked(d), "has_tank": has_tank(d), "companion": buddy and buddy["id"],
+            "loan_offers": loan_offers(d), "plans": PLANS, "pet_room": pet_room(d),
+            "garage_merged": d["garage"] and HOUSES[d["house"]][1] >= MERGE_AT, "locked": locked(d), "has_tank": has_tank(d), "companion": buddy and buddy["id"],
             "aqua_hungry": now - d["aqua_fed"] >= HUNGRY_AFTER,
             "aqua_meal": round(sum(CATALOG[a["type"]]["meal"] for a in d["aquatic"]), 2)}
 
@@ -397,6 +415,7 @@ def home_value(d):
     value += sum(CATALOG[p["type"]]["price"] for p in d["flowers"] + d["trees"] if p)
     value += sum(ZONES[z][1] + (FLOORS[v["floor"]][1] if v["floor"] else 0) for z, v in d["zones"].items())
     value += sum(THEMES[t][1] for t in d["themes"])
+    value += sum(CARS[c["type"]][1] for c in d["cars"])
     return value
 
 
@@ -414,6 +433,7 @@ def loan_offers(d):
     offers = [{"kind": "house", "ref": h, "label": f"{HOUSES[h][0]} (with its furniture)",
                "value": HOME_LOAN_BASE + HOUSES[h][1] + furnished(h)} for h in d["houses"]]
     offers += [{"kind": "build", "ref": b, "label": BUILD[b][0].split(" (")[0], "value": BUILD[b][1]} for b in BUILD if d[b]]
+    offers += [{"kind": "car", "ref": c["id"], "label": CARS[c["type"]][0], "value": CARS[c["type"]][1]} for c in d["cars"]]
     offers += [{"kind": "furniture", "ref": f["id"], "label": f"{FURNITURE[f['item']][0]} ({HOUSES[h][0].lower()})",
                 "value": FURNITURE[f["item"]][1]} for h, f in _furniture(d) if h not in pledged_houses]
     offers = [o for o in offers if (o["kind"], o["ref"]) not in taken]
@@ -480,8 +500,14 @@ def _foreclose(d, loan):
         d["loans"] = [x for x in d["loans"] if not (x["kind"] == "furniture" and x["ref"] in gone)]
         if d["house"] == ref:
             d["house"] = "shack"
+    elif kind == "car":
+        d["cars"] = [c for c in d["cars"] if c["id"] != ref]
     elif kind == "build":
-        drop = {"pool": ["pool"], "aquarium": ["aquarium", "iceland"], "iceland": ["iceland"]}[ref]
+        drop = {"pool": ["pool"], "aquarium": ["aquarium", "iceland"], "iceland": ["iceland"], "garage": ["garage"]}[ref]
+        if ref == "garage":  # the cars go with the garage
+            gone = {c["id"] for c in d["cars"]}
+            d["cars"] = []
+            d["loans"] = [x for x in d["loans"] if not (x["kind"] == "car" and x["ref"] in gone)]
         for b in drop:
             d[b] = False
         d["loans"] = [x for x in d["loans"] if not (x["kind"] == "build" and x["ref"] in drop)]
@@ -505,7 +531,7 @@ def _apply_theme(d, theme):
 
 # ----- actions
 
-LOCKED_ACTIONS = {"buy", "sell", "clean", "floor", "plant", "dig", "stash", "house", "mortgage", "buy_clothes", "theme"}
+LOCKED_ACTIONS = {"buy", "sell", "clean", "floor", "plant", "dig", "stash", "house", "mortgage", "buy_clothes", "theme", "sell_car"}
 
 
 def act(home, action, body, pnl=0.0, cash=0.0):
@@ -531,6 +557,14 @@ def _act(d, action, body, now, cash):
         if info is None or info["kind"] in ("zone", "floor"):
             raise HomeError("Unknown item.")
         kind = info["kind"]
+        if kind == "car":
+            if not d["garage"]:
+                raise HomeError("Cars need a garage: buy one first (Garden & houses).")
+            if len(d["cars"]) >= GARAGE_CARS:
+                raise HomeError(f"The garage is full ({GARAGE_CARS} cars). Sell one first.")
+            _spend(d, info["price"], f"Bought a {info['name']}")
+            d["cars"].append({"id": uuid.uuid4().hex[:6], "type": item, "bought": now})
+            return 0
         if kind == "theme":
             if item in d["themes"]:
                 raise HomeError("You already own that theme: switch to it in the garden.")
@@ -579,6 +613,14 @@ def _act(d, action, body, now, cash):
             raise HomeError("That part is already clean.")
         _spend(d, ZONES[zone][1], f"Cleaned up the {ZONES[zone][0].lower()}")
         d["zones"][zone] = {"floor": None}
+    elif action == "sell_car":
+        car = next((c for c in d["cars"] if c["id"] == body.get("id")), None)
+        if car is None:
+            raise HomeError("That car is gone.")
+        if _pledged(d, "car", car["id"]):
+            raise HomeError("This car is mortgaged: pay the loan back before selling it.")
+        d["cars"].remove(car)
+        _earn(d, CARS[car["type"]][1] * SELL_BACK, f"Sold the {CARS[car['type']][0]}")
     elif action == "theme":
         if item is not None and item not in d["themes"]:
             raise HomeError("Buy that garden theme in the store first.")

@@ -5,8 +5,9 @@ import {
   drawBee, drawBird, drawFloor, drawGarbage, drawFlower, drawHive, drawPet, drawPool, drawTree, GARBAGE_KINDS, PET_SIZE,
 } from './art.js';
 import {
-  drawFurniture, drawHouse, drawRoom, drawWallPiece, HOUSE_W, ROOM, roomSize, TILE, tileOrigin, WALL_H, wallPieces,
+  drawFurniture, drawGarage, drawHouse, drawRoom, drawWallPiece, HOUSE_W, ROOM, roomSize, TILE, tileOrigin, WALL_H, wallPieces,
 } from './build.js';
+import { drawCar } from './cars.js';
 import { petGroup } from './pets.js';
 import { decorItems, dressTree, weather } from './themes.js';
 import { AQ, drawAquarium, drawSea } from './sea.js';
@@ -16,6 +17,7 @@ const $ = (id) => document.getElementById(id);
 const GW = 256;
 const GH = 208;
 const DOOR = { x: 128, y: 86 };
+const GARAGE = { x: 64, y: 86 };  // the garage stands left of a small house
 const ZONES = {  // the garden's parts; the house lot above them is always the house's
   path: [{ x: 6, y: 86, w: 244, h: 14 }, { x: 116, y: 160, w: 24, h: 44 }],
   west: [{ x: 6, y: 100, w: 86, h: 60 }],
@@ -84,6 +86,7 @@ export function initHome(ctx) {
     clockSkew = d.now - now();
     $('home-coins').textContent = `🪙 ${Math.floor(d.coins).toLocaleString()}`;
     $('aquarium-tab').hidden = !st().aquarium;
+    $('garage-tab').hidden = !st().garage;
     ctx.coins(d.coins);
     ctx.onHome?.(d);
     syncPets();
@@ -402,6 +405,7 @@ export function initHome(ctx) {
 
     const items = [];
     items.push({ y: DOOR.y, draw: () => drawHouse(g, st().house, DOOR.x, DOOR.y, t) });
+    if (st().garage && !data.garage_merged) items.push({ y: GARAGE.y - 0.5, draw: () => drawGarage(g, GARAGE.x, GARAGE.y, t) });
     if (st().theme) items.push(...decorItems(g, st().theme, t));
     st().trees.forEach((tr, i) => { if (tr && tr.type === 'sakura' && stage(tr) === 3) for (let k = 0; k < 26; k++) rect(g, SPOTS[i].x - 14 + hash(k) * 28, SPOTS[i].y - 4 + hash(k + 40) * 9, 1, 1, k % 3 ? '#ffb4d4' : '#ffe4ef'); });
     st().flowers.forEach((f, i) => {
@@ -892,6 +896,92 @@ export function initHome(ctx) {
     });
   }
 
+  // ------------------------------------------------------------- garage: a showroom with a turntable
+
+  const show = { pick: null, angle: 0.6, auto: true, drag: null };
+  const BAYS = Array.from({ length: 5 }, (_, i) => ({ x: 24 + i * 52, y: 164 }));
+  const cars = () => st().cars;
+  const shown = () => cars().find((c) => c.id === show.pick) ?? cars()[0];
+
+  function drawGarageView(t, dt) {
+    if (show.auto && !show.drag) show.angle += dt * 0.5;
+    rect(g, 0, 0, GW, 176, '#0c0618');
+    for (let x = 0; x < GW; x += 32) { rect(g, x + 14, 0, 4, 96, '#120a24'); rect(g, x + 15, 0, 2, 96, `rgba(0,229,255,${0.25 + Math.sin(t * 2 + x) * 0.1})`); }
+    rect(g, 98, 10, 60, 12, '#140a26'); rect(g, 98, 10, 60, 1, '#ff4fd8'); rect(g, 98, 21, 60, 1, '#ff4fd8');
+    for (let i = 0; i < 8; i++) rect(g, 104 + i * 6, 14, 4, 4, (Math.floor(t * 4) + i) % 8 < 6 ? '#ff4fd8' : '#5a1a4a');  // the neon sign
+    for (let y = 96; y < 176; y += 8) for (let x = 0; x < GW; x += 16) rect(g, x, y, 16, 8, ((x / 16 + y / 8) % 2) ? '#141024' : '#181430');
+    rect(g, 0, 96, GW, 1, '#3a2a5a');
+    [64, 192].forEach((sx) => { for (let j = 0; j < 90; j += 2) rect(g, sx - j / 3, 6 + j, (j / 3) * 2 + 2, 2, 'rgba(255,240,210,0.035)'); });  // spotlights
+    ellipse(g, 128, 126, 76, 23, '#05020a'); ellipse(g, 128, 124, 74, 22, '#2a2a3a'); ellipse(g, 128, 123, 70, 19, '#363648');  // the turntable
+    for (let k = 0; k < 28; k++) {
+      const a = (k / 28) * Math.PI * 2 + show.angle;
+      rect(g, 128 + Math.cos(a) * 72, 124 + Math.sin(a) * 21, 2, 1, k % 2 ? '#00e5ff' : '#ff4fd8');
+    }
+    glow(g, 128, 124, 40, '0,229,255', 0.08);
+    const car = shown();
+    if (car) {
+      ellipse(g, 128, 126, 40, 10, 'rgba(0,0,0,0.35)');
+      drawCar(g, car.type, 128, 122, show.angle, 2.5);
+    } else {
+      rect(g, 104, 120, 48, 1, '#5a4a7a');
+    }
+    BAYS.forEach((b, i) => {  // the five parking bays
+      const c = cars()[i];
+      rect(g, b.x - 24, b.y - 16, 48, 28, '#0a0614'); rect(g, b.x - 24, b.y - 16, 48, 1, c && c.id === car?.id ? '#00e5ff' : '#3a2a5a');
+      rect(g, b.x - 24, b.y - 16, 1, 28, '#3a2a5a'); rect(g, b.x + 23, b.y - 16, 1, 28, '#3a2a5a');
+      if (c) drawCar(g, c.type, b.x, b.y + 4, 0.35, 1); else rect(g, b.x - 2, b.y - 2, 4, 1, '#3a2a5a');
+    });
+  }
+
+  function garageClick(m) {
+    const i = BAYS.findIndex((b) => Math.abs(m.x - b.x) < 24 && m.y > b.y - 16 && m.y < b.y + 12);
+    if (i >= 0 && cars()[i]) { show.pick = cars()[i].id; renderSide(); }
+  }
+  canvas.addEventListener('mousedown', (e) => { if (view === 'garage') show.drag = { x: e.clientX, angle: show.angle }; });
+  window.addEventListener('mousemove', (e) => { if (show.drag) show.angle = show.drag.angle + (e.clientX - show.drag.x) / 60; });
+  window.addEventListener('mouseup', () => { show.drag = null; });
+
+  function renderGarageSide(s) {
+    side.append(el(`<div class="box-title">GARAGE · ${s.cars.length}/5 CARS</div>`));
+    const car = shown();
+    if (car) {
+      const c = cat(car.type);
+      side.append(el(`<p><b>${c.name}</b><br><span class="muted">${c.tier} · bought for 🪙 ${c.price.toLocaleString()}</span></p>`));
+      const row = document.createElement('div');
+      row.className = 'group wrap';
+      row.append(
+        button('⟲', () => { show.auto = false; show.angle -= 0.4; }),
+        button('⟳', () => { show.auto = false; show.angle += 0.4; }),
+        button(show.auto ? 'Stop turning' : 'Turn by itself', () => { show.auto = !show.auto; renderSide(); }, show.auto ? 'active' : ''),
+      );
+      side.append(row);
+      side.append(el('<p class="muted">Drag the car to turn the showcase. Click a bay below to put another car on it.</p>'));
+    } else side.append(el('<p class="muted">The showroom is empty: buy a car in the store (up to 5).</p>'));
+    const ul = document.createElement('ul');
+    ul.className = 'list';
+    s.cars.forEach((c) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${cat(c.type).name}${c.id === car?.id ? ' ★' : ''}</span>`;
+      li.append(button('Show', () => { show.pick = c.id; renderSide(); }));
+      li.append(button(`Sell 🪙 ${Math.floor(cat(c.type).price / 2).toLocaleString()}`, () => { if (window.confirm(`Sell the ${cat(c.type).name} for half its price?`)) act('sell_car', { id: c.id }); }));
+      ul.append(li);
+    });
+    side.append(ul);
+    side.append(button('Buy cars', () => ctx.openStore('Cars'), 'primary'));
+  }
+
+  // A house with the garage built in: clicking it asks where to go.
+  function chooseDoor(e) {
+    document.querySelector('.door-choice')?.remove();
+    const menu = document.createElement('div');
+    menu.className = 'door-choice';
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+    menu.append(button('🏠 House', () => { menu.remove(); setView('house'); }), button('🚗 Garage', () => { menu.remove(); setView('garage'); }));
+    document.body.append(menu);
+    setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 0);
+  }
+
   // ------------------------------------------------------------- loop and input
 
   let last = now();
@@ -903,7 +993,9 @@ export function initHome(ctx) {
     if (data) {
       g.save();
       if (t < shake) g.translate(Math.round(Math.sin(t * 60) * 2), 0);
-      if (view === 'garden') {
+      if (view === 'garage') {
+        drawGarageView(t, dt);
+      } else if (view === 'garden') {
         pets.forEach((p) => thinkPet(p, t, dt));
         thinkBirds(t, dt);
         drawGarden(t);
@@ -922,7 +1014,7 @@ export function initHome(ctx) {
 
   function fit() {
     if (!data) return;
-    const [w, h] = view === 'garden' ? [GW, GH] : view === 'house' ? roomSize(...grid()) : [AQ.w, AQ.h];
+    const [w, h] = view === 'garden' ? [GW, GH] : view === 'house' ? roomSize(...grid()) : view === 'garage' ? [GW, 176] : [AQ.w, AQ.h];
     fitCanvas(canvas, w, h);
   }
   new ResizeObserver(fit).observe(canvas.parentElement);
@@ -967,6 +1059,7 @@ export function initHome(ctx) {
 
   function hitGarden(m) {
     const w = HOUSE_W[st().house];
+    if (st().garage && !data.garage_merged && Math.abs(m.x - GARAGE.x) < 24 && m.y > GARAGE.y - 34 && m.y < GARAGE.y + 2) return { kind: 'garage' };
     if (Math.abs(m.x - DOOR.x) < 9 && m.y > DOOR.y - 22 && m.y < DOOR.y + 2) return { kind: 'door' };
     if (Math.abs(m.x - DOOR.x) < w / 2 && m.y > 20 && m.y < DOOR.y) return { kind: 'door' };
     if (clean('plaza')) {
@@ -985,11 +1078,14 @@ export function initHome(ctx) {
     if (view === 'garden') {
       const pet = petAt(m);
       const hit = pet ? { kind: 'pet', id: pet.id } : hitGarden(m);
+      if (hit?.kind === 'garage') return setView('garage');
+      if (hit?.kind === 'door' && data.garage_merged) return chooseDoor(e);
       if (hit?.kind === 'door') return setView('house');
       selected = hit;
       return renderSide();
     }
     if (view === 'aquarium') return;
+    if (view === 'garage') return garageClick(m);
     if (!holding && atExit(m)) return setView('garden');
     const tile = tileAt(m);
     if (editing) {
@@ -1059,6 +1155,7 @@ export function initHome(ctx) {
     if (data.locked) side.append(el('<p class="down">The whole home is mortgaged: pay it back in the Store (Mortgage) to change things.</p>'));
     if (view === 'garden') renderGardenSide(s);
     else if (view === 'house') renderHouseSide(s);
+    else if (view === 'garage') renderGarageSide(s);
     else renderAquariumSide(s);
     side.append(el('<div class="box-title">RECENT</div>'));
     const log = document.createElement('ul');
@@ -1240,7 +1337,7 @@ export function initHome(ctx) {
       $('home').hidden = false;
       await refresh();
       if (!data) return;
-      setView(v === 'aquarium' && !st().aquarium ? 'garden' : v);
+      setView((v === 'aquarium' && !st().aquarium) || (v === 'garage' && !st().garage) ? 'garden' : v);
       if (!running) { running = true; last = now(); requestAnimationFrame(frame); }
     },
     close() { running = false; $('home').hidden = true; },

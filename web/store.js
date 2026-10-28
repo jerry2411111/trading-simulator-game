@@ -2,18 +2,19 @@
 // back; mortgage the home for trading dollars and pay loans back.
 import { drawFloor, drawFlower, drawPet, drawPool, drawTree } from './art.js';
 import { decorItems, dressTree } from './themes.js';
-import { drawFurniture, drawHouse, drawWallPiece, HOUSE_W, TILE, WALL_H } from './build.js';
+import { drawFurniture, drawGarage, drawHouse, drawWallPiece, HOUSE_W, TILE, WALL_H } from './build.js';
 import { drawPetHead } from './buddy.js';
+import { drawCar } from './cars.js';
 import { drawSea } from './sea.js';
 import { rect } from './pixel.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['Pets', 'Pet clothes', 'Flowers', 'Trees', 'Garden themes', 'Garden & houses', 'Furniture', 'Fish', 'Sea life', 'Mortgage', 'Sell'];
+const TABS = ['Pets', 'Pet clothes', 'Flowers', 'Trees', 'Garden themes', 'Garden & houses', 'Cars', 'Furniture', 'Fish', 'Sea life', 'Mortgage', 'Sell'];
 const KINDS = {
-  Pets: ['pet'], Flowers: ['flower'], Trees: ['tree'], 'Garden themes': ['theme'], 'Garden & houses': ['house'], Furniture: ['furniture'],
+  Pets: ['pet'], Cars: ['car'], Flowers: ['flower'], Trees: ['tree'], 'Garden themes': ['theme'], 'Garden & houses': ['house'], Furniture: ['furniture'],
   Fish: ['fish'], 'Sea life': ['sea', 'ice'],
 };
-const BUILD_TAB = { pool: 'Garden & houses', aquarium: 'Fish', iceland: 'Sea life' };
+const BUILD_TAB = { pool: 'Garden & houses', garage: 'Garden & houses', aquarium: 'Fish', iceland: 'Sea life' };
 const SEA_SIZE = { whale: [60, 30], shark: [36, 20], manta: [30, 18] };
 
 // A small preview (drawn once) of any catalog item.
@@ -22,7 +23,7 @@ function preview(id, info) {
   const g = c.getContext('2d');
   const size = {
     pet: [36, 27], flower: [26, 20], tree: [46, 56], house: [HOUSE_W[id] + 8, 110], fish: [26, 18],
-    sea: SEA_SIZE[id] ?? [26, 26], ice: [26, 24], build: [72, 40], clothes: [48, 48], theme: [96, 60],
+    sea: SEA_SIZE[id] ?? [26, 26], ice: [26, 24], build: [72, 40], clothes: [48, 48], theme: [96, 60], car: [80, 44],
   }[info.kind] ?? [info.size[0] * TILE + 2, info.size[1] * TILE + 2];
   [c.width, c.height] = size;
   if (info.kind === 'pet') drawPet(g, id, 18, 24, { dir: 1, pose: id === 'parrot' ? 'perch' : 'idle' }, 0);
@@ -30,6 +31,8 @@ function preview(id, info) {
   else if (info.kind === 'flower') drawFlower(g, id, 13, 19, 3, 0);
   else if (info.kind === 'tree') drawTree(g, id, 23, 54, 3, 0, 0, false);
   else if (info.kind === 'theme') themePreview(g, id, info);
+  else if (info.kind === 'car') drawCar(g, id, 40, 34, 0.5, 2);
+  else if (id === 'garage') drawGarage(g, 36, 38, 0);
   else if (info.kind === 'house') drawHouse(g, id, size[0] / 2, 108, 0);
   else if (['fish', 'sea', 'ice'].includes(info.kind)) {
     rect(g, 0, 0, size[0], size[1], '#0e3a6a');
@@ -89,10 +92,11 @@ function detail(info) {
   if (info.kind === 'flower') return `Blooms in ${info.hours} h, sells for ${info.sells}`;
   if (info.kind === 'tree') return `Grows in ${info.hours} h, then +${info.yield} every ${info.every} h`;
   if (info.kind === 'house') return `Level ${info.level} · ${info.grid[0]}×${info.grid[1]} floor`;
+  if (info.kind === 'car') return `${info.tier[0].toUpperCase()}${info.tier.slice(1)} · up to 5 in the garage`;
   if (info.kind === 'theme') return 'Cleans up the whole garden, lays its ground, decorates it and dresses the trees';
   if (info.kind === 'furniture') return info.wall ? `Hangs on the wall · ${info.size[0]} wide` : `${info.size[0]}×${info.size[1]} tiles`;
   if (['fish', 'sea', 'ice'].includes(info.kind)) return `Food: ${info.meal} coins a meal`;
-  return { pool: 'Goes in the pool corner (clean it first)', aquarium: 'Holds sea life; fish move in too', iceland: 'Penguins and seals live on it' }[info.id] ?? '';
+  return { garage: 'Stands next to your house; holds 5 cars', pool: 'Goes in the pool corner (clean it first)', aquarium: 'Holds sea life; fish move in too', iceland: 'Penguins and seals live on it' }[info.id] ?? '';
 }
 
 export function initStore(ctx) {
@@ -141,6 +145,7 @@ export function initStore(ctx) {
   function lockReason(name) {
     const s = data.state;
     if (name === 'Fish' && !data.has_tank) return 'Buy a fish tank (Furniture) to unlock fish.';
+    if (name === 'Cars' && !s.garage) return 'Buy a garage (Garden & houses) to unlock cars.';
     if (name === 'Sea life' && !s.aquarium) return 'Upgrade your fish tank to the aquarium (Fish tab) to unlock sea life.';
     return '';
   }

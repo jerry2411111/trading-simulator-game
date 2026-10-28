@@ -347,6 +347,17 @@ const HOUSES = {
   },
 };
 
+// The garage, standing next to a small house (x, y = door step).
+export function drawGarage(g, x, y, t) {
+  const L = x - 22;
+  rect(g, L, y - 30, 44, 30, '#6e6e78'); for (let j = 0; j < 30; j += 5) rect(g, L, y - 30 + j, 44, 1, '#5a5a64');
+  rect(g, L - 2, y - 33, 48, 3, '#2a2a32'); rect(g, L - 2, y - 30, 48, 1, `rgba(0,229,255,${0.5 + Math.sin(t * 2) * 0.2})`);
+  rect(g, L + 6, y - 24, 32, 24, '#3a3a46'); for (let j = 0; j < 24; j += 3) rect(g, L + 6, y - 24 + j, 32, 1, '#2a2a34');  // roll-up door
+  rect(g, L + 6, y - 6, 32, 1, '#ff4fd8');
+  rect(g, L + 12, y - 29, 20, 4, '#120a20'); for (let i = 0; i < 6; i++) rect(g, L + 14 + i * 3, y - 28, 2, 2, (Math.floor(t * 3) + i) % 6 < 4 ? '#00e5ff' : '#0a4a5a');
+  glow(g, x, y - 27, 10, '0,229,255', 0.25);
+}
+
 export function drawHouse(g, id, x, y, t) {
   HOUSES[id](g, Math.round(x), Math.round(y), t);
   return HOUSE_W[id];
