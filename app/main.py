@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import keys, saves
+from . import home, keys, saves
 from .agent import AgentConfig
 from .data import Alpaca
 from .game import Game
@@ -140,6 +140,20 @@ async def update_ai(body: dict):
     keys.save_ai(game.agent.stored())
     await game.push_snapshot()
     return {"ok": True, **game.agent.public()}
+
+
+@app.get("/api/home")
+async def home_view():
+    game.autosave()  # bring this game's profit into the coin count
+    return home.view()
+
+
+@app.post("/api/home/{action}")
+async def home_action(action: str, body: dict):
+    try:
+        return home.act(action, body)
+    except home.HomeError as e:
+        return JSONResponse({"ok": False, "message": str(e)}, 400)
 
 
 @app.post("/api/exit")

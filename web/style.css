@@ -65,8 +65,8 @@ body {
 }
 
 h1, .logo, .num, .titlebar, .box-title { font-family: var(--font-head); font-weight: 400; }
-[data-theme=synthwave] :is(h1, .logo, .num, .titlebar, .box-title),
-[data-theme=office] :is(h1, .logo, .num, .titlebar, .box-title) { font-weight: 700; }
+[data-theme=synthwave] body:not(.in-home) :is(h1, .logo, .num, .titlebar, .box-title),
+[data-theme=office] body:not(.in-home) :is(h1, .logo, .num, .titlebar, .box-title) { font-weight: 700; }
 h1 { font-size: calc(14px * var(--hs)); line-height: 1.6; margin: 0 0 12px; color: var(--accent); text-shadow: var(--title-glow); }
 a { color: var(--accent); }
 .muted, .small { color: var(--muted); }
@@ -97,37 +97,37 @@ button.buy { background: var(--up); color: var(--on-accent); }
 button.sell { background: var(--down); color: var(--on-accent); }
 button.close { background: var(--warn); color: var(--on-accent); }
 
-[data-theme=office] button:active, [data-theme=office] button.active {
+[data-theme=office] body:not(.in-home) button:active, [data-theme=office] body:not(.in-home) button.active {
   border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: #b0b0b0; color: var(--ink);
 }
-[data-theme=office] button.buy, [data-theme=office] button.sell, [data-theme=office] button.close { color: #fff; }
+[data-theme=office] body:not(.in-home) button.buy, [data-theme=office] body:not(.in-home) button.sell, [data-theme=office] body:not(.in-home) button.close { color: #fff; }
 
 /* Trade buttons keep their colors in every style (Terminal outlines them instead, below) */
-[data-theme] button.buy { background: var(--up); color: var(--on-accent); }
-[data-theme] button.sell { background: var(--down); color: var(--on-accent); }
-[data-theme] button.close { background: var(--warn); color: var(--on-accent); }
+[data-theme] body:not(.in-home) button.buy { background: var(--up); color: var(--on-accent); }
+[data-theme] body:not(.in-home) button.sell { background: var(--down); color: var(--on-accent); }
+[data-theme] body:not(.in-home) button.close { background: var(--warn); color: var(--on-accent); }
 
 /* Terminal: flat [bracketed] text buttons that invert when pressed */
-[data-theme=terminal] button { border: 1px solid var(--accent); background: transparent; }
-[data-theme=terminal] button:not(.tab, .cell-title)::before { content: "["; }
-[data-theme=terminal] button:not(.tab, .cell-title)::after { content: "]"; }
-[data-theme=terminal] button:hover, [data-theme=terminal] button.active { background: var(--accent); color: var(--bg); }
-[data-theme=terminal] button.buy, [data-theme=terminal] button.sell, [data-theme=terminal] button.close {
+[data-theme=terminal] body:not(.in-home) button { border: 1px solid var(--accent); background: transparent; }
+[data-theme=terminal] body:not(.in-home) button:not(.tab, .cell-title)::before { content: "["; }
+[data-theme=terminal] body:not(.in-home) button:not(.tab, .cell-title)::after { content: "]"; }
+[data-theme=terminal] body:not(.in-home) button:hover, [data-theme=terminal] body:not(.in-home) button.active { background: var(--accent); color: var(--bg); }
+[data-theme=terminal] body:not(.in-home) button.buy, [data-theme=terminal] body:not(.in-home) button.sell, [data-theme=terminal] body:not(.in-home) button.close {
   background: transparent; color: var(--ink); border-width: 2px;
 }
-[data-theme=terminal] button.buy { color: var(--up); border-color: var(--up); }
-[data-theme=terminal] button.sell { color: var(--down); border-color: var(--down); }
-[data-theme=terminal] button.close { color: var(--warn); border-color: var(--warn); }
-[data-theme=terminal] .box-title::before, [data-theme=terminal] .titlebar::before { content: "> "; }
+[data-theme=terminal] body:not(.in-home) button.buy { color: var(--up); border-color: var(--up); }
+[data-theme=terminal] body:not(.in-home) button.sell { color: var(--down); border-color: var(--down); }
+[data-theme=terminal] body:not(.in-home) button.close { color: var(--warn); border-color: var(--warn); }
+[data-theme=terminal] body:not(.in-home) .box-title::before, [data-theme=terminal] body:not(.in-home) .titlebar::before { content: "> "; }
 
 /* Synthwave: glowing pill buttons */
-[data-theme=synthwave] button { border: 2px solid var(--accent2); background: transparent; box-shadow: 0 0 8px rgb(247 6 207 / 0.45); }
-[data-theme=synthwave] button:hover, [data-theme=synthwave] button.active { background: var(--accent2); color: var(--on-accent); }
-[data-theme=synthwave] button.buy, [data-theme=synthwave] button.sell, [data-theme=synthwave] button.close { border-color: transparent; }
+[data-theme=synthwave] body:not(.in-home) button { border: 2px solid var(--accent2); background: transparent; box-shadow: 0 0 8px rgb(247 6 207 / 0.45); }
+[data-theme=synthwave] body:not(.in-home) button:hover, [data-theme=synthwave] body:not(.in-home) button.active { background: var(--accent2); color: var(--on-accent); }
+[data-theme=synthwave] body:not(.in-home) button.buy, [data-theme=synthwave] body:not(.in-home) button.sell, [data-theme=synthwave] body:not(.in-home) button.close { border-color: transparent; }
 
 /* Amber CRT: double-ruled flat buttons */
-[data-theme=amber] button { border: 3px double var(--accent); background: transparent; }
-[data-theme=amber] button:hover, [data-theme=amber] button.active { background: var(--accent); color: var(--bg); text-shadow: none; }
+[data-theme=amber] body:not(.in-home) button { border: 3px double var(--accent); background: transparent; }
+[data-theme=amber] body:not(.in-home) button:hover, [data-theme=amber] body:not(.in-home) button.active { background: var(--accent); color: var(--bg); text-shadow: none; }
 
 input, select, textarea {
   font: inherit;
@@ -141,7 +141,7 @@ input, select, textarea {
   width: 100%;
   min-width: 0;
 }
-[data-theme=office] input, [data-theme=office] select, [data-theme=office] textarea { background: #fff; }
+[data-theme=office] body:not(.in-home) input, [data-theme=office] body:not(.in-home) select, [data-theme=office] body:not(.in-home) textarea { background: #fff; }
 textarea { resize: vertical; font-size: 0.9em; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 input:disabled { color: var(--muted); }
@@ -253,8 +253,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent2); }
 .box { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; }
 .box.grow { flex: 1 1 0; min-height: 60px; overflow: hidden; }
 .box-title { font-size: calc(10px * var(--hs)); color: var(--accent2); }
-[data-theme=synthwave] .box-title, [data-theme=amber] .box-title { text-shadow: var(--title-glow); }
-[data-theme=office] .box-title { background: var(--accent); color: #fff; margin: -6px -8px 2px; padding: 2px 6px; }
+[data-theme=synthwave] body:not(.in-home) .box-title, [data-theme=amber] body:not(.in-home) .box-title { text-shadow: var(--title-glow); }
+[data-theme=office] body:not(.in-home) .box-title { background: var(--accent); color: #fff; margin: -6px -8px 2px; padding: 2px 6px; }
 .kv { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .kv .num { font-size: calc(11px * var(--hs)); }
 .kv input { width: 110px; }
@@ -312,8 +312,53 @@ section[data-panel] label.check, .check { display: flex; gap: 6px; align-items: 
 }
 #game.shake { animation: shake 0.4s steps(5) 1; }
 
+/* Coins and the anime girl */
+canvas.pixel { image-rendering: pixelated; }
+.badge.coin { color: var(--warn); border-color: var(--warn); }
+button.badge { background: transparent; }
+.girl-box { position: relative; display: grid; place-items: center; padding: 4px 0; }
+.girl-box canvas { width: 144px; height: 144px; cursor: grab; }
+.girl-pop {
+  position: absolute; top: 4px; left: 50%; pointer-events: none; white-space: nowrap;
+  font-family: var(--font-head); font-size: calc(11px * var(--hs)); text-shadow: 2px 2px 0 #000;
+  animation: pop 2.6s steps(13) forwards;
+}
+@keyframes pop {
+  0% { transform: translate(-50%, 12px); opacity: 0; }
+  10%, 80% { opacity: 1; }
+  100% { transform: translate(-50%, -34px); opacity: 0; }
+}
+
+/* Home and Store: full-window screens, always in the neon style */
+.screen {
+  position: fixed; inset: 0; z-index: 20; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; padding: 6px;
+  background: var(--bg); color: var(--ink); font: var(--body-size)/1.2 var(--font-body); text-transform: none; text-shadow: none;
+}
+.screen .spacer { flex: 1; }
+.screen-body { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 6px; min-height: 0; }
+.stage {
+  display: grid; place-items: center; min-height: 0; min-width: 0; overflow: hidden; background: #050208;
+  border: var(--frame); border-color: var(--frame-color); box-shadow: var(--panel-shadow);
+}
+.side { overflow: auto; }
+.side p { margin: 4px 0; }
+.side > button { width: 100%; margin-top: 4px; }
+.store-main { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.store-grid {
+  flex: 1; min-height: 0; overflow: auto; display: grid; gap: 6px; align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+.card {
+  display: grid; gap: 3px; justify-items: center; text-align: center; padding: 6px;
+  background: var(--panel); border: var(--frame); border-color: var(--frame-color);
+}
+.card-art { width: 100%; height: 118px; display: grid; place-items: center; background: var(--grid); }
+.card small { min-height: 2.4em; }
+
 /* Narrower windows: tabs above the chart, trading panel below it, setup stacks */
 @media (max-width: 980px) {
+  .girl-box { display: none; }
+  .screen-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 40%; }
   #game { grid-template: auto auto minmax(0, 1fr) auto / minmax(0, 1fr); }
   .left { flex-direction: row; flex-wrap: wrap; }
   .quick-save { margin-top: 0; }

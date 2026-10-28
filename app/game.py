@@ -11,7 +11,7 @@ import httpx
 import numpy as np
 import pandas as pd
 
-from . import agent, indicators, orders, saves, stats, universe
+from . import agent, home, indicators, orders, saves, stats, universe
 from .account import MAX_CAPITAL, MAX_LEVERAGE, Account, OrderError
 from .data import COLS, ET, AuthError, Cache, Day, Prefetcher, Stock
 
@@ -619,3 +619,5 @@ class Game:
 
     def autosave(self):
         saves.autosave(self.to_dict())
+        if self.s:  # this game's profit counts toward home coins
+            home.record(self.s.id, self.equity() - self.account.start)

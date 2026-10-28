@@ -60,6 +60,7 @@ export function initMenus(ctx) {
       document.documentElement.dataset.theme = id;
       store('tt.theme', id);
       ctx.charts().forEach((c) => c?.applyTheme());
+      ctx.onTheme();
       markTheme();
     };
     return b;
@@ -67,6 +68,8 @@ export function initMenus(ctx) {
   const markTheme = () => $('themes').querySelectorAll('button')
     .forEach((b) => b.classList.toggle('active', b.dataset.theme === document.documentElement.dataset.theme));
   markTheme();
+  $('show-girl').checked = ctx.girlShown();
+  $('show-girl').onchange = () => ctx.showGirl($('show-girl').checked);
 
   // Trading
   function fillTrading(s) {

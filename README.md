@@ -37,7 +37,7 @@ Tests: `python -m pytest`
   separately and labeled in a legend; Bollinger (20, 2σ), Parabolic SAR, MACD, KDJ, and a random-walk
   95% band: from the last 10 minutes of 1-second volatility σ, the band
   `P·exp(±1.96·σ·√h)` is drawn as a cone over the next 5 minutes.
-- **Speeds:** pause, ▶ (real time), 1.5x, 2x, 3x, 5x, 10x, 60x.
+- **Speeds:** pause, ▶ (real time), 1.5x, 2x, 3x, 5x, 10x, 60x. Chart window: 15 seconds to 90 minutes.
 - **Orders:** MKT, LMT, and conditional "MKT if ≥ / ≤ price"; a fixed dollar size; BUY, SELL, CLOSE,
   Close all. No spread or slippage: market orders fill at the current 1-second close. Waiting orders
   and positions are closed at the end of each day.
@@ -51,7 +51,29 @@ Tests: `python -m pytest`
   which data the AI receives (price, volume, indicators), and edit its role-play prompt. Every N game
   seconds the clock waits while the AI decides; it can place MKT, LMT and conditional orders with a
   price and size. The key stays on your computer (memory only unless you tick "Remember").
+- **The girl:** a pixel anime girl next to the chart. Focused when you're flat, expecting when your
+  open position is winning, anxious when it's losing, happy (+$) or sad (−$) when a trade closes.
+  Hover her to pat her. Her look follows the UI style; hide her in Settings → UI style.
 - Keyboard: B buy, S sell, C close, Space pause / resume, 1–5 switch stock.
+
+## Home and Store
+
+Coins = the profit of all your games (each game counts once; Clear PnL resets that game's share to 0)
++ income from your home − what you spend. The game pauses while you're in Home or Store.
+
+- **Garden:** a stone path from the gate to your house. Six flower plots (8 flowers, bloom in 8 hours,
+  pick and sell for twice the seed price), four tree spots (pine, maple, apple, sakura: grow in 1–3
+  days, then give a harvest every day or two), and a swimming pool.
+- **Pets:** turtle, lizard, cat, dog, parrot, lion, each with its own habits (the dog chases and digs,
+  the cat naps and stalks butterflies, the parrot flies between perches and sings, the turtle hides
+  and swims, the lizard darts and does push-ups, the lion patrols and roars). Each eats at a different
+  price. A pet gets hungry after 2 days without food and dies after 7 (real days).
+- **House:** the old cabin to start; modern or European house (level 2); modern tower, Chinese palace
+  or European palace (level 3). One floor on a grid with 37 kinds of furniture to place and rotate.
+  The girl lives there: she walks to furniture and uses it (sleeps, reads, plays the piano, games,
+  cooks, bathes, dances, changes outfits...). Hover to pat her, click to say hi, click the floor to call her.
+- **Store:** buy pets, seeds, saplings, the pool, houses and furniture; sell unused items back at half
+  price. Everything is saved in `data/home.json`.
 
 ## Universe
 

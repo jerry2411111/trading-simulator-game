@@ -22,6 +22,9 @@
       <span id="fallback" class="badge warn" hidden></span>
       <span id="ai-badge" class="badge" hidden>AI</span>
       <span id="bg-status" class="muted"></span>
+      <button id="coins-btn" class="badge coin" title="Coins: profit from all your games. Spend them in the store.">🪙 —</button>
+      <button id="home-btn">Home</button>
+      <button id="store-btn">Store</button>
       <button id="new-game">New game</button>
       <button id="stats-btn">Stats</button>
       <button id="api-btn">API status</button>
@@ -33,6 +36,7 @@
       <button id="add">+ Add</button>
       <button id="replace">↻ Replace</button>
       <button id="split" hidden>⊞ Split view</button>
+      <div id="girl-box" class="girl-box" title="Pat her!"><canvas class="pixel"></canvas></div>
       <button id="quick-save" class="quick-save" title="Save this game in the &quot;Quick save&quot; slot">💾 Quick save</button>
     </aside>
 
@@ -106,6 +110,45 @@
     </aside>
   </main>
 
+  <!-- Home and Store always use the neon style -->
+  <section id="home" class="screen" data-theme="neon" hidden>
+    <header class="topbar">
+      <span class="logo">HOME</span>
+      <span class="group"><button data-view="garden">Garden</button><button data-view="house">House</button></span>
+      <span id="home-coins" class="badge coin"></span>
+      <span class="spacer"></span>
+      <button id="home-store">Store</button>
+      <button data-back>Back to trading</button>
+    </header>
+    <div class="screen-body">
+      <div class="stage"><canvas id="home-canvas" class="pixel"></canvas></div>
+      <aside id="home-side" class="box side"></aside>
+    </div>
+  </section>
+
+  <section id="store" class="screen" data-theme="neon" hidden>
+    <header class="topbar">
+      <span class="logo">STORE</span>
+      <span id="store-coins" class="badge coin"></span>
+      <span class="spacer"></span>
+      <button id="store-home">Home</button>
+      <button data-back>Back to trading</button>
+    </header>
+    <div class="screen-body">
+      <div class="store-main">
+        <nav id="store-tabs" class="group wrap"></nav>
+        <div id="store-grid" class="store-grid"></div>
+      </div>
+      <aside class="box side">
+        <div class="box-title">WALLET</div>
+        <div id="wallet"></div>
+        <p class="small muted">Coins = profit from all your games (Clear PnL resets a game's share) + home income − spending.</p>
+        <div class="box-title">HISTORY</div>
+        <ul id="ledger" class="list"></ul>
+      </aside>
+    </div>
+  </section>
+
   <dialog id="api" class="window">
     <div class="titlebar">API status</div>
     <div class="window-body">
@@ -113,6 +156,7 @@
       <button id="change-key">Change key</button>
       <button id="forget-key">Forget key</button>
       <button data-close>Close</button>
+      <p class="credit muted">Charts by <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></p>
     </div>
   </dialog>
 
@@ -129,6 +173,7 @@
       <section data-panel="style">
         <p>Choose a look:</p>
         <div id="themes" class="group wrap"></div>
+        <label class="check"><input id="show-girl" type="checkbox"> Show the anime girl next to the chart</label>
       </section>
 
       <section data-panel="trading">
@@ -176,7 +221,6 @@
 
       <footer class="row menu-foot">
         <button id="exit-game" class="sell">Exit game</button>
-        <span class="small credit">Charts: <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></span>
         <button data-close>Close</button>
       </footer>
     </div>

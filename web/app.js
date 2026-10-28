@@ -3,12 +3,15 @@ import {
   INDICATOR_NAMES, PERIODIC, PriceChart, SINGLES, css, look, store, stored,
 } from './chart.js';
 import { fillTable, money, signed, summaryRows } from './format.js';
+import { Girl } from './girl.js';
+import { initHome } from './home.js';
 import { applyStoredTheme, initMenus } from './menu.js';
 import { showSetup } from './setup.js';
+import { initStore } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 const SPEEDS = [[0, '⏸'], [1, '▶'], [1.5, '1.5x'], [2, '2x'], [3, '3x'], [5, '5x'], [10, '10x'], [60, '60x']];
-const WINDOW_STEPS = [0.5, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120]; // chart window, minutes
+const WINDOW_STEPS = [0.25, 0.5, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90]; // chart window, minutes
 const AUTH_REASON = 'Alpaca stopped accepting your key, so the game is paused. Connect again to continue.';
 
 let ws = null;
@@ -25,7 +28,41 @@ const view = () => state.session?.view;
 const allCharts = () => [chart, ...[...minis.values()].map((m) => m.chart)];
 
 applyStoredTheme();
-const menus = initMenus({ send, state: () => state, charts: allCharts, lastSpeed: () => lastSpeed, openSetup, toast });
+const girl = new Girl($('girl-box'));
+const theme = () => document.documentElement.dataset.theme;
+const showGirl = (on) => { $('girl-box').hidden = !on; store('tt.girl', on ? '1' : '0'); };
+girl.setTheme(theme());
+showGirl(stored('tt.girl') !== '0');
+const menus = initMenus({
+  send, state: () => state, charts: allCharts, lastSpeed: () => lastSpeed, openSetup, toast,
+  onTheme: () => girl.setTheme(theme()), showGirl, girlShown: () => !$('girl-box').hidden,
+});
+
+// ----- Home and Store: full-window screens; the game pauses while they are open
+const setCoins = (c) => { $('coins-btn').textContent = `🪙 ${Math.floor(c).toLocaleString()}`; };
+let screenOpen = false;
+function openScreen(which, arg) {
+  if (!screenOpen && state.speed) send('speed', { value: 0 });
+  screenOpen = true;
+  document.body.classList.add('in-home');
+  if (which === 'home') { shop.close(); home.open(arg); } else { home.close(); shop.open(arg); }
+}
+function closeScreens() {
+  home.close();
+  shop.close();
+  document.body.classList.remove('in-home');
+  if (screenOpen) send('speed', { value: lastSpeed });
+  screenOpen = false;
+}
+const home = initHome({ toast, theme, coins: setCoins, openStore: (tab) => openScreen('store', tab) });
+const shop = initStore({ toast, coins: setCoins });
+$('home-btn').onclick = () => openScreen('home');
+$('store-btn').onclick = () => openScreen('store');
+$('coins-btn').onclick = () => openScreen('store');
+$('home-store').onclick = () => openScreen('store');
+$('store-home').onclick = () => openScreen('home');
+document.querySelectorAll('[data-back]').forEach((b) => { b.onclick = closeScreens; });
+const refreshCoins = async () => { try { setCoins((await (await fetch('/api/home')).json()).coins); } catch { /* offline */ } };
 
 function openSetup(reason = '', cancellable = false) {
   $('game').hidden = true;
@@ -85,6 +122,8 @@ function handle(m) {
       renderAccount();
       renderTabs();
       m.fills.forEach((f) => toast(`${f.by === 'AI' ? 'AI: ' : ''}${f.qty > 0 ? 'Bought' : 'Sold'} ${Math.abs(f.qty)} ${f.stock} @ ${f.price.toFixed(2)}`));
+      m.fills.filter((f) => f.pnl).forEach((f) => girl.tradeClosed(f.pnl - f.fee));
+      if (m.fills.some((f) => f.pnl)) refreshCoins();
       break;
     case 'ai':
       state.ai.log = [...state.ai.log, m.entry].slice(-30);
@@ -190,6 +229,8 @@ function renderAccount() {
   $('equity').textContent = money(a.equity);
   setPnl($('pnl-today'), a.today);
   setPnl($('pnl-total'), a.total);
+  const open = Object.values(a.positions);
+  girl.setPosition(open.length ? open.reduce((sum, p) => sum + p.pnl, 0) : null);
   $('buying-power').textContent = money(a.buying_power);
   showLeverage(a.settings.leverage);
   const p = a.positions[view()];
@@ -424,7 +465,7 @@ $('quick-save').onclick = async () => {
 
 // Keyboard: B buy, S sell, C close, Space pause/resume, 1-5 switch stock.
 document.addEventListener('keydown', (e) => {
-  if (e.target.closest('input, textarea, select') || document.querySelector('dialog[open]') || $('game').hidden) return;
+  if (e.target.closest('input, textarea, select') || document.querySelector('dialog[open]') || $('game').hidden || screenOpen) return;
   const key = e.key.toLowerCase();
   if (key === 'b') order('buy');
   else if (key === 's') order('sell');
@@ -434,6 +475,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 async function boot() {
+  refreshCoins();
+  setInterval(refreshCoins, 60000);
   const k = await (await fetch('/api/keys')).json();
   if (k.configured) startGame();
   else openSetup();
