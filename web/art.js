@@ -301,7 +301,7 @@ export const FLOOR_LOOK = {
   gravel: ['#8a8a98', '#a2a2b0', '#70707e', '#c8c8d4'], brick: ['#9a3a24', '#b04a30', '#80301c', '#4a3430'],
   stone: ['#7c7c8c', '#92929e', '#666676', '#30303c'], deck: ['#8e5e32', '#a06c3a', '#734a26', '#40260f'],
   neon: ['#150b28', '#1c1034', '#0e0820', '#00e5ff'],
-  base: ['#0b0614', '#0e091a', '#12606e', '#6e1c5c'],  // the bare ground: black tiles, neon blue and pink edges
+  base: ['#0b0614', '#1c1430', '#12606e', '#6e1c5c'],  // the bare ground: black tiles, neon blue and pink edges
   snow: ['#e8eef8', '#d4dcec', '#c0cce4', '#ffffff'], circuit: ['#06120c', '#0a1a12', '#1f8a5a', '#ffd84a'],
   redtile: ['#9a1e16', '#a8261c', '#d8a520', '#5a0e0a'], royal_lawn: ['#3a8a3a', '#2f7a32', '#4a9a44', '#c8c0a0'],
   zellige: ['#f0ece0', '#1f5aa8', '#1f8a8a', '#e8b020'],
@@ -378,14 +378,12 @@ const PATTERNS = {
   neon(g, x0, y0, w, h, p) {
     for (let y = y0; y < y0 + h; y += 8) for (let x = x0; x < x0 + w; x += 8) rect(g, x, y, 8, 8, p[((x + y) / 8) % 2 ? 0 : 1]);
   },
-  base(g, x0, y0, w, h, p) {  // 16 px black tiles: neon blue top / left edge, pink bottom / right edge
-    tiles(g, x0, y0, w, h, (x, y, tw, th, i, j) => {
-      rect(g, x, y, tw, th, (i + j) % 2 ? p[0] : p[1]);
-      rect(g, x + 2, y + 2, tw - 4, th - 4, '#0f0a1e');
-      rect(g, x, y, tw, 1, p[2]); rect(g, x, y, 1, th, p[2]);
-      rect(g, x + 1, y + th - 1, tw - 1, 1, p[3]); rect(g, x + tw - 1, y + 1, 1, th - 1, p[3]);
-      rect(g, x, y, 2, 1, '#2fc8dc');
-    });
+  base(g, x0, y0, w, h, p) {  // one plain panel per area: black, a neon blue top / left edge, pink bottom / right
+    rect(g, x0, y0, w, h, p[0]);
+    for (let y = y0 + 8; y < y0 + h - 4; y += 16) for (let x = x0 + 8; x < x0 + w - 4; x += 16) rect(g, x, y, 1, 1, p[1]);
+    rect(g, x0 + 1, y0 + 1, w - 2, 1, '#120c24'); rect(g, x0 + 1, y0 + 1, 1, h - 2, '#120c24');
+    rect(g, x0, y0, w, 1, p[2]); rect(g, x0, y0, 1, h, p[2]);
+    rect(g, x0 + 1, y0 + h - 1, w - 1, 1, p[3]); rect(g, x0 + w - 1, y0 + 1, 1, h - 1, p[3]);
   },
   snow(g, x0, y0, w, h, p, s) {
     rect(g, x0, y0, w, h, p[0]);

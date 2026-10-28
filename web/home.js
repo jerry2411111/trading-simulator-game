@@ -17,7 +17,8 @@ const $ = (id) => document.getElementById(id);
 const GW = 256;
 const GH = 208;
 const DOOR = { x: 128, y: 86 };
-const GARAGE = { x: 64, y: 86 };  // the garage stands left of a small house
+const GARAGE = { x: 64, y: 86 };
+const WALL_T = 6;  // the garden wall's thickness  // the garage stands left of a small house
 const ZONES = {  // the garden's parts; the house lot above them is always the house's
   path: [{ x: 6, y: 86, w: 244, h: 14 }, { x: 116, y: 160, w: 24, h: 44 }],
   west: [{ x: 6, y: 100, w: 86, h: 60 }],
@@ -326,8 +327,10 @@ export function initHome(ctx) {
       rect(q, i, 30 - h, 8, h, '#0c0820');
       for (let j = 2; j < h - 2; j += 3) if (hash(i + j) > 0.55) rect(q, i + 2 + (j % 2) * 3, 30 - h + j, 1, 1, j % 4 ? '#ffe58a' : '#ff4fd8');
     }
-    // the ground everywhere is neon tiles (the house lot too); a floor replaces them where you lay one
-    drawFloor(q, 0, 30, GW, 56, 'base', 0);
+    // the back wall the house stands in front of, then a strip of ground for the house
+    drawWallFace(q, 0, 28, GW, 42);
+    drawFloor(q, WALL_T, 70, GW - WALL_T * 2, 16, 'base', 0);
+    // each part of the garden is one panel of neon ground until a floor is laid on it
     Object.entries(ZONES).forEach(([zone, rects], zi) => {
       const z = st().zones[zone];
       rects.forEach((r, ri) => drawFloor(q, r.x, r.y, r.w, r.h, z?.floor ?? 'base', zi * 17 + ri));
@@ -378,12 +381,25 @@ export function initHome(ctx) {
       rect(q, 212, 177, 22, 1, '#ff4fd8');
       rect(q, 158, 182, 26, 14, '#5a4030'); rect(q, 160, 184, 22, 10, '#e8d4a0'); rect(q, 168, 186, 4, 3, '#ff3b6b');
     }
-    // the fence, lit with neon caps, and the gate
-    for (let y = 30; y < GH; y += 8) [2, 251].forEach((x) => { rect(q, x, y, 3, 6, '#3a2a4a'); rect(q, x, y, 3, 1, '#00e5ff'); });
-    rect(q, 3, 30, 1, GH - 30, '#5a4a6a'); rect(q, 252, 30, 1, GH - 30, '#5a4a6a');
-    for (let x = 4; x < 252; x += 8) if (x < 112 || x > 142) { rect(q, x, 200, 3, 8, '#3a2a4a'); rect(q, x, 200, 3, 1, '#ff4fd8'); }
-    rect(q, 4, 203, 108, 1, '#5a4a6a'); rect(q, 144, 203, 108, 1, '#5a4a6a');
+    // the garden wall: down both sides (seen from above: a lit top) and along the front (its face), with the gate
+    [[0, 'r'], [GW - WALL_T, 'l']].forEach(([x, inner]) => {
+      rect(q, x, 28, WALL_T, GH - 28, '#3a3050');
+      for (let y = 34; y < GH; y += 12) rect(q, x, y, WALL_T, 1, '#2a2240');
+      rect(q, inner === 'r' ? x + WALL_T - 1 : x, 28, 1, GH - 28, '#00e5ff');
+      rect(q, inner === 'r' ? x : x + WALL_T - 1, 28, 1, GH - 28, '#1a1428');
+    });
+    [[WALL_T, 112], [144, GW - WALL_T]].forEach(([x0, x1]) => drawWallFace(q, x0, 198, x1 - x0, 10));
+    [110, 144].forEach((x) => { rect(q, x, 190, 4, 18, '#4a3e62'); rect(q, x, 190, 4, 2, '#6a5a86'); rect(q, x + 1, 186, 2, 4, '#ff4fd8'); });  // gate posts
     ground = c;
+  }
+
+  // A wall seen from the front: a lit cap, big concrete panels, neon strips along the top and the base.
+  function drawWallFace(q, x0, y0, w, h) {
+    rect(q, x0, y0, w, h, '#2e2642');
+    for (let x = x0; x < x0 + w; x += 32) { rect(q, x, y0 + 4, 1, h - 4, '#221c34'); rect(q, x + 1, y0 + 4, 1, h - 4, '#3c3254'); }
+    if (h > 20) rect(q, x0, y0 + Math.round(h / 2), w, 1, '#221c34');
+    rect(q, x0, y0, w, 3, '#5a4c78'); rect(q, x0, y0 + 3, w, 1, '#00e5ff');
+    rect(q, x0, y0 + h - 2, w, 1, '#ff4fd8'); rect(q, x0, y0 + h - 1, w, 1, '#120c1c');
   }
 
   function drawGarden(t) {
