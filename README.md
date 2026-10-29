@@ -35,7 +35,7 @@ always fills the window). To play in a browser instead, run `uvicorn app.main:ap
 http://127.0.0.1:8000.
 
 To build the ready-to-run Windows version yourself (an `.exe` that doesn't need Python), run
-`packaginguild_windows.bat`; the result is in `dist\Trading Simulator Game`. It keeps its keys and
+`packaging/build_windows.bat`; the result is in `dist\Trading Simulator Game`. It keeps its keys and
 saves in a `data` folder next to the `.exe`.
 
 ## Getting the market-data key
