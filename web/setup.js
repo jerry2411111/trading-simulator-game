@@ -17,15 +17,15 @@ export function showSetup(root, { reason = '', onDone, onCancel = null }) {
   root.hidden = false;
   root.innerHTML = `
     <div class="window setup">
-      <div class="titlebar">TradingGame Setup</div>
+      <div class="titlebar">Trading Simulator Game Setup</div>
       <div class="window-body setup-body">
         <section>
           ${reason ? `<p class="notice">${reason}</p>` : ''}
-          <h1>TradingGame replays REAL market data.</h1>
+          <h1>Trading Simulator Game replays REAL market data.</h1>
           <p>Every game replays real trades from real US stocks on a random day between 2020 and 2025. The data comes
           from Alpaca, a US broker that gives free historical market data. To download it, you need your own
           free Alpaca key. It takes about 3 minutes, costs nothing, needs no bank account or ID, and works
-          from any country. Your key and data stay on your computer; TradingGame never sends them anywhere else.</p>
+          from any country. Your key and data stay on your computer; Trading Simulator Game never sends them anywhere else.</p>
         </section>
         <section>
           <ol>${STEPS.map((s) => `<li>${s}</li>`).join('')}</ol>
@@ -85,7 +85,7 @@ export function showSetup(root, { reason = '', onDone, onCancel = null }) {
       form.onsubmit = (ev) => { ev.preventDefault(); root.hidden = true; onDone(body.feed); };
     } catch {
       result.className = 'bad';
-      result.textContent = "Couldn't reach the TradingGame server. Is it still running?";
+      result.textContent = "Couldn't reach the Trading Simulator Game server. Is it still running?";
     } finally {
       submit.disabled = false;
     }

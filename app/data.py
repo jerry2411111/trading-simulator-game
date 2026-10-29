@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import shutil
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +13,8 @@ import pandas as pd
 
 log = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+# Keys, saves and the data cache. The packaged Windows build keeps them next to its .exe.
+DATA_DIR = (Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent) / "data"
 CACHE_DIR = DATA_DIR / "cache"
 DATA_URL = "https://data.alpaca.markets/v2"
 TRADING_URL = "https://paper-api.alpaca.markets/v2"

@@ -1,4 +1,4 @@
-# TradingGame
+# Trading Simulator Game
 
 A single-player, retro pixel-style day-trading practice game. It replays real US stock trades, second by
 second, from a random day between 2020 and 2025, and hides which stock and which day it is, so you trade
@@ -22,17 +22,21 @@ On Windows, double-click `start.bat`. The first run creates a local `.venv` and 
 By hand, on any system:
 
 ```
-git clone https://github.com/jerry2411111/tradinggame.git
-cd tradinggame
+git clone https://github.com/jerry2411111/trading-simulator-game.git
+cd trading-simulator-game
 python -m venv .venv
 .venv/Scripts/activate        # Windows; on macOS / Linux: source .venv/bin/activate
 pip install -r requirements.txt
 python -m app
 ```
 
-This opens TradingGame in its own desktop window (resize it by dragging any edge or corner; the app
+This opens Trading Simulator Game in its own desktop window (resize it by dragging any edge or corner; the app
 always fills the window). To play in a browser instead, run `uvicorn app.main:app` and open
 http://127.0.0.1:8000.
+
+To build the ready-to-run Windows version yourself (an `.exe` that doesn't need Python), run
+`packaginguild_windows.bat`; the result is in `dist\Trading Simulator Game`. It keeps its keys and
+saves in a `data` folder next to the `.exe`.
 
 ## Getting the market-data key
 

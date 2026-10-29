@@ -291,7 +291,7 @@ export function initCollection(ctx) {
     const owned = ownedMap();
     if (!pick) {
       box.innerHTML = `<div class="box-title">${data.collection.categories[cat].toUpperCase()}</div>
-        <p class="muted">Every 5 trades the slot machine spins; a GIFT puts a new piece in its cabinet. Rarer pieces come up less often:
+        <p class="muted">Every 5 trades earns a slot machine spin; when you use a stored GIFT, a new piece goes in its cabinet. Rarer pieces come up less often:
         <span style="color:${RARITY.rare}">rare</span>, <span style="color:${RARITY.epic}">epic</span>,
         <span style="color:${RARITY.legendary}">legendary</span>, <span style="color:${RARITY.mythic}">mythic</span>.
         Collection pieces can never be sold. Click a piece to look closer.</p>`;
