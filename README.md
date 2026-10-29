@@ -1,27 +1,67 @@
-# TapeTrainer
+# TradingGame
 
-A single-player, retro pixel-style day-trading practice game that replays real US stock trades,
-second by second, from a random day between 2020 and 2025. Educational only, not financial advice.
+A single-player, retro pixel-style day-trading practice game. It replays real US stock trades, second by
+second, from a random day between 2020 and 2025, and hides which stock and which day it is, so you trade
+the tape and not the headlines. Profits buy things for a pixel home: a garden, houses, pets, cars and an
+aquarium. Educational only, not financial advice.
 
-> Work in progress. The full README (Alpaca signup guide, screenshots) comes with the last milestone.
+![Trading screen](docs/trading.png)
 
-## Run
+![Home: the garden starts as a wasteland](docs/home.png)
 
-On Windows, double-click `start.bat` (the first run installs everything into a local `.venv`).
-Or by hand:
+## Requirements
+
+- Windows, macOS or Linux with **Python 3.11 or newer** (the desktop window uses
+  [pywebview](https://pywebview.flowrl.com/); on Windows it uses the built-in Edge WebView2).
+- A free **Alpaca paper-trading key** for the market data (see below). No bank account or ID is needed.
+
+## Install and run
+
+On Windows, double-click `start.bat`. The first run creates a local `.venv` and installs everything.
+
+By hand, on any system:
 
 ```
+git clone https://github.com/jerry2411111/tradinggame.git
+cd tradinggame
+python -m venv .venv
+.venv/Scripts/activate        # Windows; on macOS / Linux: source .venv/bin/activate
 pip install -r requirements.txt
 python -m app
 ```
 
-This opens TapeTrainer in its own desktop window (resize it by dragging any edge or corner; the app
+This opens TradingGame in its own desktop window (resize it by dragging any edge or corner; the app
 always fills the window). To play in a browser instead, run `uvicorn app.main:app` and open
-http://127.0.0.1:8000. The first screen walks you through getting a free Alpaca paper-trading
-key. Market data is fetched by your own machine with your own key and is never redistributed.
-Developers can put the key in `.env` instead (see `.env.example`).
+http://127.0.0.1:8000.
 
-Tests: `python -m pytest`
+## Getting the market-data key
+
+The game downloads real trade data from [Alpaca](https://alpaca.markets), which gives free historical
+market data. The first screen walks you through it:
+
+1. Sign up at alpaca.markets (free, about 3 minutes, works from any country).
+2. Open the **Paper Trading** dashboard and generate an **API key** (Key ID + Secret Key).
+3. Paste both into the game's setup screen and press **Connect**.
+
+Market data is fetched by your own machine with your own key and is never redistributed.
+
+## Your keys and data stay on your computer
+
+- Nothing personal is in this repository. Keys, saves and the downloaded data all live in the local
+  `data/` folder, which is gitignored and never committed.
+- The Alpaca key is kept in `data/keys.json` on your computer (or in `.env` if you are a developer, see
+  `.env.example`). It is never logged and never sent to the browser page after you save it.
+- The optional AI player's key (Anthropic or any OpenAI-compatible endpoint) stays in memory only, unless
+  you tick "Remember on this computer". It is never included in the prompts.
+- If you fork this project, keep `data/`, `.env` and `keys.json` out of your commits (the included
+  `.gitignore` does this).
+
+## Tests
+
+```
+pip install -r requirements.txt
+python -m pytest
+```
 
 ## How it plays
 
@@ -132,3 +172,7 @@ home − what you spend. The game pauses while you're in Home, Store or Collecti
 `app/universe.json` is the seed list of stocks the game picks from. It is maintainer-editable.
 
 Charts: [TradingView Lightweight Charts™](https://www.tradingview.com/lightweight-charts/) (Apache 2.0).
+
+## License
+
+MIT, see [LICENSE](LICENSE). Market data belongs to its providers and is not included.

@@ -19,7 +19,7 @@ ANTHROPIC_URL = "https://api.anthropic.com"
 OPENAI_URL = "https://api.openai.com/v1"
 SIDES = ("buy", "sell", "close")
 
-STANDARD_PROMPT = """You are an experienced, disciplined intraday trader playing TapeTrainer, a day-trading simulator \
+STANDARD_PROMPT = """You are an experienced, disciplined intraday trader playing TradingGame, a day-trading simulator \
 that replays real US stock trades second by second.
 
 - The stocks are anonymous (STOCK A, STOCK B, ...). Prices are rescaled so each stock opened at $100 on its \

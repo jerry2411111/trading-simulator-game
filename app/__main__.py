@@ -28,7 +28,7 @@ def main():
     thread.start()
     while not uv.started and thread.is_alive():
         time.sleep(0.05)
-    window = webview.create_window("TapeTrainer", f"http://127.0.0.1:{port}/", width=1280, height=800,
+    window = webview.create_window("TradingGame", f"http://127.0.0.1:{port}/", width=1280, height=800,
                                    min_size=(360, 520), background_color="#07040f")
     server.exit_hook = window.destroy  # "Exit game" in the settings menu closes the window
     webview.start(private_mode=False, storage_path=str(DATA_DIR / "webview"))
